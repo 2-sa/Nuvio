@@ -150,13 +150,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: macos-15
-            arch: arm64
-          - runner: macos-15-intel
-            arch: x86_64
-        exclude:
-          - arch: ${{ inputs.target == 'macos-arm64' && 'x86_64' || (inputs.target == 'macos-x86_64' && 'arm64' || 'none') }}
+        include: ${{ inputs.target == 'macos-arm64' && fromJSON('[{"runner":"macos-15","arch":"arm64"}]') || (inputs.target == 'macos-x86_64' && fromJSON('[{"runner":"macos-15-intel","arch":"x86_64"}]') || fromJSON('[{"runner":"macos-15","arch":"arm64"},{"runner":"macos-15-intel","arch":"x86_64"}]')) }}
     env:
       MACOS_NOTARIZATION_ENABLED: 'false'
       LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 }}
