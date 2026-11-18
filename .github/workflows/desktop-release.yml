@@ -14,13 +14,15 @@ on:
           - publish
         default: dry-run
       target:
-        description: Platforms to build in build-only mode
+        description: Platforms to build
         required: true
         type: choice
         options:
           - all
           - windows
           - macos
+          - macos-arm64
+          - macos-x86_64
           - linux
         default: all
       exclude_commits:
@@ -85,12 +87,10 @@ jobs:
 
           if [[ "${RELEASE_MODE}" != "build-only" ]]; then
             if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}"; then
-              echo "Tag ${RELEASE_TAG} already exists." >&2
-              exit 1
+              echo "Notice: Tag ${RELEASE_TAG} already exists; release step will update/upload assets if needed." >&2
             fi
             if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-              echo "A GitHub release for ${RELEASE_TAG} already exists." >&2
-              exit 1
+              echo "Notice: A GitHub release for ${RELEASE_TAG} already exists; assets will be uploaded/clobbered onto it." >&2
             fi
 
             unexpected_changes="$(
@@ -141,7 +141,9 @@ jobs:
 
   macos:
     name: macOS ${{ matrix.arch }}
-    if: inputs.mode != 'dry-run' && (inputs.target == 'all' || inputs.target == 'macos')
+    if: >-
+      inputs.mode != 'dry-run' &&
+      (inputs.target == 'all' || inputs.target == 'macos' || inputs.target == 'macos-arm64' || inputs.target == 'macos-x86_64')
     needs: metadata
     runs-on: ${{ matrix.runner }}
     environment: desktop-release
@@ -153,6 +155,8 @@ jobs:
             arch: arm64
           - runner: macos-15-intel
             arch: x86_64
+        exclude:
+          - arch: ${{ inputs.target == 'macos-arm64' && 'x86_64' || (inputs.target == 'macos-x86_64' && 'arm64' || 'none') }}
     env:
       MACOS_NOTARIZATION_ENABLED: 'false'
       LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 }}
@@ -1088,9 +1092,13 @@ jobs:
       - name: Create checksums
         run: |
           release_assets=()
-          if [[ "${RELEASE_TARGET}" == "all" || "${RELEASE_TARGET}" == "macos" ]]; then
+          if [[ "${RELEASE_TARGET}" == "all" || "${RELEASE_TARGET}" == "macos" || "${RELEASE_TARGET}" == "macos-arm64" ]]; then
             release_assets+=(
               "release/Nuvio-macOS-arm64-${RELEASE_VERSION}.dmg"
+            )
+          fi
+          if [[ "${RELEASE_TARGET}" == "all" || "${RELEASE_TARGET}" == "macos" || "${RELEASE_TARGET}" == "macos-x86_64" ]]; then
+            release_assets+=(
               "release/Nuvio-macOS-x86_64-${RELEASE_VERSION}.dmg"
             )
           fi
@@ -1128,9 +1136,13 @@ jobs:
       - name: Create GitHub release
         run: |
           release_assets=()
-          if [[ "${RELEASE_TARGET}" == "all" || "${RELEASE_TARGET}" == "macos" ]]; then
+          if [[ "${RELEASE_TARGET}" == "all" || "${RELEASE_TARGET}" == "macos" || "${RELEASE_TARGET}" == "macos-arm64" ]]; then
             release_assets+=(
               "release/Nuvio-macOS-arm64-${RELEASE_VERSION}.dmg"
+            )
+          fi
+          if [[ "${RELEASE_TARGET}" == "all" || "${RELEASE_TARGET}" == "macos" || "${RELEASE_TARGET}" == "macos-x86_64" ]]; then
+            release_assets+=(
               "release/Nuvio-macOS-x86_64-${RELEASE_VERSION}.dmg"
             )
           fi
@@ -1149,14 +1161,18 @@ jobs:
             )
           fi
           release_assets+=("release/SHA256SUMS.txt")
-          release_args=(
-            "${RELEASE_TAG}"
-            --target "${RELEASE_COMMIT}"
-            --title "${RELEASE_VERSION}"
-            --notes-file release/release-notes.md
-          )
-          if [[ "${RELEASE_MODE}" == "draft" ]]; then
-            release_args+=(--draft)
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload --repo "${GITHUB_REPOSITORY}" "${RELEASE_TAG}" "${release_assets[@]}" --clobber
+          else
+            release_args=(
+              "${RELEASE_TAG}"
+              --target "${RELEASE_COMMIT}"
+              --title "${RELEASE_VERSION}"
+              --notes-file release/release-notes.md
+            )
+            if [[ "${RELEASE_MODE}" == "draft" ]]; then
+              release_args+=(--draft)
+            fi
+            gh release create --repo "${GITHUB_REPOSITORY}" "${release_args[@]}" "${release_assets[@]}"
           fi
-          gh release create --repo "${GITHUB_REPOSITORY}" "${release_args[@]}" "${release_assets[@]}"
 
