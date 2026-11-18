@@ -54,8 +54,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.gestures.ScrollableState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -531,6 +536,7 @@ private fun SeasonTextChipScrollRow(
             .nuvioHorizontalScrollBleed(horizontalScrollPadding)
             .fillMaxWidth()
             .nuvioDesktopDragScroll(seasonListState)
+            .nuvioDesktopWheelHorizontalScroll(seasonListState)
             .let { if (isDesktop) it.padding(bottom = 4.dp) else it },
         contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
         horizontalArrangement = Arrangement.spacedBy(sizing.seasonChipGap),
@@ -640,6 +646,7 @@ private fun SeasonPosterScrollRow(
             .nuvioHorizontalScrollBleed(horizontalScrollPadding)
             .fillMaxWidth()
             .nuvioDesktopDragScroll(seasonListState)
+            .nuvioDesktopWheelHorizontalScroll(seasonListState)
             .let { if (isDesktop) it.padding(bottom = 4.dp) else it },
         contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
         horizontalArrangement = Arrangement.spacedBy(sizing.seasonChipGap),
@@ -793,7 +800,8 @@ private fun EpisodeHorizontalRow(
         modifier = Modifier
             .nuvioHorizontalScrollBleed(horizontalScrollPadding)
             .fillMaxWidth()
-            .nuvioDesktopDragScroll(listState),
+            .nuvioDesktopDragScroll(listState)
+            .nuvioDesktopWheelHorizontalScroll(listState),
         contentPadding = PaddingValues(
             horizontal = horizontalScrollPadding + rowMetrics.rowHorizontalPadding,
             vertical = rowMetrics.rowVerticalPadding,
@@ -1625,3 +1633,38 @@ private fun formatEpisodeRating(rating: Double): String {
     val tenth = (roundedTenths % 10).absoluteValue
     return "$whole.$tenth"
 }
+
+/**
+ * Maps vertical mouse wheel rotation (Scroll Up / Scroll Down) while hovering over
+ * the seasons or episodes horizontal rows into horizontal scrolling, consuming the
+ * event so the outer vertical detail screen does not jump vertically.
+ */
+private fun Modifier.nuvioDesktopWheelHorizontalScroll(
+    state: ScrollableState,
+): Modifier {
+    if (!isDesktop) return this
+
+    return pointerInput(state) {
+        awaitEachGesture {
+            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+            if (event.type == PointerEventType.Scroll) {
+                val scrollDelta = event.changes.fold(0f) { acc, change ->
+                    acc + if (change.scrollDelta.y.absoluteValue >= change.scrollDelta.x.absoluteValue) {
+                        change.scrollDelta.y
+                    } else {
+                        change.scrollDelta.x
+                    }
+                }
+                val canScrollInDirection =
+                    (scrollDelta > 0f && state.canScrollForward) ||
+                        (scrollDelta < 0f && state.canScrollBackward)
+                if (canScrollInDirection) {
+                    val stepPx = 96.dp.toPx()
+                    state.dispatchRawDelta(scrollDelta * stepPx)
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        }
+    }
+}
+

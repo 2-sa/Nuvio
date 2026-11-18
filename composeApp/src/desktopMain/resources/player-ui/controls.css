@@ -186,9 +186,22 @@ button:disabled {
 }
 
 /* The open panel's scrim covers these buttons: they would look active but every click lands on the scrim. */
-.player.modal-open .header-actions {
+.player.modal-open .header-actions,
+.player.modal-open .metadata {
   opacity: 0;
   pointer-events: none;
+}
+
+.player.popover-open .progress {
+  z-index: 31;
+  pointer-events: none;
+}
+
+.player.popover-open .progress .seek-wrap,
+.player.popover-open .progress .time-row,
+.player.popover-open .progress .action-pill,
+.player.popover-open .progress .playback-status {
+  pointer-events: auto;
 }
 
 .player.chrome-hidden .top-gradient,
@@ -197,11 +210,8 @@ button:disabled {
 .player.chrome-hidden .header-actions,
 .player.chrome-hidden .center-controls,
 .player.chrome-hidden .progress,
-.player.info-open .top-gradient,
-.player.info-open .bottom-gradient,
 .player.info-open .metadata,
-.player.info-open .center-controls,
-.player.info-open .progress {
+.player.info-open .center-controls {
   opacity: 0;
   pointer-events: none;
 }
@@ -2092,29 +2102,28 @@ button:disabled {
 }
 
 .player-rail-modal {
-  /* Room for the bottom bar, which stays visible under the panel: the seek bar's top sits
-     --slider-bottom + 74px above the bottom (48px action row, 16px gap, 10px seek bar), plus a 16px gap. */
-  --rail-bottom-clearance: calc(var(--slider-bottom) + 90px);
+  /* Room for the bottom bar, which stays visible under the popover: the seek bar's top sits
+     --slider-bottom + 74px above the bottom. */
+  --rail-bottom-clearance: calc(var(--slider-bottom) + 74px);
   display: flex;
   align-items: flex-end;
   justify-content: flex-start;
-  padding: clamp(28px, 4vw, 52px) clamp(28px, 4vw, 52px) max(clamp(64px, 11vh, 124px), var(--rail-bottom-clearance));
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, .88) 0%, rgba(0, 0, 0, .66) 36%, transparent 82%),
-    linear-gradient(180deg, rgba(0, 0, 0, .6) 0%, rgba(0, 0, 0, .34) 30%, rgba(0, 0, 0, .14) 60%, transparent 100%),
-    rgba(0, 0, 0, .34);
+  padding: 20px var(--hp) var(--rail-bottom-clearance);
+  background: transparent;
 }
 
 .player-rail-modal .track-panel {
   width: auto;
-  max-width: calc(100vw - clamp(56px, 8vw, 104px));
-  /* Fit inside the layer's padding; a vh guess let tall rails push the title up against the top edge. */
-  max-height: 100%;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  max-width: calc(100vw - 48px);
+  max-height: min(440px, calc(100vh - var(--rail-bottom-clearance) - 32px));
+  overflow: hidden;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(18, 20, 26, 0.94);
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
   transform: translateY(14px);
 }
 
@@ -2127,11 +2136,21 @@ button:disabled {
 }
 
 .audio-rail-panel {
-  width: min(444px, calc(100vw - clamp(56px, 8vw, 104px))) !important;
+  width: min(320px, calc(100vw - 48px)) !important;
 }
 
-.subtitle-rail-panel {
-  max-width: calc(100vw - clamp(56px, 8vw, 104px));
+#speedModal .audio-rail-panel {
+  width: 220px !important;
+}
+
+#audioModal .audio-rail-panel {
+  width: min(320px, calc(100vw - 48px)) !important;
+}
+
+.subtitle-rail-panel,
+#subtitleModal .subtitle-rail-panel {
+  width: auto !important;
+  max-width: min(860px, calc(100vw - 48px)) !important;
 }
 
 .player-side-modal {
@@ -2170,11 +2189,13 @@ button:disabled {
 }
 
 .player-rail-modal .track-header {
-  padding: 0 0 12px;
-  color: #fff;
-  font-size: 28px;
-  line-height: 34px;
-  font-weight: 500;
+  padding: 2px 8px 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 700;
 }
 
 .track-header-row {
@@ -2374,7 +2395,7 @@ button:disabled {
 
 .subtitle-rails {
   display: grid;
-  grid-template-columns: 200px 300px;
+  grid-template-columns: 180px 260px;
   grid-template-rows: minmax(0, 1fr);
   flex: 0 1 auto;
   min-height: 0;
@@ -2387,7 +2408,7 @@ button:disabled {
 }
 
 .subtitle-rails.style-visible {
-  grid-template-columns: 200px 300px 280px;
+  grid-template-columns: 180px 260px 260px;
 }
 
 .subtitle-rails::-webkit-scrollbar {
@@ -2410,8 +2431,8 @@ button:disabled {
   flex-shrink: 0;
   overflow: hidden;
   color: var(--theme-text-muted);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 12px;
+  line-height: 16px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2421,7 +2442,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: auto;
-  max-height: calc(100vh - clamp(152px, 22vh, 220px));
+  max-height: min(332px, calc(100vh - var(--rail-bottom-clearance) - 124px));
   padding: 0 8px 8px 0;
 }
 
@@ -2617,14 +2638,18 @@ button:disabled {
 }
 
 .player-rail-modal .track-list {
-  max-height: calc(100vh - clamp(132px, 20vh, 188px));
-  gap: 4px;
-  padding: 8px 0;
+  max-height: min(360px, calc(100vh - var(--rail-bottom-clearance) - 96px));
+  gap: 3px;
+  padding: 2px 0 0;
 }
 
 .audio-rail-panel .track-list {
-  max-height: min(620px, calc(100vh - clamp(120px, 18vh, 160px)));
-  gap: 6px;
+  max-height: min(360px, calc(100vh - var(--rail-bottom-clearance) - 96px));
+  gap: 3px;
+}
+
+#subtitleModal .track-list {
+  max-height: min(332px, calc(100vh - var(--rail-bottom-clearance) - 124px));
 }
 
 
@@ -2709,12 +2734,12 @@ button:disabled {
   text-align: left;
 }
 
-.player-rail-modal .track-row {
-  padding: 8px 10px;
-}
-
+.player-rail-modal .track-row,
 .audio-rail-panel .track-row {
-  padding: 8px 12px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 13px;
 }
 
 .track-row.stream-row,
@@ -2771,8 +2796,8 @@ button:disabled {
 }
 
 .subtitle-language-row {
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .subtitle-count {
@@ -2792,8 +2817,9 @@ button:disabled {
 }
 
 .subtitle-option-row {
+  min-height: 52px !important;
   align-items: center;
-  padding: 9px 12px !important;
+  padding: 8px 10px !important;
 }
 
 .subtitle-option-copy {
@@ -2826,16 +2852,16 @@ button:disabled {
 
 .subtitle-option-title {
   color: inherit;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 13.5px;
+  line-height: 18px;
 }
 
 .subtitle-option-metadata,
 .audio-track-language {
   overflow: hidden;
   color: var(--theme-text-muted);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 11.5px;
+  line-height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2852,6 +2878,11 @@ button:disabled {
   white-space: nowrap;
   font-size: 15px;
   line-height: 1.25;
+}
+
+.player-rail-modal .track-label {
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .track-copy,
@@ -2894,8 +2925,8 @@ button:disabled {
 .audio-track-name {
   overflow: hidden;
   color: inherit;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 13.5px;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3279,158 +3310,12 @@ button.action:focus-visible {
 }
 
 @media (min-width: 1200px) {
-  .player-rail-modal {
-    justify-content: flex-start;
-    padding-right: clamp(28px, 4vw, 52px);
-    padding-left: clamp(28px, 4vw, 52px);
-  }
-
-  .player-rail-modal .track-header {
-    padding-bottom: 20px;
-    font-size: 34px;
-    line-height: 42px;
-  }
-
-  .audio-rail-panel {
-    width: min(560px, calc(100vw - clamp(112px, 12vw, 224px))) !important;
-  }
-
-  .subtitle-rail-panel {
-    width: min(1280px, calc(100vw - clamp(112px, 12vw, 224px))) !important;
-  }
-
   .subtitle-rails {
-    width: min(860px, 100%);
-    grid-template-columns: minmax(250px, .8fr) minmax(400px, 1.2fr);
-    gap: 28px;
+    grid-template-columns: 180px 260px;
   }
 
   .subtitle-rails.style-visible {
-    width: 100%;
-    grid-template-columns: minmax(250px, .78fr) minmax(400px, 1.25fr) minmax(340px, 1fr);
-  }
-
-  .subtitle-rail {
-    gap: 12px;
-  }
-
-  .subtitle-rail-title {
-    font-size: 16px;
-    line-height: 22px;
-  }
-
-  .player-rail-modal .track-list {
-    gap: 7px;
-    padding-top: 10px;
-  }
-
-  .player-rail-modal .track-row {
-    min-height: 50px;
-    padding: 11px 14px;
-    border-radius: 14px;
-  }
-
-  .audio-rail-panel .track-list {
-    gap: 8px;
-  }
-
-  .audio-rail-panel .track-row {
-    min-height: 58px;
-    padding: 13px 16px;
-  }
-
-  .subtitle-language-row {
-    font-size: 18px;
-    line-height: 26px;
-  }
-
-  .subtitle-count {
-    margin-left: 10px;
-    padding: 4px 9px;
-    font-size: 12px;
-    line-height: 15px;
-  }
-
-  .subtitle-option-row {
-    min-height: 82px !important;
-    padding: 12px 16px !important;
-  }
-
-  .subtitle-option-copy {
-    gap: 8px;
-  }
-
-  .subtitle-source-chip {
-    padding: 4px 10px;
-    font-size: 12px;
-    line-height: 15px;
-  }
-
-  .subtitle-option-title,
-  .audio-track-name {
-    font-size: 18px;
-    line-height: 26px;
-  }
-
-  .subtitle-option-metadata,
-  .audio-track-language {
-    font-size: 14px;
-    line-height: 19px;
-  }
-
-  .style-panel {
-    padding-right: 6px;
-  }
-
-  .style-card {
-    gap: 20px;
-  }
-
-  .style-section {
-    gap: 12px;
-  }
-
-  .style-label {
-    font-size: 16px;
-    line-height: 22px;
-  }
-
-  #outlineColorLabel {
-    font-size: 14px;
-    line-height: 20px;
-  }
-
-  .style-control-row,
-  .stepper {
-    gap: 10px;
-  }
-
-  .round-step {
-    width: 46px;
-    height: 46px;
-    border-radius: 14px;
-  }
-
-  .stepper-value {
-    min-width: 98px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    font-size: 16px;
-    line-height: 22px;
-  }
-
-  .swatch-row {
-    gap: 10px;
-  }
-
-  .swatch {
-    width: 38px;
-    height: 38px;
-  }
-
-  .track-check {
-    width: 21px;
-    height: 21px;
+    grid-template-columns: 180px 260px 260px;
   }
 
   .player-side-modal .player-side-panel {
@@ -3530,7 +3415,7 @@ button.action:focus-visible {
   }
 
   .player-rail-modal {
-    padding: 28px 24px var(--rail-bottom-clearance);
+    padding: 16px var(--hp) var(--rail-bottom-clearance);
   }
 
   .subtitle-rails {
@@ -3553,19 +3438,17 @@ button.action:focus-visible {
 
 @media (max-height: 680px) {
   .player-rail-modal {
-    padding-top: 24px;
+    padding-top: 16px;
     padding-bottom: var(--rail-bottom-clearance);
   }
 
-  .player-rail-modal .track-header {
-    padding-bottom: 8px;
-    font-size: 24px;
-    line-height: 30px;
+  .player-rail-modal .track-list {
+    max-height: calc(100vh - var(--rail-bottom-clearance) - 96px);
   }
 
-  .player-rail-modal .track-list,
+  #subtitleModal .track-list,
   .style-panel {
-    max-height: calc(100vh - 108px);
+    max-height: calc(100vh - var(--rail-bottom-clearance) - 124px);
   }
 
   .player-side-modal .player-side-panel {
@@ -3627,21 +3510,48 @@ svg {
   display: flex;
   align-items: flex-end;
   justify-content: flex-start;
-  padding: 20px 44px;
-  background:
-    linear-gradient(to top, rgba(0, 0, 0, .6), rgba(0, 0, 0, .4) 30%, rgba(0, 0, 0, .2) 60%, transparent),
-    linear-gradient(to right, rgba(0, 0, 0, .88), transparent),
-    rgba(0, 0, 0, .34);
+  padding: 20px var(--hp) calc(var(--slider-bottom) + 74px);
+  background: transparent;
 }
 
 .stream-info-content {
   display: flex;
+  width: min(540px, calc(100vw - 48px));
   max-width: 100%;
-  max-height: 100%;
+  max-height: min(420px, calc(100vh - var(--slider-bottom) - 110px));
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 20, 26, 0.94);
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
   color: #fff;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, .3) transparent;
+  transform: translateY(14px);
+  transition: transform var(--motion-panel) var(--ease-out);
+  will-change: transform;
+}
+
+.stream-info-modal.modal-visible .stream-info-content {
+  transform: translateY(0);
+}
+
+.stream-info-modal.modal-closing .stream-info-content {
+  transform: translateY(10px);
+}
+
+.stream-info-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.stream-info-content::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .3);
 }
 
 .stream-info-section-title {
@@ -3679,11 +3589,11 @@ svg {
 }
 
 .stream-info-secondary {
-  overflow: hidden;
-  font-size: 14px;
+  font-size: 12.5px;
+  line-height: 1.4;
   color: rgba(255, 255, 255, .7);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .stream-info-source + .stream-info-secondary {

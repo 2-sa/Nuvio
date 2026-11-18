@@ -1170,6 +1170,8 @@ const renderSpeedOptionList = () => {
     speedPanelTitle.textContent = state.speedPanelTitle || "Playback Speed";
   }
 
+  const isArabicUi = /[\u0600-\u06FF]/.test(state.speedPanelTitle || "")
+    || /[\u0600-\u06FF]/.test(state.playLabel || "");
   const currentSpeedStr = String(state.playbackSpeedLabel || "1x");
   const currentSpeedNum = parseFloat(currentSpeedStr.replace("x", "")) || 1.0;
 
@@ -1185,7 +1187,7 @@ const renderSpeedOptionList = () => {
     });
     const labelElement = document.createElement("span");
     labelElement.className = "track-label";
-    labelElement.textContent = opt.label;
+    labelElement.textContent = opt.value === 1.0 && isArabicUi ? "1x (عادي)" : opt.label;
     row.appendChild(labelElement);
     row.appendChild(buildCheckIcon());
     speedOptionList.appendChild(row);
@@ -2745,7 +2747,9 @@ const renderChrome = () => {
   const showError = renderPlaybackError();
   root.classList.toggle("pip-mode", Boolean(state.isInPip));
   root.classList.toggle("chrome-hidden", Boolean(showError || !state.controlsVisible));
+  const isBottomPopover = activeModal === "speed" || activeModal === "audio" || activeModal === "subtitles" || activeModal === "streamInfo";
   root.classList.toggle("modal-open", Boolean(activeModal));
+  root.classList.toggle("popover-open", isBottomPopover);
   root.classList.toggle("info-open", activeModal === "streamInfo");
   root.classList.toggle("source-visible", Boolean(!showError && !isPlaying && !state.isLoading && (state.streamTitle || state.providerName)));
   if (showError || !state.controlsVisible || durationMs <= 0) hideSeekTooltip();
@@ -3194,34 +3198,62 @@ document.querySelectorAll("[data-command]").forEach(button => {
       return;
     }
     if (command === "audio") {
+      if (activeModal === "audio") {
+        closePlayerModal(true);
+        return;
+      }
       openPlayerModal("audio");
       return;
     }
     if (command === "subtitles") {
+      if (activeModal === "subtitles") {
+        closePlayerModal(true);
+        return;
+      }
       openPlayerModal("subtitles");
       return;
     }
     if (command === "speed") {
+      if (activeModal === "speed") {
+        closePlayerModal(true);
+        return;
+      }
       openPlayerModal("speed");
       return;
     }
     if (command === "sources") {
+      if (activeModal === "sources") {
+        closePlayerModal(true);
+        return;
+      }
       sourceFilterId = "";
       openPlayerModal("sources");
       send("sources", 0);
       return;
     }
     if (command === "episodes") {
+      if (activeModal === "episodes") {
+        closePlayerModal(true);
+        return;
+      }
       episodeStreamFilterId = "";
       openPlayerModal("episodes");
       send("episodes", 0);
       return;
     }
     if (command === "chapters") {
+      if (activeModal === "chapters") {
+        closePlayerModal(true);
+        return;
+      }
       openPlayerModal("chapters");
       return;
     }
     if (command === "streamInfo") {
+      if (activeModal === "streamInfo") {
+        closePlayerModal(true);
+        return;
+      }
       streamInfoSignature = "";
       send("streamInfo", 0);
       openPlayerModal("streamInfo");

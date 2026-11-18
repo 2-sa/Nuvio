@@ -455,6 +455,7 @@
     <string name="compose_player_chapter_remaining">المتبقي: %1$s</string>
     <string name="compose_player_panel_streams">مصادر البث</string>
     <string name="compose_player_playback_error">خطأ في التشغيل</string>
+    <string name="compose_player_playback_speed">سرعة التشغيل</string>
     <string name="compose_player_playing">قيد التشغيل</string>
     <string name="compose_player_fetch_subtitles">اضغط لجلب الترجمات</string>
     <string name="compose_player_go_back">رجوع</string>
