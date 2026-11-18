@@ -153,7 +153,7 @@ jobs:
         include: ${{ inputs.target == 'macos-arm64' && fromJSON('[{"runner":"macos-15","arch":"arm64"}]') || (inputs.target == 'macos-x86_64' && fromJSON('[{"runner":"macos-15-intel","arch":"x86_64"}]') || fromJSON('[{"runner":"macos-15","arch":"arm64"},{"runner":"macos-15-intel","arch":"x86_64"}]')) }}
     env:
       MACOS_NOTARIZATION_ENABLED: 'false'
-      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 }}
+      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 || secrets.LOCAL_PROPERTIES_BASE64 }}
       MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
       MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
       MACOS_CERTIFICATE_SHA256: ${{ vars.MACOS_CERTIFICATE_SHA256 }}
@@ -391,7 +391,7 @@ jobs:
     runs-on: windows-2022
     environment: desktop-release
     env:
-      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 }}
+      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 || secrets.LOCAL_PROPERTIES_BASE64 }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_DESKTOP_DSN: ${{ secrets.SENTRY_DESKTOP_DSN }}
       WEBVIEW2_VERSION: 1.0.4078.44
@@ -608,7 +608,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: desktop-release
     env:
-      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 }}
+      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 || secrets.LOCAL_PROPERTIES_BASE64 }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_DESKTOP_DSN: ${{ secrets.SENTRY_DESKTOP_DSN }}
       RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
@@ -745,7 +745,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: desktop-release
     env:
-      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 }}
+      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 || secrets.LOCAL_PROPERTIES_BASE64 }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_DESKTOP_DSN: ${{ secrets.SENTRY_DESKTOP_DSN }}
       RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
@@ -831,7 +831,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: desktop-release
     env:
-      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 }}
+      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 || secrets.LOCAL_PROPERTIES_BASE64 }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_DESKTOP_DSN: ${{ secrets.SENTRY_DESKTOP_DSN }}
       RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
@@ -917,7 +917,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: desktop-release
     env:
-      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 }}
+      LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_DESKTOP_LOCAL_PROPERTIES_BASE64 || secrets.LOCAL_PROPERTIES_BASE64 }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_DESKTOP_DSN: ${{ secrets.SENTRY_DESKTOP_DSN }}
       RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
