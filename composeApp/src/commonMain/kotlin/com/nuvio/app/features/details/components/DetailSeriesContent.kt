@@ -51,9 +51,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,7 +73,10 @@ import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioProgressBar
+import com.nuvio.app.core.ui.PosterZoomAnchor
+import com.nuvio.app.core.ui.PosterZoomAnchorHolder
 import com.nuvio.app.core.ui.backdropControlColor
+import com.nuvio.app.core.ui.captureSecondaryClickRootOffset
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.nuvioFocusBorder
@@ -472,6 +480,7 @@ private fun SeasonViewModeToggle(
                 color = Color.White.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(8.dp),
             )
+            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
@@ -528,10 +537,35 @@ private fun SeasonTextChipScrollRow(
     ) {
         items(seasons, key = { season -> season }) { season ->
             val isSelected = season == currentSeason
-            val onSecondaryClick = onLongPress?.let { handler -> { handler(season) } }
             val chipShape = RoundedCornerShape(sizing.seasonChipRadius)
+            var chipBounds by remember(season) { mutableStateOf<Rect?>(null) }
+            val onSecondaryClick = onLongPress?.let { handler ->
+                {
+                    val pointerOffset = PosterZoomAnchorHolder.consumeLastPointerPositionInRoot()
+                    chipBounds?.let { bounds ->
+                        PosterZoomAnchorHolder.stash(
+                            PosterZoomAnchor(
+                                boundsInRoot = bounds,
+                                imageUrl = null,
+                                cornerRadius = sizing.seasonChipRadius,
+                                pointerPositionInRoot = pointerOffset,
+                            ),
+                        )
+                    }
+                    handler(season)
+                }
+            }
             Box(
                 modifier = Modifier
+                    .onGloballyPositioned { coordinates ->
+                        val position = coordinates.positionInRoot()
+                        chipBounds = Rect(
+                            left = position.x,
+                            top = position.y,
+                            right = position.x + coordinates.size.width,
+                            bottom = position.y + coordinates.size.height,
+                        )
+                    }
                     .clip(chipShape)
                     .background(
                         if (isSelected) {
@@ -541,8 +575,13 @@ private fun SeasonTextChipScrollRow(
                         },
                     )
                     .nuvioFocusBorder(chipShape)
+                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                    .captureSecondaryClickRootOffset(enabled = onSecondaryClick != null)
                     .combinedClickable(
-                        onClick = { onSelect(season) },
+                        onClick = {
+                            PosterZoomAnchorHolder.consumeLastPointerPositionInRoot()
+                            onSelect(season)
+                        },
                         onLongClick = onSecondaryClick,
                     )
                     .secondaryClick(onSecondaryClick)
@@ -1210,8 +1249,35 @@ private fun EpisodeListCard(
             ?.let(::formatEpisodeRating)
     }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
+    val imageUrl = video.thumbnail ?: fallbackImage
+    var cardBounds by remember { mutableStateOf<Rect?>(null) }
+    val handleLongPress = onLongPress?.let { handler ->
+        {
+            val pointerOffset = PosterZoomAnchorHolder.consumeLastPointerPositionInRoot()
+            cardBounds?.let { bounds ->
+                PosterZoomAnchorHolder.stash(
+                    PosterZoomAnchor(
+                        boundsInRoot = bounds,
+                        imageUrl = imageUrl,
+                        cornerRadius = cornerRadius,
+                        pointerPositionInRoot = pointerOffset,
+                    ),
+                )
+            }
+            handler()
+        }
+    }
     Box(
         modifier = modifier
+            .onGloballyPositioned { coordinates ->
+                val position = coordinates.positionInRoot()
+                cardBounds = Rect(
+                    left = position.x,
+                    top = position.y,
+                    right = position.x + coordinates.size.width,
+                    bottom = position.y + coordinates.size.height,
+                )
+            }
             .fillMaxWidth()
             .height(sizing.cardHeight)
             .clip(cardShape)
@@ -1222,12 +1288,17 @@ private fun EpisodeListCard(
                 shape = cardShape,
             )
             .nuvioFocusBorder(cardShape)
+            .then(if (isDesktop && (onClick != null || onLongPress != null)) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+            .captureSecondaryClickRootOffset(enabled = handleLongPress != null)
             .combinedClickable(
                 enabled = onClick != null || onLongPress != null,
-                onClick = { onClick?.invoke() },
-                onLongClick = onLongPress,
+                onClick = {
+                    PosterZoomAnchorHolder.consumeLastPointerPositionInRoot()
+                    onClick?.invoke()
+                },
+                onLongClick = handleLongPress,
             )
-            .secondaryClick(onLongPress),
+            .secondaryClick(handleLongPress),
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -1239,7 +1310,6 @@ private fun EpisodeListCard(
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topStart = cornerRadius, bottomStart = cornerRadius)),
             ) {
-                val imageUrl = video.thumbnail ?: fallbackImage
                 val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
                 if (imageUrl != null) {
                     AsyncImage(

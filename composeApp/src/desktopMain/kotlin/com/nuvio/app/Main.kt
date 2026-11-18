@@ -47,6 +47,7 @@ import com.nuvio.app.features.settings.AppIconRepository
 import com.nuvio.app.features.settings.applyDesktopRendererPreference
 import com.nuvio.app.features.settings.transparentPreviewResource
 import java.awt.Desktop
+import java.awt.Dimension
 import javax.imageio.ImageIO
 import java.awt.Color as AwtColor
 import javax.swing.JComponent
@@ -161,6 +162,7 @@ fun main(args: Array<String>) {
             }
 
             LaunchedEffect(window) {
+                window.minimumSize = Dimension(960, 600)
                 applyNativeDesktopWindowChrome(window)
                 installLinuxExtendedMouseButtons()
                 installWindowsTouchScroll()

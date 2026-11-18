@@ -9,8 +9,10 @@ import androidx.compose.runtime.RememberObserver
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -19,6 +21,13 @@ import androidx.compose.ui.graphics.GraphicsContext
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalGraphicsContext
@@ -69,6 +78,33 @@ internal class PosterLiftSource(private val graphicsContext: GraphicsContext) : 
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+internal fun Modifier.captureSecondaryClickRootOffset(
+    enabled: Boolean = true,
+): Modifier {
+    if (!isDesktop || !enabled) return this
+    var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val currentEnabled by rememberUpdatedState(enabled)
+    return this
+        .onGloballyPositioned { coordinates = it }
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                    if (!currentEnabled) continue
+                    if (event.type == PointerEventType.Press && event.button == PointerButton.Secondary) {
+                        val pos = event.changes.firstOrNull()?.position
+                        if (pos != null) {
+                            PosterZoomAnchorHolder.lastPointerPositionInRoot =
+                                coordinates?.takeIf { it.isAttached }?.localToRoot(pos)
+                        }
+                    }
+                }
+            }
+        }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun Modifier.posterCardClickable(
@@ -104,6 +140,7 @@ internal fun Modifier.posterCardClickable(
     if (onClick == null && onLongClick == null) return posterModifier
     val interactionSource = remember { MutableInteractionSource() }
     val handleClick: () -> Unit = {
+        PosterZoomAnchorHolder.consumeLastPointerPositionInRoot()
         if (onClick != null) {
             source.bounds?.let { bounds ->
                 onPosterClickAnchor?.invoke(
@@ -115,9 +152,15 @@ internal fun Modifier.posterCardClickable(
     }
     val handleLongClick = onLongClick?.let { longClick ->
         {
+            val pointerOffset = PosterZoomAnchorHolder.consumeLastPointerPositionInRoot()
             source.bounds?.let { cardBounds ->
                 PosterZoomAnchorHolder.stash(
-                    PosterZoomAnchor(cardBounds, zoomImageUrl, zoomCornerRadius).also {
+                    PosterZoomAnchor(
+                        boundsInRoot = cardBounds,
+                        imageUrl = zoomImageUrl,
+                        cornerRadius = zoomCornerRadius,
+                        pointerPositionInRoot = pointerOffset,
+                    ).also {
                         it.source = source
                     },
                 )
@@ -133,20 +176,23 @@ internal fun Modifier.posterCardClickable(
         .then(posterModifier)
         .then(
             if (isDesktop) {
-                Modifier.controllerFocusable(
-                    id = controllerFocusId,
-                    enabled = onClick != null,
-                    cornerRadius = zoomCornerRadius,
-                    focusScale = 1.07f,
-                    selectLabel = "Open",
-                    secondaryActionLabel = if (handleLongClick != null) "Options" else null,
-                    onSecondaryAction = handleLongClick,
-                    onSelect = handleClick,
-                )
+                Modifier
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .controllerFocusable(
+                        id = controllerFocusId,
+                        enabled = onClick != null,
+                        cornerRadius = zoomCornerRadius,
+                        focusScale = 1.07f,
+                        selectLabel = "Open",
+                        secondaryActionLabel = if (handleLongClick != null) "Options" else null,
+                        onSecondaryAction = handleLongClick,
+                        onSelect = handleClick,
+                    )
             } else {
                 Modifier
             },
         )
+        .captureSecondaryClickRootOffset(enabled = handleLongClick != null)
         .combinedClickable(
             interactionSource = interactionSource,
             indication = if (!isDesktop && onPosterClickAnchor == null) LocalIndication.current else null,

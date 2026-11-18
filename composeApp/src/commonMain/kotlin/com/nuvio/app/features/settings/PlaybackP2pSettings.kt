@@ -1,6 +1,5 @@
 package com.nuvio.app.features.settings
 
-import com.nuvio.app.isDesktop
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
@@ -66,22 +65,20 @@ internal fun PlaybackP2pSettings(
                     isTablet = isTablet,
                     onCheckedChange = P2pSettingsRepository::setHideTorrentStats,
                 )
-                if (!isDesktop) {
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_p2p_profile_title),
-                        description = p2pProfileLabel(p2pSettings.torrentProfile),
-                        isTablet = isTablet,
-                        onClick = { showP2pProfileDialog = true },
-                    )
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_p2p_cache_size_title),
-                        description = p2pCacheSizeLabel(p2pSettings.cacheSize),
-                        isTablet = isTablet,
-                        onClick = { showP2pCacheSizeDialog = true },
-                    )
-                }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_p2p_profile_title),
+                    description = p2pProfileLabel(p2pSettings.torrentProfile),
+                    isTablet = isTablet,
+                    onClick = { showP2pProfileDialog = true },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_p2p_cache_size_title),
+                    description = p2pCacheSizeLabel(p2pSettings.cacheSize),
+                    isTablet = isTablet,
+                    onClick = { showP2pCacheSizeDialog = true },
+                )
                 SettingsGroupDivider(isTablet = isTablet)
                 val cacheClearAvailable = p2pStreamingState !is P2pStreamingState.Connecting &&
                     p2pStreamingState !is P2pStreamingState.Streaming &&

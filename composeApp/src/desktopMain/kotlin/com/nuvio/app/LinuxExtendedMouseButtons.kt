@@ -44,9 +44,11 @@ import java.awt.event.MouseWheelEvent
 private const val AWT_WHEEL_LEFT = 4
 private const val AWT_WHEEL_RIGHT = 5
 private const val AWT_THUMB_BACK = 6
+private const val AWT_THUMB_FORWARD = 7
 
-// The AWT button Compose reads as PointerButton.Back.
+// The AWT buttons Compose reads as PointerButton.Back and PointerButton.Forward.
 private const val COMPOSE_BACK = 4
+private const val COMPOSE_FORWARD = 5
 
 // One notch per press, matching what the toolkit sends for the vertical wheel.
 private const val WHEEL_SCROLL_AMOUNT = 3
@@ -90,6 +92,7 @@ private class LinuxExtendedMouseButtonQueue : EventQueue() {
         val component = event.component ?: return event
         return when (event.button) {
             AWT_THUMB_BACK -> withButton(event, component, COMPOSE_BACK)
+            AWT_THUMB_FORWARD -> withButton(event, component, COMPOSE_FORWARD)
             AWT_WHEEL_LEFT -> horizontalScroll(event, component, rotation = -1)
             AWT_WHEEL_RIGHT -> horizontalScroll(event, component, rotation = 1)
             else -> event

@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,6 +40,13 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
@@ -567,7 +575,7 @@ internal fun MainAppContent(
         if (!ownsAppRuntime) return@LaunchedEffect
         NetworkStatusRepository.ensureStarted()
         EpisodeReleaseNotificationsRepository.refreshAsync()
-        kotlinx.coroutines.delay(5_000)
+        kotlinx.coroutines.delay(if (isDesktop) 400L else 5_000L)
         initialHomeReady = true
     }
 
@@ -1340,11 +1348,34 @@ internal fun MainAppContent(
         // Desktop has no system back, so mouse Back joins Esc in Compose's window back
         // dispatcher; open dialogs then take it before screen-level handlers.
         val mouseBackInput = remember { DirectNavigationEventInput() }
+        val forwardHistory = remember { mutableStateListOf<AppRoute>() }
+        var isNavigatingForward by remember { mutableStateOf(false) }
         if (isDesktop) {
             val navigationEventDispatcher = LocalNavigationEventDispatcherOwner.current?.navigationEventDispatcher
             DisposableEffect(navigationEventDispatcher) {
                 navigationEventDispatcher?.addInput(mouseBackInput)
                 onDispose { navigationEventDispatcher?.removeInput(mouseBackInput) }
+            }
+            LaunchedEffect(navBackStack) {
+                var previousStack = navBackStack.toList()
+                snapshotFlow { navBackStack.toList() }.collect { currentStack ->
+                    if (currentStack != previousStack) {
+                        if (isNavigatingForward) {
+                            isNavigatingForward = false
+                        } else if (
+                            currentStack.size == previousStack.size - 1 &&
+                            currentStack == previousStack.dropLast(1)
+                        ) {
+                            val popped = previousStack.lastOrNull() as? AppRoute
+                            if (popped != null && popped !is PlayerRoute && popped !is StreamRoute) {
+                                forwardHistory.add(popped)
+                            }
+                        } else {
+                            forwardHistory.clear()
+                        }
+                        previousStack = currentStack
+                    }
+                }
             }
         }
 
@@ -1356,6 +1387,28 @@ internal fun MainAppContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.nuvio.colors.background)
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (!isDesktop || keyEvent.type != KeyEventType.KeyDown || currentRoute is PlayerRoute) {
+                            return@onPreviewKeyEvent false
+                        }
+                        val hasPrimaryModifier = keyEvent.isCtrlPressed || keyEvent.isMetaPressed
+                        if (!hasPrimaryModifier) return@onPreviewKeyEvent false
+                        when (keyEvent.key) {
+                            Key.F -> {
+                                while (navController.currentRoute !is TabsRoute && navController.popBackStack()) { }
+                                activateTab(AppScreenTab.Search)
+                                searchFocusRequestCount++
+                                searchScrollToTopRequests.tryEmit(Unit)
+                                true
+                            }
+                            Key.Comma -> {
+                                while (navController.currentRoute !is TabsRoute && navController.popBackStack()) { }
+                                activateTab(AppScreenTab.Settings)
+                                true
+                            }
+                            else -> false
+                        }
+                    }
                     .pointerInput(Unit) {
                         awaitPointerEventScope {
                             while (true) {
@@ -1369,6 +1422,13 @@ internal fun MainAppContent(
                                             } else {
                                                 navController.popBackStack()
                                             }
+                                        } else if (isDesktop && event.button == PointerButton.Forward) {
+                                            event.changes.forEach { it.consume() }
+                                            val nextRoute = forwardHistory.removeLastOrNull()
+                                            if (nextRoute != null && currentRoute != nextRoute) {
+                                                isNavigatingForward = true
+                                                navController.navigate(nextRoute)
+                                            }
                                         }
                                     }
                                 }
@@ -1380,7 +1440,7 @@ internal fun MainAppContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(
-                        if (selectedPosterActionTarget != null || selectedContinueWatchingZoomAnchor != null) {
+                        if (!isDesktop && (selectedPosterActionTarget != null || selectedContinueWatchingZoomAnchor != null)) {
                             Modifier.hazeSource(state = posterOverlayHazeState)
                         } else {
                             Modifier
@@ -1612,7 +1672,7 @@ internal fun MainAppContent(
                         onBack = {
                             if (selectedTab != AppScreenTab.Home) {
                                 activateTab(AppScreenTab.Home)
-                            } else {
+                            } else if (!isDesktop) {
                                 showExitConfirmation = !showExitConfirmation
                             }
                         },

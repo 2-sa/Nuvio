@@ -3,6 +3,9 @@ package com.nuvio.app.core.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,27 +16,39 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.nuvio.app.isDesktop
 import com.nuvio.app.isWindows
 
 private val SheetShape = RoundedCornerShape(NuvioTokens.Space.s28)
+private val DesktopDialogShape = RoundedCornerShape(16.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +62,36 @@ fun NuvioModalBottomSheet(
     fullHeight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    if (isDesktop) {
+        Dialog(
+            onDismissRequest = onDismissRequest,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            CompositionLocalProvider(
+                LocalBottomInsetsConsumed provides true,
+                LocalContentColor provides contentColor,
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .padding(NuvioTokens.Space.s24)
+                        .widthIn(min = 320.dp, max = if (fullHeight) 620.dp else 520.dp)
+                        .heightIn(max = 680.dp)
+                        .then(modifier)
+                        .border(1.dp, SurfaceEdge, DesktopDialogShape),
+                    shape = DesktopDialogShape,
+                    color = containerColor,
+                    contentColor = contentColor,
+                    shadowElevation = 16.dp,
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        content = content,
+                    )
+                }
+            }
+        }
+        return
+    }
     if (usesNativeNuvioBottomSheet) {
         NuvioNativeModalBottomSheet(
             onDismissRequest = onDismissRequest,
@@ -115,13 +160,21 @@ fun NuvioBottomSheetActionRow(
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val rowBackground = when {
+        selected -> tokens.colors.accent.copy(alpha = tokens.opacity.hover)
+        isDesktop && isHovered -> tokens.colors.textPrimary.copy(alpha = 0.06f)
+        else -> Color.Transparent
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = NuvioTokens.Space.s8)
-            .heightIn(min = NuvioTokens.Space.s56)
+            .heightIn(min = if (isDesktop) 46.dp else NuvioTokens.Space.s56)
             .clip(tokens.shapes.compactCard)
-            .background(if (selected) tokens.colors.accent.copy(alpha = tokens.opacity.hover) else Color.Transparent)
+            .background(rowBackground)
+            .then(if (isDesktop) Modifier.hoverable(interactionSource).pointerHoverIcon(PointerIcon.Hand) else Modifier)
             .clickable(onClick = onClick)
             .padding(NuvioTokens.Space.s8),
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
@@ -161,6 +214,10 @@ suspend fun dismissNuvioBottomSheet(
     sheetState: SheetState,
     onDismiss: () -> Unit,
 ) {
+    if (isDesktop) {
+        onDismiss()
+        return
+    }
     if (usesNativeNuvioBottomSheet) {
         dismissNativeNuvioBottomSheet()
     } else if (sheetState.isVisible) {

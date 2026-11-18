@@ -42,51 +42,51 @@ internal fun PlaybackVideoSettings(
     var showIosTargetTransferDialog by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(if (isTablet) 18.dp else 12.dp)) {
         if (!isIos) {
-            val decoderEnabled = !settings.externalPlayerEnabled
-            val exoOptionsEnabled = decoderEnabled && (isDesktop || settings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv)
-            val libmpvOptionsVisible = !isDesktop && settings.androidPlaybackEngine != AndroidPlaybackEngine.ExoPlayer
-            val libmpvOptionsEnabled = decoderEnabled && libmpvOptionsVisible
-            SettingsSection(
-                title = stringResource(Res.string.settings_playback_section_decoder),
-                isTablet = isTablet,
-            ) {
-                SettingsGroup(isTablet = isTablet) {
-                    if (libmpvOptionsVisible) {
+            if (!isDesktop) {
+                val decoderEnabled = !settings.externalPlayerEnabled
+                val exoOptionsEnabled = decoderEnabled && settings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv
+                val libmpvOptionsVisible = settings.androidPlaybackEngine != AndroidPlaybackEngine.ExoPlayer
+                val libmpvOptionsEnabled = decoderEnabled && libmpvOptionsVisible
+                SettingsSection(
+                    title = stringResource(Res.string.settings_playback_section_decoder),
+                    isTablet = isTablet,
+                ) {
+                    SettingsGroup(isTablet = isTablet) {
+                        if (libmpvOptionsVisible) {
+                            SettingsNavigationRow(
+                                title = stringResource(Res.string.settings_playback_libmpv_video_output),
+                                description = settings.androidLibmpvVideoOutput.label,
+                                enabled = libmpvOptionsEnabled,
+                                isTablet = isTablet,
+                                onClick = { showLibmpvVideoOutputDialog = true },
+                            )
+                            SettingsGroupDivider(isTablet = isTablet)
+                            SettingsSwitchRow(
+                                title = stringResource(Res.string.settings_playback_libmpv_hardware_decoding),
+                                description = stringResource(Res.string.settings_playback_libmpv_hardware_decoding_description),
+                                checked = settings.androidLibmpvHardwareDecodingEnabled,
+                                enabled = libmpvOptionsEnabled,
+                                isTablet = isTablet,
+                                onCheckedChange = PlayerSettingsRepository::setAndroidLibmpvHardwareDecodingEnabled,
+                            )
+                            SettingsGroupDivider(isTablet = isTablet)
+                            SettingsSwitchRow(
+                                title = stringResource(Res.string.settings_playback_libmpv_yuv420p),
+                                description = stringResource(Res.string.settings_playback_libmpv_yuv420p_description),
+                                checked = settings.androidLibmpvYuv420pEnabled,
+                                enabled = libmpvOptionsEnabled,
+                                isTablet = isTablet,
+                                onCheckedChange = PlayerSettingsRepository::setAndroidLibmpvYuv420pEnabled,
+                            )
+                        }
+                        if (libmpvOptionsVisible) SettingsGroupDivider(isTablet = isTablet)
                         SettingsNavigationRow(
-                            title = stringResource(Res.string.settings_playback_libmpv_video_output),
-                            description = settings.androidLibmpvVideoOutput.label,
-                            enabled = libmpvOptionsEnabled,
+                            title = stringResource(Res.string.settings_playback_decoder_priority),
+                            description = decoderPriorityLabel(settings.decoderPriority),
+                            enabled = exoOptionsEnabled,
                             isTablet = isTablet,
-                            onClick = { showLibmpvVideoOutputDialog = true },
+                            onClick = { showDecoderPriorityDialog = true },
                         )
-                        SettingsGroupDivider(isTablet = isTablet)
-                        SettingsSwitchRow(
-                            title = stringResource(Res.string.settings_playback_libmpv_hardware_decoding),
-                            description = stringResource(Res.string.settings_playback_libmpv_hardware_decoding_description),
-                            checked = settings.androidLibmpvHardwareDecodingEnabled,
-                            enabled = libmpvOptionsEnabled,
-                            isTablet = isTablet,
-                            onCheckedChange = PlayerSettingsRepository::setAndroidLibmpvHardwareDecodingEnabled,
-                        )
-                        SettingsGroupDivider(isTablet = isTablet)
-                        SettingsSwitchRow(
-                            title = stringResource(Res.string.settings_playback_libmpv_yuv420p),
-                            description = stringResource(Res.string.settings_playback_libmpv_yuv420p_description),
-                            checked = settings.androidLibmpvYuv420pEnabled,
-                            enabled = libmpvOptionsEnabled,
-                            isTablet = isTablet,
-                            onCheckedChange = PlayerSettingsRepository::setAndroidLibmpvYuv420pEnabled,
-                        )
-                    }
-                    if (libmpvOptionsVisible) SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_decoder_priority),
-                        description = decoderPriorityLabel(settings.decoderPriority),
-                        enabled = exoOptionsEnabled,
-                        isTablet = isTablet,
-                        onClick = { showDecoderPriorityDialog = true },
-                    )
-                    if (!isDesktop) {
                         SettingsGroupDivider(isTablet = isTablet)
                         SettingsSwitchRow(
                             title = stringResource(Res.string.settings_playback_map_dv7_to_hevc),
@@ -179,7 +179,7 @@ internal fun PlaybackVideoSettings(
         }
     }
 
-    if (showDecoderPriorityDialog) {
+    if (!isDesktop && showDecoderPriorityDialog) {
         DecoderPriorityDialog(
             selectedPriority = settings.decoderPriority,
             onPrioritySelected = { priority ->

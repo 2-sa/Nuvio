@@ -1,5 +1,8 @@
 const root = document.getElementById("playerRoot");
 const seek = document.getElementById("seek");
+const seekTooltip = document.getElementById("seekTooltip");
+const seekTooltipChapter = document.getElementById("seekTooltipChapter");
+const seekTooltipTime = document.getElementById("seekTooltipTime");
 const positionLabel = document.getElementById("position");
 const durationLabel = document.getElementById("duration");
 const timeLabel = document.getElementById("timeLabel");
@@ -275,7 +278,7 @@ let state = {
   subtitleStyleTabLabel: "Style",
   forcedLabel: "Forced",
   noneLabel: "None",
-  fetchSubtitlesLabel: "Tap to fetch subtitles",
+  fetchSubtitlesLabel: "Click to fetch subtitles",
   subtitleDelayLabel: "Subtitle Delay",
   resetLabel: "Reset",
   autoSyncLabel: "Auto Sync",
@@ -459,12 +462,6 @@ let playerToastToken = 0;
 let pendingSettingToastCommand = "";
 let pendingSettingToastToken = 0;
 let timeLabelShowRemaining = false;
-let isPipLocked = false;
-const pipLockButton = document.getElementById("pipLockButton");
-const pipLockOverlay = document.getElementById("pipLockOverlay");
-const pipLockBadge = document.getElementById("pipLockBadge");
-const pipLockLabel = () => String(state.lockLabel || "Lock player controls").trim();
-const pipUnlockLabel = () => String(state.unlockLabel || "Unlock player controls").trim();
 const setTextContent = (element, text) => {
   const value = String(text ?? "");
   const only = element.firstChild;
@@ -480,37 +477,6 @@ const setAttr = (element, name, value) => {
   if (element.getAttribute(name) !== text) element.setAttribute(name, text);
 };
 
-const syncPipLockLabels = () => {
-  const lockLabel = isPipLocked ? pipUnlockLabel() : pipLockLabel();
-  if (pipLockButton) {
-    setAttr(pipLockButton, "aria-label", lockLabel);
-    setAttr(pipLockButton, "title", lockLabel);
-  }
-  if (pipLockBadge) {
-    const unlockLabel = pipUnlockLabel();
-    setAttr(pipLockBadge, "aria-label", unlockLabel);
-    setAttr(pipLockBadge, "title", unlockLabel);
-  }
-};
-const setPipLocked = locked => {
-  isPipLocked = locked;
-  if (locked && document.body.style.cursor && document.body.style.cursor.includes("resize")) {
-    document.body.style.cursor = "";
-  }
-  root.classList.toggle("pip-locked", locked);
-  if (pipLockButton) {
-    pipLockButton.setAttribute("aria-pressed", String(locked));
-    const useEl = pipLockButton.querySelector("use");
-    if (useEl) useEl.setAttribute("href", locked ? "#icon-lock-open" : "#icon-lock");
-  }
-  if (pipLockOverlay) {
-    pipLockOverlay.setAttribute("aria-hidden", "true");
-  }
-  if (pipLockBadge) {
-    pipLockBadge.hidden = !locked;
-  }
-  syncPipLockLabels();
-};
 const prefersReducedMotion = window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const modalTransitionMs = prefersReducedMotion ? 1 : 240;
@@ -549,8 +515,14 @@ const syncFullscreenButtons = () => {
   const label = isFullscreen ? "Exit fullscreen" : "Enter fullscreen";
   if (fullscreenIcon) setAttr(fullscreenIcon, "href", icon);
   if (openingFullscreenIcon) setAttr(openingFullscreenIcon, "href", icon);
-  if (fullscreenButton) setAttr(fullscreenButton, "aria-label", label);
-  if (openingFullscreenButton) setAttr(openingFullscreenButton, "aria-label", label);
+  if (fullscreenButton) {
+    setAttr(fullscreenButton, "aria-label", label);
+    setAttr(fullscreenButton, "title", label);
+  }
+  if (openingFullscreenButton) {
+    setAttr(openingFullscreenButton, "aria-label", label);
+    setAttr(openingFullscreenButton, "title", label);
+  }
 };
 
 const togglePlayerFullscreen = (fromEscape = false) => {
@@ -1112,7 +1084,12 @@ const closePlayerModal = (notifyDismiss = false, animated = true) => {
   renderChrome();
 };
 
+const hideSeekTooltip = () => {
+  if (seekTooltip) seekTooltip.hidden = true;
+};
+
 const openPlayerModal = modal => {
+  hideSeekTooltip();
   const targetModal = modalByName[modal];
   if (!targetModal) {
     closePlayerModal(false);
@@ -1420,7 +1397,7 @@ const renderSubtitleSelectionRails = () => {
   } else if (state.isLoadingAddonSubtitles) {
     appendSubtitleOptionsEmptyState("Loading subtitles...");
   } else {
-    appendSubtitleOptionsEmptyState(state.fetchSubtitlesLabel || "Tap to fetch subtitles", true);
+    appendSubtitleOptionsEmptyState(state.fetchSubtitlesLabel || "Click to fetch subtitles", true);
   }
   const styleVisible = activeSubtitleLanguageKey !== "__off__" && activeOptions.some(option =>
     option.id === pendingSubtitleOptionId || (!pendingSubtitleOptionId && option.selected));
@@ -1517,7 +1494,7 @@ const renderSubtitleStylePanel = () => {
   autoSyncReload.textContent = state.reloadSmallLabel || "Reload";
   autoSyncCapture.textContent = state.captureLineLabel || "Capture";
   fontSizeLabel.textContent = state.fontSizeLabel || "Font Size";
-  fontSizeValue.textContent = `${Number(style.fontSizeSp) || 18}sp`;
+  fontSizeValue.textContent = `${Number(style.fontSizeSp) || 18}px`;
   outlineLabel.textContent = state.outlineLabel || "Outline";
   outlineToggle.textContent = style.outlineEnabled ? (state.onLabel || "On") : (state.offLabel || "Off");
   outlineToggle.classList.toggle("primary", Boolean(style.outlineEnabled));
@@ -2767,11 +2744,11 @@ const renderChrome = () => {
   const isPlaying = Boolean(state.isPlaying);
   const showError = renderPlaybackError();
   root.classList.toggle("pip-mode", Boolean(state.isInPip));
-  if (!state.isInPip && isPipLocked) setPipLocked(false);
   root.classList.toggle("chrome-hidden", Boolean(showError || !state.controlsVisible));
   root.classList.toggle("modal-open", Boolean(activeModal));
   root.classList.toggle("info-open", activeModal === "streamInfo");
   root.classList.toggle("source-visible", Boolean(!showError && !isPlaying && !state.isLoading && (state.streamTitle || state.providerName)));
+  if (showError || !state.controlsVisible || durationMs <= 0) hideSeekTooltip();
   syncHiddenCursor();
   const showOpening = renderOpeningOverlay(showError);
   if (state.pauseOverlayEnabled || showError) renderPauseMetadataOverlay(showOpening || showError);
@@ -2800,7 +2777,6 @@ const renderChrome = () => {
     setAttr(pipButton, "title", pipLabel);
     pipButton.hidden = !pipLabel;
   }
-  syncPipLockLabels();
   const showBuffering = Boolean(!showError && state.isLoading && !activeModal && !showOpening);
   bufferingStatus.classList.toggle("visible", showBuffering);
   setAttr(bufferingStatus, "aria-hidden", showBuffering ? "false" : "true");
@@ -2822,7 +2798,9 @@ const renderChrome = () => {
 
   const playPauseLabel = isPlaying ? state.pauseLabel : state.playLabel;
   if (toggle) {
-    setAttr(toggle, "aria-label", playPauseLabel || (isPlaying ? "Pause" : "Play"));
+    const toggleText = playPauseLabel || (isPlaying ? "Pause" : "Play");
+    setAttr(toggle, "aria-label", toggleText);
+    setAttr(toggle, "title", toggleText);
   }
   if (toggleIcon) {
     setAttr(toggleIcon, "href", isPlaying ? "#icon-pause" : "#icon-play");
@@ -2838,9 +2816,15 @@ const renderChrome = () => {
     if (nextEpisodeButtonLabel) nextEpisodeButtonLabel.textContent = nextLabel;
   }
   syncFullscreenButtons();
-  setAttr(backButton, "aria-label", state.closeLabel || "Close player");
-  setAttr(submitIntroButton, "aria-label", state.submitIntroLabel || "Submit Intro");
-  setAttr(videoSettingsButton, "aria-label", state.videoSettingsLabel || "Video settings");
+  const closeText = state.closeLabel || "Close player";
+  const submitIntroText = state.submitIntroLabel || "Submit Intro";
+  const videoSettingsText = state.videoSettingsLabel || "Video settings";
+  setAttr(backButton, "aria-label", closeText);
+  setAttr(backButton, "title", closeText);
+  setAttr(submitIntroButton, "aria-label", submitIntroText);
+  setAttr(submitIntroButton, "title", submitIntroText);
+  setAttr(videoSettingsButton, "aria-label", videoSettingsText);
+  setAttr(videoSettingsButton, "title", videoSettingsText);
   setProgress(positionMs, durationMs, bufferedPositionMs);
   if (showError) {
     skipPrompt.classList.remove("visible", "show-progress");
@@ -3062,13 +3046,14 @@ const sendKeyboardVolume = delta => {
   const currentLevel = typeof state.volumeLevel === "number" && Number.isFinite(state.volumeLevel)
     ? state.volumeLevel
     : 1;
-  if (delta > 0 && currentLevel >= standardMaxVolumeLevel) {
+  const volumeCeiling = state.volumeBoostEnabled === false ? standardMaxVolumeLevel : maxVolumeLevel;
+  if (delta > 0 && currentLevel >= volumeCeiling) {
     showPlayerToast(volumeToastLabel(delta));
     return;
   }
   const adjustedLevel = currentLevel + (delta * volumeStepLevel);
   const nextLevel = delta > 0
-    ? Math.min(standardMaxVolumeLevel, clampVolumeLevel(adjustedLevel))
+    ? Math.min(volumeCeiling, clampVolumeLevel(adjustedLevel))
     : clampVolumeLevel(adjustedLevel);
   state.volumeLevel = nextLevel;
   if (nextLevel > 0) {
@@ -3534,6 +3519,58 @@ nextEpisodeCard.addEventListener("click", event => {
   }
 });
 
+const chapterTitleAtPositionMs = positionMs => {
+  const chapters = Array.isArray(state.chapters) ? state.chapters : [];
+  let matchedTitle = "";
+  for (const chapter of chapters) {
+    if (!chapter) continue;
+    const startMs = Number(chapter.startMs);
+    if (Number.isFinite(startMs) && startMs <= positionMs) {
+      matchedTitle = String(chapter.title || "").trim();
+    }
+  }
+  return matchedTitle;
+};
+
+const updateSeekTooltip = clientX => {
+  if (!seekTooltip || !seekTooltipTime || !seek || activeModal) {
+    hideSeekTooltip();
+    return;
+  }
+  const durationMs = Math.max(0, Number(state.durationMs) || 0);
+  if (durationMs <= 0 || playbackErrorText()) {
+    hideSeekTooltip();
+    return;
+  }
+  const rect = seek.getBoundingClientRect();
+  if (rect.width <= 0) {
+    hideSeekTooltip();
+    return;
+  }
+  const rawX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+  const fraction = rawX / rect.width;
+  const hoverMs = Math.round(fraction * durationMs);
+  setTextContent(seekTooltipTime, formatTime(hoverMs));
+  if (seekTooltipChapter) {
+    const chapTitle = state.isInPip ? "" : chapterTitleAtPositionMs(hoverMs);
+    setTextContent(seekTooltipChapter, chapTitle);
+    seekTooltipChapter.hidden = !chapTitle;
+  }
+  seekTooltip.hidden = false;
+  const halfWidth = (seekTooltip.offsetWidth || 0) / 2;
+  const clampedX = halfWidth > 0 && rect.width > halfWidth * 2
+    ? Math.max(halfWidth, Math.min(rect.width - halfWidth, rawX))
+    : rawX;
+  seekTooltip.style.left = `${clampedX}px`;
+};
+
+seek.addEventListener("mousemove", event => {
+  updateSeekTooltip(event.clientX);
+});
+
+seek.addEventListener("mouseleave", hideSeekTooltip);
+seek.addEventListener("pointercancel", hideSeekTooltip);
+
 seek.addEventListener("input", () => {
   noteChromeActivity();
   isScrubbing = true;
@@ -3885,7 +3922,7 @@ root.addEventListener("contextmenu", event => {
 
 root.addEventListener("pointerdown", event => {
   if (!canSpeedBoostStart() || state.isInPip || playbackErrorText() || isControlsSurfaceEvent(event)) return;
-  if (event.button !== 0) return;
+  if (event.button !== 0 || event.pointerType === "mouse") return;
 
   rootPointerStartX = event.clientX;
   rootPointerStartY = event.clientY;
@@ -3903,7 +3940,7 @@ root.addEventListener("pointerdown", event => {
 const PIP_RESIZE_BORDER = 8;
 
 const getPipEdgeHit = (clientX, clientY) => {
-  if (!state.isInPip || isPipLocked) return null;
+  if (!state.isInPip) return null;
   const w = window.innerWidth;
   const h = window.innerHeight;
   if (w <= 0 || h <= 0) return null;
@@ -3929,8 +3966,8 @@ window.addEventListener("pointermove", event => {
     const dy = Math.abs(event.clientY - rootPointerStartY);
     if (dx > 12 || dy > 12) clearSpeedBoostHoldTimer();
   }
-  if (state.isInPip && !isPipLocked) {
-    if (event.target && event.target.closest && event.target.closest("button, input, select, textarea, [data-command], a, #seek, .volume-control, .pip-lock-badge, .modal")) {
+  if (state.isInPip) {
+    if (event.target && event.target.closest && event.target.closest("button, input, select, textarea, [data-command], a, #seek, .volume-control, .modal")) {
       if (document.body.style.cursor && document.body.style.cursor.includes("resize")) {
         document.body.style.cursor = "";
       }
@@ -3980,7 +4017,6 @@ window.addEventListener("blur", () => {
 
 root.addEventListener("click", event => {
   if (event.button !== 0) return;
-  if (isPipLocked) return;
   if (suppressNextRootClick) {
     clearSuppressNextRootClick();
     window.clearTimeout(tapTimer);
@@ -3992,29 +4028,27 @@ root.addEventListener("click", event => {
   window.clearTimeout(tapTimer);
   tapTimer = window.setTimeout(() => {
     requestPlaybackState("setPlaybackStateQuiet", false);
-  }, 220);
+  }, 160);
 });
 
 root.addEventListener("pointerdown", event => {
   if (!state.isInPip || event.button !== 0) return;
   if (activeModal) return;
 
-  if (event.target.closest("button, input, select, textarea, [data-command], a, #seek, .volume-control, .pip-lock-badge, .modal")) return;
+  if (event.target.closest("button, input, select, textarea, [data-command], a, #seek, .volume-control, .modal")) return;
 
-  if (!isPipLocked) {
-    const edge = getPipEdgeHit(event.clientX, event.clientY);
-    if (edge) {
-      event.preventDefault();
-      event.stopPropagation();
-      setSuppressNextRootClick();
-      pipPointerDown = false;
-      root.classList.add("native-resizing");
-      if (event.target && event.target.releasePointerCapture) {
-        try { event.target.releasePointerCapture(event.pointerId); } catch (_) {}
-      }
-      send("resizeWindow", edge.hit);
-      return;
+  const edge = getPipEdgeHit(event.clientX, event.clientY);
+  if (edge) {
+    event.preventDefault();
+    event.stopPropagation();
+    setSuppressNextRootClick();
+    pipPointerDown = false;
+    root.classList.add("native-resizing");
+    if (event.target && event.target.releasePointerCapture) {
+      try { event.target.releasePointerCapture(event.pointerId); } catch (_) {}
     }
+    send("resizeWindow", edge.hit);
+    return;
   }
 
   pipPointerStartX = event.clientX;
@@ -4022,23 +4056,8 @@ root.addEventListener("pointerdown", event => {
   pipPointerDown = true;
 });
 
-if (pipLockButton) {
-  pipLockButton.addEventListener("click", () => {
-    setPipLocked(!isPipLocked);
-  });
-}
-
-if (pipLockBadge) {
-  pipLockBadge.addEventListener("click", event => {
-    event.stopPropagation();
-    setPipLocked(false);
-  });
-}
-
-
 root.addEventListener("dblclick", event => {
   if (event.button !== 0) return;
-  if (isPipLocked) return;
   if (playbackErrorText() || isControlsSurfaceEvent(event)) return;
   event.preventDefault();
   window.clearTimeout(tapTimer);
@@ -4052,13 +4071,12 @@ root.addEventListener("dblclick", event => {
 root.addEventListener("wheel", event => {
   if (playbackErrorText() || activeModal) return;
   const isProgressTarget = Boolean(event.target.closest("#seek, .time-row, .time-pill, .scrub"));
-  // Seeking is the primary wheel action. Ctrl/Alt/Meta + wheel keeps volume control available.
-  const isVolumeWheel = !isProgressTarget && (event.ctrlKey || event.altKey || event.metaKey);
+  const hasSeekModifier = event.shiftKey || event.ctrlKey || event.altKey || event.metaKey;
   const delta = event.deltaY !== 0 ? Math.sign(event.deltaY) * -1 : Math.sign(event.deltaX);
   if (delta === 0) return;
   event.preventDefault();
   noteChromeActivity();
-  if (isVolumeWheel) {
+  if (!isProgressTarget && !hasSeekModifier) {
     sendKeyboardVolume(delta);
     return;
   }

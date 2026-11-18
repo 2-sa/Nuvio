@@ -545,7 +545,7 @@ private fun MobileSettingsScreen(
     val saveableStateHolder = rememberSaveableStateHolder()
     saveableStateHolder.SaveableStateProvider(page.name) {
         var settingsSearchQuery by rememberSaveable { mutableStateOf("") }
-        var rootSearchVisible by rememberSaveable { mutableStateOf(false) }
+        var rootSearchVisible by rememberSaveable { mutableStateOf(isDesktop) }
         var rootSearchRevealAnimating by rememberSaveable { mutableStateOf(false) }
         val listState = rememberLazyListState()
         ScreenActivityEffect(listState) { screenActive ->
@@ -957,7 +957,7 @@ private fun TabletSettingsScreen(
 
         saveableStateHolder.SaveableStateProvider(page.name) {
             var settingsSearchQuery by rememberSaveable { mutableStateOf("") }
-            var rootSearchVisible by rememberSaveable { mutableStateOf(false) }
+            var rootSearchVisible by rememberSaveable { mutableStateOf(isDesktop) }
             var rootSearchRevealAnimating by rememberSaveable { mutableStateOf(false) }
             val hapticFeedback = LocalHapticFeedback.current
             val hapticScope = rememberCoroutineScope()

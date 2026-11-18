@@ -197,21 +197,12 @@ private val NuvioRippleConfiguration = RippleConfiguration(
     color = Color.Black,
 )
 
-private const val NuvioDesktopFontScale = 1.08f
-private const val NuvioDesktopBaseWidthDp = 1280f
-private const val NuvioDesktopBaseHeightDp = 820f
+private const val NuvioDesktopFontScale = 1.0f
 private const val NuvioDesktopMinUiScale = 1f
 private const val NuvioDesktopMaxUiScale = 1.18f
 
-internal fun desktopUiScaleForWindow(widthDp: Float, heightDp: Float): Float {
-    if (!isDesktop || widthDp <= 0f || heightDp <= 0f) return NuvioDesktopMinUiScale
-
-    val rawScale = minOf(
-        widthDp / NuvioDesktopBaseWidthDp,
-        heightDp / NuvioDesktopBaseHeightDp,
-    )
-    return rawScale.coerceIn(NuvioDesktopMinUiScale, NuvioDesktopMaxUiScale)
-}
+@Suppress("UNUSED_PARAMETER")
+internal fun desktopUiScaleForWindow(widthDp: Float, heightDp: Float): Float = NuvioDesktopMinUiScale
 
 @Composable
 fun NuvioTheme(

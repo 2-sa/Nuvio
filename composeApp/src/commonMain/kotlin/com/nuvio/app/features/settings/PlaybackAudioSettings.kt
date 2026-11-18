@@ -16,6 +16,7 @@ import com.nuvio.app.features.player.IosAudioOutputMode
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.effectiveDownmixEnabled
 import com.nuvio.app.features.player.languageLabelForCode
+import com.nuvio.app.isDesktop
 import com.nuvio.app.isIos
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -56,7 +57,7 @@ internal fun PlaybackAudioSettings(
                     isTablet = isTablet,
                     onClick = { showSecondaryAudioDialog = true },
                 )
-                if (!isIos) {
+                if (!isIos && !isDesktop) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsSwitchRow(
                         title = stringResource(Res.string.settings_playback_remember_audio_delay),
@@ -73,8 +74,7 @@ internal fun PlaybackAudioSettings(
         if (!isIos) {
             // The downmix runs in the app's FFmpeg decoder, which ExoPlayer only prefers with that decoder priority.
             val downmixAvailable = !settings.externalPlayerEnabled &&
-                settings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv &&
-                settings.decoderPriority == 2
+                (isDesktop || (settings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv && settings.decoderPriority == 2))
             SettingsSection(
                 title = stringResource(Res.string.settings_playback_downmix_section),
                 isTablet = isTablet,

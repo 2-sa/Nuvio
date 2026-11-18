@@ -24,10 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.jelly.JellyNavigationBar
 import com.nuvio.app.features.settings.NavBarStyle
+import com.nuvio.app.isDesktop
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 
@@ -90,7 +93,11 @@ internal fun DesktopNavigationBar(
             glowStrength = glowStrength,
             horizontalLabels = true,
             iconSize = iconSize,
-            modifier = Modifier.width(trackWidth).height(iconSize + 20.dp).hoverable(interactionSource),
+            modifier = Modifier
+                .width(trackWidth)
+                .height(iconSize + 20.dp)
+                .hoverable(interactionSource)
+                .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
         ) {
             Box(
                 modifier = Modifier.matchParentSize()

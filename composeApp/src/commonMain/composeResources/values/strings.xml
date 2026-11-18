@@ -1148,8 +1148,8 @@
     <string name="settings_playback_decoder_prefer_app">Prefer app decoders (FFmpeg)</string>
     <string name="settings_playback_decoder_prefer_device">Prefer device decoders</string>
     <string name="settings_playback_decoder_priority">Decoder Priority</string>
-    <string name="settings_playback_dialog_close">Tap outside to close</string>
-    <string name="settings_playback_dialog_save_close">Tap outside to save &amp; close</string>
+    <string name="settings_playback_dialog_close">Click outside to close</string>
+    <string name="settings_playback_dialog_save_close">Click outside to save &amp; close</string>
     <string name="settings_playback_duration_day_one">%1$d day</string>
     <string name="settings_playback_duration_days">%1$d days</string>
     <string name="settings_playback_duration_hour_one">%1$d hour</string>
@@ -2630,7 +2630,7 @@
     <string name="settings_playback_page_skip">Skip segments</string>
     <string name="settings_playback_page_skip_description">Skip intros, recaps, and credits</string>
     <string name="settings_playback_page_interface">Player interface</string>
-    <string name="settings_playback_page_interface_description">Controls, overlays, touch gestures, and hold to speed</string>
+    <string name="settings_playback_page_interface_description">Controls, overlays, and playback shortcuts</string>
     <string name="settings_playback_page_audio">Audio</string>
     <string name="settings_playback_page_audio_description">Preferred languages and audio output</string>
     <string name="settings_playback_page_subtitles">Subtitles</string>

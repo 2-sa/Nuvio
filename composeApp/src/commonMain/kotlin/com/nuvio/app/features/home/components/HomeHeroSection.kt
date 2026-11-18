@@ -1,13 +1,19 @@
 package com.nuvio.app.features.home.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import com.nuvio.app.core.ui.NuvioDesktopAnimation
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
@@ -31,6 +38,11 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +62,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
@@ -59,6 +73,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.nuvio.app.isDesktop
 import com.nuvio.app.core.ui.FullscreenActionButton
 import com.nuvio.app.core.ui.DesktopBackdropVerticalBias
@@ -574,11 +589,14 @@ private fun DesktopHomeHeroFrame(
     val opacity = NuvioTokens.Opacity
     val space = NuvioTokens.Space
     val backgroundColor = colorScheme.background
+    val heroInteractionSource = remember { MutableInteractionSource() }
+    val isHeroHovered by heroInteractionSource.collectIsHoveredAsState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor),
+            .background(backgroundColor)
+            .then(if (isDesktop) Modifier.hoverable(heroInteractionSource) else Modifier),
     ) {
         HeroBackgroundLayers(
             items = items,
@@ -698,6 +716,84 @@ private fun DesktopHomeHeroFrame(
                     ),
             )
         }
+
+        if (isDesktop && items.size > 1) {
+            AnimatedVisibility(
+                visible = isHeroHovered && pagerState.currentPage > 0,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = space.s16)
+                    .zIndex(2f),
+            ) {
+                HeroCarouselArrowButton(
+                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                    contentDescription = "Previous hero item",
+                    onClick = {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0))
+                        }
+                    },
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isHeroHovered && pagerState.currentPage < pagerState.pageCount - 1,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = space.s16)
+                    .zIndex(2f),
+            ) {
+                HeroCarouselArrowButton(
+                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = "Next hero item",
+                    onClick = {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(pagerState.pageCount - 1))
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroCarouselArrowButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    Surface(
+        modifier = Modifier
+            .size(44.dp)
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = if (hovered) 0.30f else 0.14f),
+                shape = CircleShape,
+            ),
+        shape = CircleShape,
+        color = colorScheme.surfaceVariant.copy(alpha = if (hovered) 0.92f else 0.72f),
+        contentColor = colorScheme.onSurface,
+        shadowElevation = 6.dp,
+    ) {
+        IconButton(
+            onClick = onClick,
+            interactionSource = interactionSource,
+            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(NuvioTokens.Icon.md),
+            )
+        }
     }
 }
 
@@ -721,6 +817,7 @@ private fun HeroPageIndicatorRow(
             Box(
                 modifier = Modifier
                     .nuvioFocusBorder(CircleShape, borderWidth = 2.dp)
+                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
                     .clickable {
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(heroPageForItem(pagerState.currentPage, index, itemCount))
@@ -884,6 +981,7 @@ private fun DesktopHeroContentBlock(
         modifier = Modifier
             .fillMaxWidth()
             .nuvioFocusBorder(RoundedCornerShape(NuvioTokens.Radius.md))
+            .then(if (isDesktop && onItemClick != null) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -962,6 +1060,7 @@ private fun DesktopHeroContentBlock(
                     modifier = Modifier
                         .height(48.dp)
                         .nuvioFocusBorder(RoundedCornerShape(40.dp))
+                        .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
                         .clickable { onItemClick(item) },
                     color = colorScheme.onBackground,
                     contentColor = colorScheme.background,

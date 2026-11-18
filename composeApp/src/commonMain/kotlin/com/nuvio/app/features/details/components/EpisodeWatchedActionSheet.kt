@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,9 +37,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.DesktopContextMenuPopup
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
+import com.nuvio.app.core.ui.PosterZoomAnchorHolder
+import com.nuvio.app.core.ui.PosterZoomOverlayAction
+import com.nuvio.app.core.ui.PosterZoomOverlayCoordinator
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
@@ -46,6 +51,7 @@ import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.tracking.TrackingMediaReference
 import com.nuvio.app.features.tracking.TrackingRatingState
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -72,10 +78,112 @@ fun EpisodeWatchedActionSheet(
     val coroutineScope = rememberCoroutineScope()
     val ratingState = ratingMedia?.let { rememberRatingState(it).value } ?: TrackingRatingState()
     var showRating by remember { mutableStateOf(false) }
+    val desktopAnchor = remember { if (isDesktop) PosterZoomAnchorHolder.consume() else null }
+    if (isDesktop) {
+        DisposableEffect(Unit) {
+            if (desktopAnchor != null) {
+                PosterZoomOverlayCoordinator.show()
+            }
+            onDispose {
+                if (desktopAnchor != null) {
+                    PosterZoomOverlayCoordinator.hide()
+                }
+            }
+        }
+    }
     val dismiss: () -> Unit = {
         coroutineScope.launch {
             dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
         }
+    }
+
+    val episodeTitleText = localizedEpisodeTitle(episode.title, episode.episode) ?: episode.title
+    val episodeSubtitleText = buildString {
+        localizedSeasonEpisodeCode(
+            seasonNumber = episode.season,
+            episodeNumber = episode.episode,
+        )?.let {
+            append(it)
+            append(" • ")
+        }
+        append(seasonLabel)
+    }
+
+    if (isDesktop && !showRating) {
+        val markWatchedTitle = if (isEpisodeWatched) {
+            stringResource(Res.string.episode_mark_unwatched)
+        } else {
+            stringResource(Res.string.episode_mark_watched)
+        }
+        val markPreviousTitle = if (arePreviousEpisodesWatched) {
+            stringResource(Res.string.episode_mark_previous_unwatched)
+        } else {
+            stringResource(Res.string.episode_mark_previous_watched)
+        }
+        val markSeasonTitle = if (isSeasonWatched) {
+            stringResource(Res.string.episode_mark_season_unwatched, seasonLabel)
+        } else {
+            stringResource(Res.string.episode_mark_season_watched, seasonLabel)
+        }
+        val rateEpisodeTitle = stringResource(Res.string.rating_rate_episode)
+        val playManuallyTitle = stringResource(Res.string.play_manually)
+        val rated = ratingState.rating
+        val desktopActions = buildList {
+            add(
+                PosterZoomOverlayAction(
+                    icon = Icons.Default.CheckCircle,
+                    label = markWatchedTitle,
+                    onSelected = onToggleWatched,
+                ),
+            )
+            if (canMarkPreviousEpisodes) {
+                add(
+                    PosterZoomOverlayAction(
+                        icon = Icons.Default.DoneAll,
+                        label = markPreviousTitle,
+                        onSelected = onTogglePreviousWatched,
+                    ),
+                )
+            }
+            add(
+                PosterZoomOverlayAction(
+                    icon = Icons.Default.PlaylistAddCheckCircle,
+                    label = markSeasonTitle,
+                    onSelected = onToggleSeasonWatched,
+                ),
+            )
+            if (ratingState.isAvailable && ratingMedia != null) {
+                add(
+                    PosterZoomOverlayAction(
+                        icon = if (rated != null) Icons.Rounded.Star else Icons.Rounded.StarOutline,
+                        label = rateEpisodeTitle,
+                        trailingText = rated?.let(::formatRating),
+                        dismissOnSelect = false,
+                        onSelected = { showRating = true },
+                    ),
+                )
+            }
+            if (showPlayManually && onPlayManually != null) {
+                add(
+                    PosterZoomOverlayAction(
+                        icon = Icons.Default.PlayArrow,
+                        label = playManuallyTitle,
+                        onSelected = onPlayManually,
+                    ),
+                )
+            }
+        }
+        val pointerPos = remember(desktopAnchor) {
+            desktopAnchor?.pointerPositionInRoot ?: desktopAnchor?.boundsInRoot?.center
+        }
+        DesktopContextMenuPopup(
+            title = episodeTitleText,
+            subtitle = episodeSubtitleText,
+            pointerPositionInRoot = pointerPos,
+            actions = desktopActions,
+            onDismissed = onDismiss,
+        )
+        return
     }
 
     NuvioModalBottomSheet(
@@ -197,6 +305,55 @@ fun SeasonWatchedActionSheet(
     onToggleSeasonWatched: () -> Unit,
     onMarkPreviousSeasonsWatched: () -> Unit,
 ) {
+    val desktopAnchor = remember { if (isDesktop) PosterZoomAnchorHolder.consume() else null }
+    if (isDesktop) {
+        DisposableEffect(Unit) {
+            if (desktopAnchor != null) {
+                PosterZoomOverlayCoordinator.show()
+            }
+            onDispose {
+                if (desktopAnchor != null) {
+                    PosterZoomOverlayCoordinator.hide()
+                }
+            }
+        }
+        val markSeasonTitle = if (isSeasonWatched) {
+            stringResource(Res.string.episode_mark_season_unwatched, seasonLabel)
+        } else {
+            stringResource(Res.string.episode_mark_season_watched, seasonLabel)
+        }
+        val markPrevSeasonsTitle = stringResource(Res.string.episode_mark_previous_seasons_watched)
+        val actions = buildList {
+            add(
+                PosterZoomOverlayAction(
+                    icon = Icons.Default.PlaylistAddCheckCircle,
+                    label = markSeasonTitle,
+                    onSelected = onToggleSeasonWatched,
+                ),
+            )
+            if (canMarkPreviousSeasons) {
+                add(
+                    PosterZoomOverlayAction(
+                        icon = Icons.Default.DoneAll,
+                        label = markPrevSeasonsTitle,
+                        onSelected = onMarkPreviousSeasonsWatched,
+                    ),
+                )
+            }
+        }
+        val pointerPos = remember(desktopAnchor) {
+            desktopAnchor?.pointerPositionInRoot ?: desktopAnchor?.boundsInRoot?.center
+        }
+        DesktopContextMenuPopup(
+            title = seasonLabel,
+            subtitle = null,
+            pointerPositionInRoot = pointerPos,
+            actions = actions,
+            onDismissed = onDismiss,
+        )
+        return
+    }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
 

@@ -58,6 +58,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -651,7 +653,8 @@ private fun TabletTopPillItem(
         tonalElevation = if (selected) tokens.elevation.raised else tokens.elevation.flat,
         modifier = Modifier
             .height(pillHeight)
-            .clip(itemShape),
+            .clip(itemShape)
+            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
     ) {
         Row(
             modifier = Modifier
@@ -791,6 +794,16 @@ internal fun DesktopHoverSidebar(
                 label = "desktop_sidebar_nav_offset",
             )
 
+            val profileInteractionSource = remember { MutableInteractionSource() }
+            val isProfileHovered by profileInteractionSource.collectIsHoveredAsState()
+            val profileHoverBg by animateColorAsState(
+                targetValue = if (isDesktop && isProfileHovered) {
+                    tokens.colors.textPrimary.copy(alpha = 0.08f)
+                } else {
+                    Color.Transparent
+                },
+                label = "desktop_sidebar_profile_hover",
+            )
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -798,8 +811,12 @@ internal fun DesktopHoverSidebar(
                     .fillMaxWidth()
                     .height(DesktopSidebarItemHeight)
                     .padding(horizontal = 6.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(profileHoverBg)
+                    .hoverable(profileInteractionSource)
+                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = profileInteractionSource,
                         indication = null,
                         onClick = { onProfileStackVisibleChange(!profileStackVisible) },
                     ),
@@ -966,12 +983,24 @@ private fun DesktopSidebarItem(
     val tokens = MaterialTheme.nuvio
     val contentColor = if (selected) tokens.colors.textPrimary else tokens.colors.textMuted
     val iconColor = if (selected) tokens.colors.onAccent else contentColor
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val hoverBgColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered && !selected) {
+            tokens.colors.textPrimary.copy(alpha = 0.08f)
+        } else {
+            Color.Transparent
+        },
+        label = "desktop_sidebar_item_hover",
+    )
 
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         modifier = Modifier
             .fillMaxWidth()
             .height(DesktopSidebarItemHeight)
+            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
             .controllerFocusable(
                 id = id,
                 zone = ControllerFocusZone.Navigation,
@@ -983,7 +1012,7 @@ private fun DesktopSidebarItem(
                 onSelect = onClick,
             )
             .padding(horizontal = 6.dp, vertical = 4.dp),
-        color = Color.Transparent,
+        color = hoverBgColor,
         shape = RoundedCornerShape(16.dp),
     ) {
         Row(
