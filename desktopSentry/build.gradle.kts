@@ -8,6 +8,18 @@ val sentryAuthToken = providers.environmentVariable("SENTRY_AUTH_TOKEN")
     ?.trim()
     ?.takeIf { it.isNotBlank() }
 
+val sentryOrg = providers.environmentVariable("SENTRY_ORG")
+    .orNull
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+    ?: "nuviomedia"
+
+val sentryProject = providers.environmentVariable("SENTRY_PROJECT")
+    .orNull
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+    ?: "nuvio-desktop"
+
 sentry {
     includeSourceContext.set(true)
     autoUploadSourceContext.set(sentryAuthToken != null)
@@ -20,8 +32,8 @@ sentry {
     )
     includeDependenciesReport.set(false)
     telemetry.set(false)
-    org.set("nuviomedia")
-    projectName.set("nuvio-desktop")
+    org.set(sentryOrg)
+    projectName.set(sentryProject)
     sentryAuthToken?.let(authToken::set)
     autoInstallation {
         enabled.set(false)
