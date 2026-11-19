@@ -4,6 +4,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -253,11 +254,20 @@ internal fun TabletStreamsLayout(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(24.dp))
-                    .hazeEffect(state = hazeState) {
-                        inputScale = HazeInputScale.Fixed(0.66f)
-                        blurRadius = 56.dp
-                    }
-                    .background(Color.Black.copy(alpha = 0.36f)),
+                    .then(
+                        if (isDesktop) {
+                            Modifier
+                                .background(Color(0xEB12141A))
+                                .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(24.dp))
+                        } else {
+                            Modifier
+                                .hazeEffect(state = hazeState) {
+                                    inputScale = HazeInputScale.Fixed(0.66f)
+                                    blurRadius = 56.dp
+                                }
+                                .background(Color.Black.copy(alpha = 0.36f))
+                        },
+                    ),
             ) {
                 Column(
                     modifier = Modifier

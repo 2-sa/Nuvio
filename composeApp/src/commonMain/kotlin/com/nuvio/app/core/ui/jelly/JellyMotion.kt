@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.nuvio.app.isDesktop
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
@@ -156,6 +157,10 @@ internal class JellyMotion(initialIndex: Int, count: Int) {
     private fun indexAt(x: Double): Int = floor((x - 4) / tabWidth).toInt().coerceIn(0, maxIndex)
 
     private fun publish() {
+        if (isDesktop) {
+            frame = JellyFrame(position = position.value.toFloat())
+            return
+        }
         val speed = velocity.value / 10
         frame = JellyFrame(
             position = position.value.toFloat(),

@@ -30,6 +30,7 @@ import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.detectJellyTabGestures
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.visualNavIndex
+import com.nuvio.app.isDesktop
 
 @Composable
 internal fun JellyNavigationBar(
@@ -67,14 +68,21 @@ internal fun JellyNavigationBar(
         }
     }
 
+    val effectiveGlowStrength = if (isDesktop) 0f else glowStrength
     Box(
         modifier = modifier
             .onSizeChanged {
                 motion.resize(it.width / density.density, it.height / density.density, items.size)
             }
-            .pointerInput(motion, density, items.size, isRtl) {
-                detectJellyTabGestures(motion, density.density, { currentItems }, { currentIsRtl })
-            },
+            .then(
+                if (!isDesktop) {
+                    Modifier.pointerInput(motion, density, items.size, isRtl) {
+                        detectJellyTabGestures(motion, density.density, { currentItems }, { currentIsRtl })
+                    }
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Box(
             modifier = Modifier
@@ -108,7 +116,7 @@ internal fun JellyNavigationBar(
                             .clip(RoundedCornerShape(50))
                             .drawWithContent {
                                 drawContent()
-                                drawJellyGlow(motion.frame, accentColor.copy(alpha = accentColor.alpha * glowStrength))
+                                drawJellyGlow(motion.frame, accentColor.copy(alpha = accentColor.alpha * effectiveGlowStrength))
                             },
                     ) {
                         surface()
@@ -135,7 +143,7 @@ internal fun JellyNavigationBar(
                                         motion.frame,
                                         items.size,
                                         selectedSurface,
-                                        accentColor.copy(alpha = accentColor.alpha * glowStrength),
+                                        accentColor.copy(alpha = accentColor.alpha * effectiveGlowStrength),
                                     ) { drawContent() }
                                 },
                         ) {

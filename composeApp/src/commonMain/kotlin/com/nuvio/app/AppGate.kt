@@ -480,8 +480,12 @@ internal fun AppGate(
             targetState = gateScreen,
             label = "app_gate",
             transitionSpec = {
-                (fadeIn(tween(400)) + scaleIn(tween(400), initialScale = 0.94f))
-                    .togetherWith(fadeOut(tween(250)))
+                if (isDesktop) {
+                    fadeIn(tween(100)).togetherWith(fadeOut(tween(80)))
+                } else {
+                    (fadeIn(tween(400)) + scaleIn(tween(400), initialScale = 0.94f))
+                        .togetherWith(fadeOut(tween(250)))
+                }
             },
         ) { currentGate ->
             when (currentGate) {
@@ -560,8 +564,8 @@ internal fun AppGate(
 
         androidx.compose.animation.AnimatedVisibility(
             visibleState = launchOverlayState,
-            enter = fadeIn(tween(400)),
-            exit = fadeOut(tween(400)),
+            enter = fadeIn(tween(if (isDesktop) 100 else 400)),
+            exit = fadeOut(tween(if (isDesktop) 100 else 400)),
             modifier = Modifier.fillMaxSize(),
         ) {
             AppLaunchOverlay(
@@ -577,9 +581,9 @@ internal fun AppGate(
             enter = if (skipProfileSelectionEnterAnimation) {
                 androidx.compose.animation.EnterTransition.None
             } else {
-                fadeIn(tween(400))
+                fadeIn(tween(if (isDesktop) 100 else 400))
             },
-            exit = fadeOut(tween(400)),
+            exit = fadeOut(tween(if (isDesktop) 100 else 400)),
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(NuvioTokens.Z.dialog),

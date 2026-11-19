@@ -93,9 +93,9 @@ fun ProfileSelectionScreen(
     var isEditMode by remember { mutableStateOf(false) }
     var hoveredProfileIndex by remember { mutableStateOf<Int?>(null) }
 
-    val titleAlpha = remember { Animatable(0f) }
-    val titleOffset = remember { Animatable(20f) }
-    val manageAlpha = remember { Animatable(0f) }
+    val titleAlpha = remember { Animatable(if (isDesktop) 1f else 0f) }
+    val titleOffset = remember { Animatable(if (isDesktop) 0f else 20f) }
+    val manageAlpha = remember { Animatable(if (isDesktop) 1f else 0f) }
     val onProfileClick: (NuvioProfile) -> Unit = { profile ->
         if (interactionEnabled) {
             routeProfileSelection(
@@ -115,6 +115,7 @@ fun ProfileSelectionScreen(
     }
 
     LaunchedEffect(Unit) {
+        if (isDesktop) return@LaunchedEffect
         launch { titleAlpha.animateTo(1f, tween(600, easing = FastOutSlowInEasing)) }
         launch { titleOffset.animateTo(0f, tween(600, easing = FastOutSlowInEasing)) }
         delay(300)
@@ -375,11 +376,12 @@ private fun ProfileAvatarCard(
         profileAvatarImageUrl(profile, avatarItem)
     }
 
-    val animAlpha = remember { Animatable(0f) }
-    val animScale = remember { Animatable(0.85f) }
-    val animOffset = remember { Animatable(30f) }
+    val animAlpha = remember { Animatable(if (isDesktop) 1f else 0f) }
+    val animScale = remember { Animatable(if (isDesktop) 1f else 0.85f) }
+    val animOffset = remember { Animatable(if (isDesktop) 0f else 30f) }
 
     LaunchedEffect(Unit) {
+        if (isDesktop) return@LaunchedEffect
         delay(animDelay.toLong() + 150)
         launch { animAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
         launch { animScale.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
@@ -390,7 +392,7 @@ private fun ProfileAvatarCard(
     val isPressed by interactionSource.collectIsPressedAsState()
     val isHovered by interactionSource.collectIsHoveredAsState()
     val currentOnHoverChange = rememberUpdatedState(onHoverChange)
-    val pressScale = if (isPressed) 0.95f else 1f
+    val pressScale = if (isPressed && !isDesktop) 0.95f else 1f
 
     LaunchedEffect(isHovered, profile.profileIndex) {
         if (isDesktop) {
@@ -551,11 +553,12 @@ private fun AddProfileCard(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val animAlpha = remember { Animatable(0f) }
-    val animScale = remember { Animatable(0.85f) }
-    val animOffset = remember { Animatable(30f) }
+    val animAlpha = remember { Animatable(if (isDesktop) 1f else 0f) }
+    val animScale = remember { Animatable(if (isDesktop) 1f else 0.85f) }
+    val animOffset = remember { Animatable(if (isDesktop) 0f else 30f) }
 
     LaunchedEffect(Unit) {
+        if (isDesktop) return@LaunchedEffect
         delay(animDelay.toLong() + 150)
         launch { animAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
         launch { animScale.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
@@ -564,7 +567,7 @@ private fun AddProfileCard(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val pressScale = if (isPressed) 0.95f else 1f
+    val pressScale = if (isPressed && !isDesktop) 0.95f else 1f
 
     val addProfileShape = RoundedCornerShape(20.dp)
     Column(

@@ -211,13 +211,17 @@ fun DetailSeriesContent(
             AnimatedContent(
                 targetState = currentSeason,
                 transitionSpec = {
-                    val fromIdx = seasons.indexOf(initialState).takeIf { it >= 0 } ?: 0
-                    val toIdx = seasons.indexOf(targetState).takeIf { it >= 0 } ?: 0
-                    val dir = if (toIdx >= fromIdx) 1 else -1
-                    (fadeIn(tween(220)) + slideInHorizontally(tween(220)) { dir * it / 5 })
-                        .togetherWith(
-                            fadeOut(tween(170)) + slideOutHorizontally(tween(170)) { -dir * it / 5 },
-                        )
+                    if (isDesktop) {
+                        fadeIn(tween(120)).togetherWith(fadeOut(tween(100)))
+                    } else {
+                        val fromIdx = seasons.indexOf(initialState).takeIf { it >= 0 } ?: 0
+                        val toIdx = seasons.indexOf(targetState).takeIf { it >= 0 } ?: 0
+                        val dir = if (toIdx >= fromIdx) 1 else -1
+                        (fadeIn(tween(220)) + slideInHorizontally(tween(220)) { dir * it / 5 })
+                            .togetherWith(
+                                fadeOut(tween(170)) + slideOutHorizontally(tween(170)) { -dir * it / 5 },
+                            )
+                    }
                 },
                 label = "season_episodes",
             ) { seasonForContent ->

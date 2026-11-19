@@ -1366,10 +1366,17 @@ compose.desktop {
     }
 }
 
+val windowsPackagingResourceDir = project.file("packaging/windows")
+
 tasks.withType<AbstractJPackageTask>()
     .matching { it.name.endsWith("Msi") || it.name.endsWith("Exe") }
     .configureEach {
         freeArgs.add("--win-shortcut-prompt")
+        if (windowsPackagingResourceDir.exists()) {
+            inputs.dir(windowsPackagingResourceDir)
+            freeArgs.add("--resource-dir")
+            freeArgs.add(windowsPackagingResourceDir.absolutePath)
+        }
     }
 
 fun renameMacosDmgOutput(release: Boolean) {

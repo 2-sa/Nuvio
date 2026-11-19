@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.isDesktop
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -124,7 +125,7 @@ class HeroStretchState internal constructor(
 @Composable
 fun rememberHeroStretchState(listState: LazyListState): HeroStretchState {
     val scope = rememberCoroutineScope()
-    val maxStretchPx = with(LocalDensity.current) { HERO_STRETCH_MAX.toPx() }
+    val maxStretchPx = if (isDesktop) 0f else with(LocalDensity.current) { HERO_STRETCH_MAX.toPx() }
     return remember(listState, maxStretchPx) {
         HeroStretchState(scope, maxStretchPx) { !listState.canScrollBackward }
     }

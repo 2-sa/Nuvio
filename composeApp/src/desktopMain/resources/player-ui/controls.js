@@ -2747,7 +2747,7 @@ const renderChrome = () => {
   const showError = renderPlaybackError();
   root.classList.toggle("pip-mode", Boolean(state.isInPip));
   root.classList.toggle("chrome-hidden", Boolean(showError || !state.controlsVisible));
-  const isBottomPopover = activeModal === "speed" || activeModal === "audio" || activeModal === "subtitles" || activeModal === "streamInfo";
+  const isBottomPopover = activeModal === "speed" || activeModal === "audio" || activeModal === "subtitles" || activeModal === "streamInfo" || activeModal === "sources" || activeModal === "episodes" || activeModal === "chapters" || activeModal === "party";
   root.classList.toggle("modal-open", Boolean(activeModal));
   root.classList.toggle("popover-open", isBottomPopover);
   root.classList.toggle("info-open", activeModal === "streamInfo");

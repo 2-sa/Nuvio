@@ -679,33 +679,4 @@ private fun NuvioPosterShape.cardWidth(basePosterWidthDp: Int): Dp =
 internal fun Modifier.desktopPosterHoverScale(
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
-): Modifier {
-    if (!enabled || !isDesktop) return this
-
-    val hovered by interactionSource.collectIsHoveredAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (hovered) DesktopPosterHoverScale else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-        label = "desktop_poster_hover_scale",
-    )
-
-    val isScaling = hovered || scale != 1f
-
-    return this
-        .then(
-            if (isScaling) {
-                Modifier
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    }
-                    .zIndex(1f)
-            } else {
-                Modifier
-            },
-        )
-        .hoverable(interactionSource)
-}
+): Modifier = this

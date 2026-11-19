@@ -58,24 +58,20 @@ internal fun DesktopNavigationBar(
         ((isHomeSelected || isSettingsSelected) && isScrolledAwayFromTop)
     val labelFraction by animateFloatAsState(
         targetValue = desktopNavigationLabelFraction(navBarStyle, isHomeSelected, isHeroEnabled, isHovered, profileSwitcherOpen, isScrolledAwayFromTop),
-        animationSpec = tween(320, easing = FastOutSlowInEasing),
+        animationSpec = tween(140, easing = FastOutSlowInEasing),
         label = "desktop_nav_labels",
     )
     val surfaceColor by animateColorAsState(
         targetValue = if (isFrosted) Color(0xFF1C1C1E).copy(alpha = 0.30f) else Color(0xFF0F0F11).copy(alpha = 0.20f),
-        animationSpec = tween(320, easing = FastOutSlowInEasing),
+        animationSpec = tween(140, easing = FastOutSlowInEasing),
         label = "desktop_nav_surface",
     )
     val sheenAlpha by animateFloatAsState(
         targetValue = if (isFrosted) 1f else 0f,
-        animationSpec = tween(320, easing = FastOutSlowInEasing),
+        animationSpec = tween(140, easing = FastOutSlowInEasing),
         label = "desktop_nav_sheen",
     )
-    val glowStrength by animateFloatAsState(
-        targetValue = if (glowEnabled) 1f else 0f,
-        animationSpec = tween(420, easing = NuvioTokens.Motion.standard),
-        label = "desktop_nav_glow",
-    )
+    val glowStrength = 0f
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth().nuvioTrackTopBarFocus().padding(contentPadding).padding(horizontal = 16.dp),
         contentAlignment = Alignment.TopCenter,
@@ -134,10 +130,5 @@ internal fun desktopNavigationLabelFraction(
 ): Float = when (style) {
     NavBarStyle.EXPANDED -> 1f
     NavBarStyle.COMPACT -> 0f
-    else -> when {
-        isHovered || profileSwitcherOpen -> 1f
-        isHomeSelected && isHeroEnabled -> 0f
-        isHomeSelected && isScrolledAwayFromTop -> 0f
-        else -> 1f
-    }
+    else -> 1f
 }

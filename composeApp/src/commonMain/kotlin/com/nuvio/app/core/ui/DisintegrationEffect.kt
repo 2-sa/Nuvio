@@ -24,7 +24,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.Dispatchers
+
 import kotlinx.coroutines.withContext
 import kotlin.math.cos
 import kotlin.math.sin
@@ -42,6 +44,13 @@ fun DisintegratingContainer(
     if (!disintegrating) {
         Box(modifier = modifier) {
             content()
+        }
+        return
+    }
+    if (isDesktop) {
+        LaunchedEffect(Unit) {
+            onDisintegrationStarted()
+            onDisintegrated()
         }
         return
     }

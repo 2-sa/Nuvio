@@ -174,7 +174,7 @@ fun HomeHeroSection(
     }
 
     ScreenActivityEffect(autoScrollPage, items.size) { active ->
-        if (!active || items.size <= 1) return@ScreenActivityEffect
+        if (isDesktop || !active || items.size <= 1) return@ScreenActivityEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
         while (pagerState.isScrollInProgress) {
             delay(100L)
@@ -303,23 +303,20 @@ private fun HeroBackgroundLayers(
             modifier = backgroundModifier
                 .graphicsLayer {
                     val pageOffset = heroPageOffset(pagerState, page)
-                    val scrollOffsetPx = heroScrollOffsetPx(listState, heroHeightPx)
-                    val scrollScale = if (desktopFrame) {
-                        1f + (heroBackgroundScrollScale(scrollOffsetPx) - 1f) * backgroundMotionStrength
-                    } else {
-                        heroBackgroundScrollScale(scrollOffsetPx)
-                    }
-
                     alpha = heroPageVisibility(pageOffset)
-                    translationX = -pageOffset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                    translationY = if (desktopFrame) {
-                        heroDesktopBackgroundScrollTranslationY(scrollOffsetPx) * backgroundMotionStrength
+                    if (desktopFrame) {
+                        translationX = 0f
+                        translationY = 0f
+                        scaleX = 1f
+                        scaleY = 1f
                     } else {
-                        heroBackgroundScrollTranslationY(scrollOffsetPx)
+                        val scrollOffsetPx = heroScrollOffsetPx(listState, heroHeightPx)
+                        val scrollScale = heroBackgroundScrollScale(scrollOffsetPx)
+                        translationX = -pageOffset * heroWidthPx * HERO_BACKGROUND_PARALLAX
+                        translationY = heroBackgroundScrollTranslationY(scrollOffsetPx)
+                        scaleX = HERO_BACKGROUND_SCALE * scrollScale
+                        scaleY = HERO_BACKGROUND_SCALE * scrollScale
                     }
-                    val baseScale = if (desktopFrame) 1f else HERO_BACKGROUND_SCALE
-                    scaleX = baseScale * scrollScale
-                    scaleY = baseScale * scrollScale
                 },
             alignment = when {
                 desktopFrame -> BiasAlignment(
@@ -433,7 +430,7 @@ private fun HeroDesktopContentLayers(
                     val pageOffset = heroPageOffset(pagerState, page)
 
                     alpha = heroPageVisibility(pageOffset)
-                    translationX = -pageOffset * heroWidthPx * HERO_CONTENT_PARALLAX
+                    translationX = 0f
                 },
         ) {
             DesktopHeroContentBlock(

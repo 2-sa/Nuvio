@@ -177,8 +177,9 @@ actual object AppUpdaterPlatform {
     }
 
     private fun scheduleAppExit() {
+        val exitDelayMillis = if (currentOs == DesktopUpdaterOs.WINDOWS) 100L else 500L
         thread(name = "nuvio-updater-exit", isDaemon = true) {
-            Thread.sleep(500)
+            Thread.sleep(exitDelayMillis)
             exitProcess(0)
         }
     }
@@ -240,7 +241,12 @@ internal fun windowsInstallerCommand(updateFile: File): List<String> {
         return listOf(updateFile.absolutePath)
     }
 
-    return listOf("msiexec", "/i", updateFile.absolutePath)
+    val quotedPath = "\"${updateFile.absolutePath}\""
+    return listOf(
+        "cmd",
+        "/c",
+        "ping -n 3 127.0.0.1 >nul && start \"\" msiexec /i $quotedPath",
+    )
 }
 
 internal enum class LinuxInstallMethod {

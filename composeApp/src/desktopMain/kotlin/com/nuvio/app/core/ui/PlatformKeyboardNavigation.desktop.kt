@@ -168,10 +168,9 @@ actual fun PlatformKeyboardNavigationHost() {
         onDispose { Toolkit.getDefaultToolkit().removeAWTEventListener(listener) }
     }
 
-    // Hide the mouse pointer while the user navigates with a controller or the keyboard; the first
-    // real mouse movement switches navigation off again and restores it.
+    // Hide the mouse pointer only while navigating with an active gamepad controller.
     LaunchedEffect(Unit) {
-        ControllerManager.isNavigationActive.collect { active ->
+        ControllerManager.isControllerActive.collect { active ->
             applyNavigationCursor(active)
         }
     }
@@ -244,7 +243,6 @@ actual fun PlatformKeyboardNavigationHost() {
                 }
                 if (PlayerControllerBridge.dispatch(command)) {
                     ControllerManager.notifyNavigationInput()
-                    ControllerSoundPlayer.playNavigate()
                     return@KeyEventDispatcher true
                 }
             }
@@ -257,9 +255,7 @@ actual fun PlatformKeyboardNavigationHost() {
             // Screens without engine nodes (details, streams, settings, player) use Compose's own
             // directional focus search.
             ControllerManager.notifyNavigationInput()
-            if (focusManager.moveSpatialFocus(direction)) {
-                ControllerSoundPlayer.playNavigate()
-            }
+            focusManager.moveSpatialFocus(direction)
             true
         }
         java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()

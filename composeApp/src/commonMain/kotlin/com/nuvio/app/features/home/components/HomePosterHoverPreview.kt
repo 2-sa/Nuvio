@@ -106,8 +106,8 @@ import nuvio.composeapp.generated.resources.tracking_lists_update_failed
 import org.jetbrains.compose.resources.stringResource
 
 private const val HoverPreviewCloseDelayMillis = 120L
-private const val HoverPreviewEnterDurationMillis = 260
-private const val HoverPreviewExitDurationMillis = 170
+private const val HoverPreviewEnterDurationMillis = 120
+private const val HoverPreviewExitDurationMillis = 90
 private const val HoverTrailerExtractionDebounceMillis = 1_000L
 private val HoverPreviewWidth = 420.dp
 
@@ -291,31 +291,10 @@ internal fun HomePosterHoverPreview(
                 AnimatedVisibility(
                     visible = previewVisible,
                     enter = fadeIn(
-                        animationSpec = tween(
-                            durationMillis = HoverPreviewEnterDurationMillis,
-                            easing = NuvioTokens.Motion.decelerate,
-                        ),
-                    ) + scaleIn(
-                        animationSpec = tween(
-                            durationMillis = HoverPreviewEnterDurationMillis,
-                            easing = NuvioTokens.Motion.emphasized,
-                        ),
-                        initialScale = 0.9f,
-                    ) + slideInVertically(
-                        animationSpec = tween(
-                            durationMillis = HoverPreviewEnterDurationMillis,
-                            easing = NuvioTokens.Motion.decelerate,
-                        ),
-                        initialOffsetY = { height -> height / 18 },
+                        animationSpec = tween(durationMillis = HoverPreviewEnterDurationMillis),
                     ),
                     exit = fadeOut(
-                        animationSpec = tween(HoverPreviewExitDurationMillis),
-                    ) + scaleOut(
-                        animationSpec = tween(HoverPreviewExitDurationMillis),
-                        targetScale = 0.97f,
-                    ) + slideOutVertically(
-                        animationSpec = tween(HoverPreviewExitDurationMillis),
-                        targetOffsetY = { height -> height / 32 },
+                        animationSpec = tween(durationMillis = HoverPreviewExitDurationMillis),
                     ),
                 ) {
                     HomePosterPreviewCard(

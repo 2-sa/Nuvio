@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import com.nuvio.app.isDesktop
 
 @Composable
 fun ProfileMeshBackground(
@@ -21,7 +22,7 @@ fun ProfileMeshBackground(
 ) {
     val animatedProfileColor by animateColorAsState(
         targetValue = profileColor,
-        animationSpec = tween(durationMillis = 520),
+        animationSpec = tween(durationMillis = if (isDesktop) 120 else 520),
         label = "profileMeshBackgroundColor",
     )
     val baseColor = Color.Black

@@ -49,17 +49,15 @@
 }
 
 .party-pill-text.changed {
-  animation: party-text-in 240ms var(--ease-out);
+  animation: party-text-in 120ms ease;
 }
 
 @keyframes party-text-in {
   from {
     opacity: 0;
-    transform: translateY(50%);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -186,7 +184,7 @@
 }
 
 .player-side-modal .party-panel {
-  width: min(420px, calc(100vw - 24px));
+  width: min(390px, calc(100vw - 48px));
 }
 
 .party-body {
@@ -334,11 +332,6 @@
   filter: brightness(1.08);
 }
 
-.party-button:active:not(:disabled),
-.party-button.is-pressed:not(:disabled) {
-  transform: scale(.98);
-}
-
 .party-button:disabled {
   opacity: .6;
 }
@@ -370,17 +363,12 @@
   border-radius: 999px;
   color: var(--theme-text-primary);
   transition:
-    transform var(--motion-fast) var(--ease-out),
     background-color var(--motion-standard) ease,
     color var(--motion-standard) ease;
 }
 
 .party-icon-button:hover {
   background: rgba(255, 255, 255, .1);
-}
-
-.party-icon-button:active {
-  transform: scale(.92);
 }
 
 .party-icon-button svg {
@@ -394,18 +382,6 @@
 
 .party-icon-button.done {
   color: var(--theme-accent);
-  animation: party-pop 320ms var(--ease-out);
-}
-
-@keyframes party-pop {
-  from {
-    transform: scale(.4);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
 }
 
 .party-overview {
@@ -446,16 +422,6 @@
   flex: 0 0 auto;
   border-radius: 999px;
   background: var(--theme-accent);
-  animation: party-blink 700ms ease-in-out infinite alternate;
-}
-
-@keyframes party-blink {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: .25;
-  }
 }
 
 .party-code-slots {
@@ -524,18 +490,7 @@
 }
 
 .party-member-row.entering {
-  animation: party-row-in 280ms var(--ease-out);
-}
-
-@keyframes party-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  animation: party-fade-in 120ms ease;
 }
 
 .party-open-seat-row {
@@ -738,17 +693,15 @@
 @keyframes party-card-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(.985);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
 @media (max-width: 760px) {
   .player-side-modal .party-panel {
-    width: 100vw;
+    width: min(390px, calc(100vw - 32px));
   }
 }
 
@@ -799,32 +752,28 @@
 }
 
 .party-unread.entering {
-  animation: party-badge-in 220ms var(--ease-out);
+  animation: party-badge-in 120ms ease;
 }
 
 .party-unread.leaving {
-  animation: party-badge-out 160ms ease forwards;
+  animation: party-badge-out 100ms ease forwards;
 }
 
 @keyframes party-badge-in {
   from {
     opacity: 0;
-    transform: scale(.8);
   }
   to {
     opacity: 1;
-    transform: scale(1);
   }
 }
 
 @keyframes party-badge-out {
   from {
     opacity: 1;
-    transform: scale(1);
   }
   to {
     opacity: 0;
-    transform: scale(.8);
   }
 }
 
@@ -1151,32 +1100,28 @@
 }
 
 .party-chat-new.entering {
-  animation: party-chat-new-in 240ms var(--ease-out);
+  animation: party-chat-new-in 120ms ease;
 }
 
 .party-chat-new.leaving {
-  animation: party-chat-new-out 160ms ease forwards;
+  animation: party-chat-new-out 100ms ease forwards;
 }
 
 @keyframes party-chat-new-in {
   from {
     opacity: 0;
-    transform: translate(-50%, 100%);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
   }
 }
 
 @keyframes party-chat-new-out {
   from {
     opacity: 1;
-    transform: translate(-50%, 0);
   }
   to {
     opacity: 0;
-    transform: translate(-50%, 100%);
   }
 }
 
@@ -1237,10 +1182,6 @@
   background: var(--theme-surface-card);
   color: var(--theme-text-muted);
   pointer-events: none;
-}
-
-.party-chat-send:active:not(:disabled) {
-  transform: scale(.94);
 }
 
 .party-chat-send svg {

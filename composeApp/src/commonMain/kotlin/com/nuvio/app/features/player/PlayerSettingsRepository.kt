@@ -37,8 +37,8 @@ data class PlayerSettingsUiState(
     val useLegacyPlayerLayout: Boolean = false,
     val showLoadingOverlay: Boolean = true,
     val showPlayerLoadingStatus: Boolean = true,
-    val pauseOverlayEnabled: Boolean = true,
-    val showParentalGuide: Boolean = true,
+    val pauseOverlayEnabled: Boolean = !isDesktop,
+    val showParentalGuide: Boolean = !isDesktop,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     val holdToSpeedEnabled: Boolean = true,
     val holdToSpeedValue: Float = 2f,
@@ -154,8 +154,8 @@ object PlayerSettingsRepository {
     private var useLegacyPlayerLayout = false
     private var showLoadingOverlay = true
     private var showPlayerLoadingStatus = true
-    private var pauseOverlayEnabled = true
-    private var showParentalGuide = true
+    private var pauseOverlayEnabled = !isDesktop
+    private var showParentalGuide = !isDesktop
     private var resizeMode = PlayerResizeMode.Fit
     private var holdToSpeedEnabled = true
     private var holdToSpeedValue = 2f
@@ -258,8 +258,8 @@ object PlayerSettingsRepository {
         useLegacyPlayerLayout = false
         showLoadingOverlay = true
         showPlayerLoadingStatus = true
-        pauseOverlayEnabled = true
-        showParentalGuide = true
+        pauseOverlayEnabled = !isDesktop
+        showParentalGuide = !isDesktop
         resizeMode = PlayerResizeMode.Fit
         holdToSpeedEnabled = true
         holdToSpeedValue = 2f
@@ -356,8 +356,8 @@ object PlayerSettingsRepository {
         useLegacyPlayerLayout = PlayerSettingsStorage.loadUseLegacyPlayerLayout() ?: false
         showLoadingOverlay = PlayerSettingsStorage.loadShowLoadingOverlay() ?: true
         showPlayerLoadingStatus = PlayerSettingsStorage.loadShowPlayerLoadingStatus() ?: true
-        pauseOverlayEnabled = PlayerSettingsStorage.loadPauseOverlayEnabled() ?: true
-        showParentalGuide = PlayerSettingsStorage.loadShowParentalGuide() ?: true
+        pauseOverlayEnabled = PlayerSettingsStorage.loadPauseOverlayEnabled() ?: !isDesktop
+        showParentalGuide = PlayerSettingsStorage.loadShowParentalGuide() ?: !isDesktop
         resizeMode = PlayerSettingsStorage.loadResizeMode()
             ?.let { runCatching { PlayerResizeMode.valueOf(it) }.getOrNull() }
             ?: PlayerResizeMode.Fit

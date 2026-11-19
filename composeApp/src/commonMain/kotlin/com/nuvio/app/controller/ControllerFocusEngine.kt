@@ -56,6 +56,7 @@ import androidx.compose.ui.zIndex
 import com.nuvio.app.controller.audio.ControllerSoundPlayer
 import com.nuvio.app.core.ui.LocalScreenActive
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -2428,7 +2429,7 @@ fun Modifier.controllerFocusable(
     val focusedSnapshot by ControllerFocusEngine.focusedNodeSnapshot.collectAsState()
     val isSiblingActiveInGroup = !isFocused && isControllerActive && effectiveGroupKey != null &&
         focusedSnapshot?.groupKey == effectiveGroupKey
-    val targetAlpha = if (isSiblingActiveInGroup) 0.82f else 1f
+    val targetAlpha = if (!isDesktop && isSiblingActiveInGroup) 0.82f else 1f
     val animatedAlpha by animateFloatAsState(
         targetValue = targetAlpha,
         animationSpec = tween(durationMillis = 150),
@@ -2436,13 +2437,13 @@ fun Modifier.controllerFocusable(
     )
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) effectiveFocusScale else 1f,
+        targetValue = if (isFocused && !isDesktop) effectiveFocusScale else 1f,
         animationSpec = tween(durationMillis = 150),
         label = "controller_focus_scale",
     )
 
     val sheenProgress by animateFloatAsState(
-        targetValue = if (isFocused && !hideFocusRing) 1f else 0f,
+        targetValue = if (isFocused && !hideFocusRing && !isDesktop) 1f else 0f,
         animationSpec = tween(durationMillis = 180),
         label = "controller_focus_sheen",
     )
