@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           test_args=()
-          if [ -n "${TEST_FILTER:-}" ]; then
+          if [ -n "${TEST_FILTER:-}" ] && [ "${TEST_FILTER}" != "all" ]; then
             read -r -a filter_patterns <<< "${TEST_FILTER}"
             for pattern in "${filter_patterns[@]+"${filter_patterns[@]}"}"; do
               if [ -n "${pattern}" ]; then
