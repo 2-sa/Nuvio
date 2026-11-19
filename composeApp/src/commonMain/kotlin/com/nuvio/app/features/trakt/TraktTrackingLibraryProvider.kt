@@ -58,8 +58,11 @@ object TraktTrackingLibraryProvider : TrackingLibraryProvider {
     override fun contains(contentId: String, contentType: String?): Boolean {
         if (contentType != null) return TraktLibraryRepository.isInAnyList(contentId, contentType)
         val item = find(contentId) ?: return false
-        return TraktLibraryRepository.isInAnyList(item.id, item.type)
+        return TraktLibraryRepository.isInAnyList(item)
     }
+
+    override fun contains(item: LibraryItem): Boolean =
+        TraktLibraryRepository.isInAnyList(item)
 
     override fun find(contentId: String): LibraryItem? =
         TraktLibraryRepository.uiState.value.allItems.firstOrNull { item -> item.id == contentId }

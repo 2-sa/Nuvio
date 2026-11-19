@@ -4,6 +4,9 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.RawHttpResponse
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.library.LibraryItem
+import com.nuvio.app.features.player.skip.SimklIdResolver
+import com.nuvio.app.features.tracking.parseTrackingExternalIds
+import io.ktor.http.encodeURLParameter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +68,7 @@ object TraktLibraryRepository {
     private val refreshMutex = Mutex()
     private var lastRefreshAtMs: Long = 0L
     private var lastListTabsRefreshAtMs: Long = 0L
+    private val resolvedIdsByContentKey = MutableStateFlow<Map<String, TraktIdsDto>>(emptyMap())
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -88,6 +92,7 @@ object TraktLibraryRepository {
         hasLoaded = false
         lastRefreshAtMs = 0L
         lastListTabsRefreshAtMs = 0L
+        resolvedIdsByContentKey.value = emptyMap()
         _uiState.value = TraktLibraryUiState()
         ensureLoaded()
     }
@@ -96,6 +101,7 @@ object TraktLibraryRepository {
         hasLoaded = false
         lastRefreshAtMs = 0L
         lastListTabsRefreshAtMs = 0L
+        resolvedIdsByContentKey.value = emptyMap()
         _uiState.value = TraktLibraryUiState()
         TraktLibraryStorage.savePayload("")
     }
@@ -103,8 +109,16 @@ object TraktLibraryRepository {
     fun currentListTabs(): List<TraktListTab> = _uiState.value.listTabs
 
     fun isInAnyList(itemId: String, itemType: String): Boolean {
+        val membership = _uiState.value.membershipByContent
         val key = contentKey(itemId, itemType)
-        return _uiState.value.membershipByContent[key].orEmpty().isNotEmpty()
+        if (membership[key].orEmpty().isNotEmpty()) return true
+        val cached = resolvedIdsByContentKey.value[key] ?: return false
+        return keysForIds(normalizeType(itemType), cached).any { membership[it].orEmpty().isNotEmpty() }
+    }
+
+    fun isInAnyList(item: LibraryItem): Boolean {
+        val membership = _uiState.value.membershipByContent
+        return allContentKeys(item).any { key -> membership[key].orEmpty().isNotEmpty() }
     }
 
     suspend fun refreshNow() {
@@ -187,14 +201,18 @@ object TraktLibraryRepository {
 
     suspend fun getMembershipSnapshot(item: LibraryItem): TraktMembershipSnapshot {
         ensureLoaded()
-        if (TraktAuthRepository.isAuthenticated.value) {
+        val headers = if (TraktAuthRepository.isAuthenticated.value) {
             ensureFresh()
+            TraktAuthRepository.authorizedHeaders()
+        } else {
+            null
         }
-        val itemMembership = _uiState.value.membershipByContent[contentKey(item.id, item.type)].orEmpty()
-        val map = _uiState.value.listTabs.associate { tab ->
-            tab.key to itemMembership.contains(tab.key)
-        }
-        return TraktMembershipSnapshot(listMembership = map)
+        val resolvedItem = enrichItemWithResolvedIds(
+            headers = headers,
+            item = item,
+            allowRemoteLookup = headers != null,
+        )
+        return TraktMembershipSnapshot(listMembership = membershipMapFor(resolvedItem))
     }
 
     suspend fun applyMembershipChanges(item: LibraryItem, changes: TraktMembershipChanges) {
@@ -202,14 +220,19 @@ object TraktLibraryRepository {
         val headers = TraktAuthRepository.authorizedHeaders() ?: return
         ensureFresh()
 
-        val current = getMembershipSnapshot(item).listMembership
+        val resolvedItem = enrichItemWithResolvedIds(
+            headers = headers,
+            item = item,
+            allowRemoteLookup = true,
+        )
+        val current = membershipMapFor(resolvedItem)
         val desired = changes.desiredMembership
         val keys = (current.keys + desired.keys).distinct()
         val previousState = _uiState.value
 
         _uiState.value = applyOptimisticMembershipChanges(
             state = previousState,
-            item = item,
+            item = resolvedItem,
             desiredMembership = desired,
         )
 
@@ -221,23 +244,32 @@ object TraktLibraryRepository {
 
                 if (key == WATCHLIST_KEY) {
                     if (after) {
-                        addToWatchlist(headers, item)
+                        addToWatchlist(headers, resolvedItem)
                     } else {
-                        removeFromWatchlist(headers, item)
+                        removeFromWatchlist(headers, resolvedItem)
                     }
                 } else {
                     val listId = key.removePrefix(PERSONAL_LIST_PREFIX)
                     if (listId == key || listId.isBlank()) continue
                     if (after) {
-                        addToPersonalList(headers, listId, item)
+                        addToPersonalList(headers, listId, resolvedItem)
                     } else {
-                        removeFromPersonalList(headers, listId, item)
+                        removeFromPersonalList(headers, listId, resolvedItem)
                     }
                 }
             }
         } catch (error: Throwable) {
             _uiState.value = previousState
             throw error
+        }
+    }
+
+    private fun membershipMapFor(item: LibraryItem): Map<String, Boolean> {
+        val state = _uiState.value
+        val itemMembership = allContentKeys(item)
+            .flatMapTo(mutableSetOf()) { key -> state.membershipByContent[key].orEmpty() }
+        return state.listTabs.associate { tab ->
+            tab.key to itemMembership.contains(tab.key)
         }
     }
 
@@ -248,8 +280,10 @@ object TraktLibraryRepository {
     ): TraktLibraryUiState {
         if (state.listTabs.isEmpty()) return state
 
-        val contentKey = contentKey(item.id, item.type)
-        val currentMembership = state.membershipByContent[contentKey].orEmpty()
+        val itemKeys = allContentKeys(item)
+        val currentMembership = itemKeys.flatMapTo(mutableSetOf()) { key ->
+            state.membershipByContent[key].orEmpty()
+        }
         val updatedEntriesByList = state.entriesByList.toMutableMap()
         val keys = (currentMembership + desiredMembership.keys).distinct()
 
@@ -261,12 +295,12 @@ object TraktLibraryRepository {
             if (after) {
                 val resolvedItem = resolveOptimisticItem(state, item)
                 updatedEntriesByList[listKey] = listOf(resolvedItem) +
-                    updatedEntriesByList[listKey].orEmpty().filterNot {
-                        allContentKeys(it).contains(contentKey)
+                    updatedEntriesByList[listKey].orEmpty().filterNot { entry ->
+                        allContentKeys(entry).any { it in itemKeys }
                     }
             } else {
-                updatedEntriesByList[listKey] = updatedEntriesByList[listKey].orEmpty().filterNot {
-                    allContentKeys(it).contains(contentKey)
+                updatedEntriesByList[listKey] = updatedEntriesByList[listKey].orEmpty().filterNot { entry ->
+                    allContentKeys(entry).any { it in itemKeys }
                 }
             }
         }
@@ -281,16 +315,21 @@ object TraktLibraryRepository {
         state: TraktLibraryUiState,
         item: LibraryItem,
     ): LibraryItem {
-        val itemKey = contentKey(item.id, item.type)
-        val existing = state.allItems.firstOrNull {
-            allContentKeys(it).contains(itemKey)
+        val itemKeys = allContentKeys(item)
+        val existing = state.allItems.firstOrNull { entry ->
+            allContentKeys(entry).any { it in itemKeys }
         }
         val base = existing ?: item
         val savedAt = base.savedAtEpochMs.takeIf { it > 0L }
             ?: item.savedAtEpochMs.takeIf { it > 0L }
             ?: TraktPlatformClock.nowEpochMs()
 
-        return base.copy(savedAtEpochMs = savedAt)
+        return base.copy(
+            imdbId = base.imdbId ?: item.imdbId,
+            tmdbId = base.tmdbId ?: item.tmdbId,
+            traktId = base.traktId ?: item.traktId,
+            savedAtEpochMs = savedAt,
+        )
     }
 
     private fun rebuildUiState(
@@ -646,7 +685,7 @@ object TraktLibraryRepository {
     }
 
     private suspend fun addToWatchlist(headers: Map<String, String>, item: LibraryItem) {
-        val body = buildMutationBody(item)
+        val body = buildMutationBody(headers, item)
         val response = postJson(
             url = "$BASE_URL/sync/watchlist",
             body = body,
@@ -658,7 +697,7 @@ object TraktLibraryRepository {
     }
 
     private suspend fun removeFromWatchlist(headers: Map<String, String>, item: LibraryItem) {
-        val body = buildMutationBody(item)
+        val body = buildMutationBody(headers, item)
         postJson(
             url = "$BASE_URL/sync/watchlist/remove",
             body = body,
@@ -667,7 +706,7 @@ object TraktLibraryRepository {
     }
 
     private suspend fun addToPersonalList(headers: Map<String, String>, listId: String, item: LibraryItem) {
-        val body = buildMutationBody(item)
+        val body = buildMutationBody(headers, item)
         val response = postJson(
             url = "$BASE_URL/users/me/lists/$listId/items",
             body = body,
@@ -679,7 +718,7 @@ object TraktLibraryRepository {
     }
 
     private suspend fun removeFromPersonalList(headers: Map<String, String>, listId: String, item: LibraryItem) {
-        val body = buildMutationBody(item)
+        val body = buildMutationBody(headers, item)
         postJson(
             url = "$BASE_URL/users/me/lists/$listId/items/remove",
             body = body,
@@ -687,9 +726,9 @@ object TraktLibraryRepository {
         )
     }
 
-    private suspend fun buildMutationBody(item: LibraryItem): String {
+    private suspend fun buildMutationBody(headers: Map<String, String>, item: LibraryItem): String {
         val type = normalizeType(item.type)
-        val ids = resolveIds(item)
+        val ids = resolveIds(headers = headers, item = item, allowRemoteLookup = true)
         if (!ids.hasAnyId()) {
             throw IllegalStateException(localizedString(Res.string.trakt_error_missing_ids))
         }
@@ -718,13 +757,196 @@ object TraktLibraryRepository {
         return json.encodeToString(request)
     }
 
-    private fun resolveIds(item: LibraryItem): TraktIdsDto {
+    private fun resolveLocalIds(item: LibraryItem): TraktIdsDto {
         val parsed = parseTraktContentIds(item.id)
-
+        val normalizedImdb = item.imdbId?.let { parseTraktContentIds(it).imdb ?: it.trim().takeIf(String::isNotBlank) }
         return TraktIdsDto(
-            imdb = item.imdbId ?: parsed.imdb,
+            imdb = normalizedImdb ?: parsed.imdb,
             tmdb = item.tmdbId ?: parsed.tmdb,
             trakt = item.traktId ?: parsed.trakt,
+        )
+    }
+
+    private suspend fun enrichItemWithResolvedIds(
+        headers: Map<String, String>?,
+        item: LibraryItem,
+        allowRemoteLookup: Boolean,
+    ): LibraryItem {
+        val resolved = resolveIds(
+            headers = headers,
+            item = item,
+            allowRemoteLookup = allowRemoteLookup,
+        )
+        if (!resolved.hasAnyId()) return item
+        return item.copy(
+            imdbId = item.imdbId?.takeIf { it.isNotBlank() } ?: resolved.imdb,
+            tmdbId = item.tmdbId ?: resolved.tmdb,
+            traktId = item.traktId ?: resolved.trakt,
+        )
+    }
+
+    private suspend fun resolveIds(
+        headers: Map<String, String>?,
+        item: LibraryItem,
+        allowRemoteLookup: Boolean,
+    ): TraktIdsDto {
+        val local = resolveLocalIds(item)
+        if (local.hasAnyId()) return local
+
+        val key = contentKey(item.id, item.type)
+        resolvedIdsByContentKey.value[key]?.takeIf { it.hasAnyId() }?.let { return it }
+        if (!allowRemoteLookup) return TraktIdsDto()
+
+        val external = parseTrackingExternalIds(item.id)
+        val resolvedFromSimkl = resolveViaSimkl(external, item.type)
+        if (resolvedFromSimkl.hasAnyId()) {
+            cacheResolvedIds(key, resolvedFromSimkl)
+            return resolvedFromSimkl
+        }
+
+        if (headers != null) {
+            val normalizedType = normalizeType(item.type)
+            val tvdbId = external.tvdb?.trim()?.takeIf(String::isNotBlank)
+            if (tvdbId != null && normalizedType != "movie") {
+                val resolvedFromTvdb = resolveViaTraktTvdbSearch(headers, tvdbId)
+                if (resolvedFromTvdb.hasAnyId()) {
+                    cacheResolvedIds(key, resolvedFromTvdb)
+                    return resolvedFromTvdb
+                }
+            }
+
+            if (item.name.isNotBlank()) {
+                val resolvedFromSearch = resolveViaTraktTextSearch(
+                    headers = headers,
+                    title = item.name,
+                    year = extractYear(item.releaseInfo),
+                    normalizedType = normalizedType,
+                )
+                if (resolvedFromSearch.hasAnyId()) {
+                    cacheResolvedIds(key, resolvedFromSearch)
+                    return resolvedFromSearch
+                }
+            }
+        }
+
+        return TraktIdsDto()
+    }
+
+    private fun cacheResolvedIds(key: String, ids: TraktIdsDto) {
+        if (!ids.hasAnyId()) return
+        resolvedIdsByContentKey.value = resolvedIdsByContentKey.value + (key to ids)
+    }
+
+    private suspend fun resolveViaSimkl(
+        external: com.nuvio.app.features.tracking.TrackingExternalIds,
+        contentType: String,
+    ): TraktIdsDto {
+        val lookup = when {
+            external.kitsu != null -> "kitsu" to external.kitsu.toString()
+            external.mal != null -> "mal" to external.mal.toString()
+            external.anilist != null -> "anilist" to external.anilist.toString()
+            external.anidb != null -> "anidb" to external.anidb.toString()
+            !external.tvdb.isNullOrBlank() -> "tvdb" to external.tvdb
+            external.simkl != null -> "simkl" to external.simkl.toString()
+            else -> return TraktIdsDto()
+        }
+        val resolved = runCatching {
+            SimklIdResolver.resolveIds(
+                source = lookup.first,
+                id = lookup.second,
+                contentTypeHint = contentType,
+            )
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            log.w { "Simkl ID bridge failed for ${lookup.first}:${lookup.second}: ${error.message}" }
+        }.getOrNull() ?: return TraktIdsDto()
+
+        return TraktIdsDto(
+            imdb = parseTraktContentIds(resolved.imdb).imdb,
+            tmdb = resolved.tmdb,
+        )
+    }
+
+    private suspend fun resolveViaTraktTvdbSearch(
+        headers: Map<String, String>,
+        tvdbId: String,
+    ): TraktIdsDto {
+        val url = "$BASE_URL/search/tvdb/${tvdbId.encodeURLParameter()}?type=show"
+        val response = runCatching {
+            httpRequestRaw(
+                method = "GET",
+                url = url,
+                headers = mapOf("Accept" to "application/json") + headers,
+                body = "",
+                followRedirects = true,
+            )
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            log.w { "Trakt TVDB lookup failed for tvdb=$tvdbId: ${error.message}" }
+        }.getOrNull() ?: return TraktIdsDto()
+
+        if (response.status !in 200..299 || response.body.isBlank()) return TraktIdsDto()
+        val results = runCatching {
+            json.decodeFromString<List<TraktSearchResultDto>>(response.body)
+        }.getOrNull().orEmpty()
+        return results.firstNotNullOfOrNull { result ->
+            result.show?.ids?.takeIf { it.hasAnyId() }
+        } ?: TraktIdsDto()
+    }
+
+    private suspend fun resolveViaTraktTextSearch(
+        headers: Map<String, String>,
+        title: String,
+        year: Int?,
+        normalizedType: String,
+    ): TraktIdsDto {
+        val searchType = if (normalizedType == "movie") "movie" else "show"
+        val queryUrl = buildString {
+            append("$BASE_URL/search/$searchType?query=")
+            append(title.trim().encodeURLParameter())
+            if (year != null) {
+                append("&years=")
+                append(year)
+            }
+            append("&limit=10")
+        }
+        val response = runCatching {
+            httpRequestRaw(
+                method = "GET",
+                url = queryUrl,
+                headers = mapOf("Accept" to "application/json") + headers,
+                body = "",
+                followRedirects = true,
+            )
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            log.w { "Trakt title lookup failed for '$title': ${error.message}" }
+        }.getOrNull() ?: return TraktIdsDto()
+
+        if (response.status !in 200..299 || response.body.isBlank()) return TraktIdsDto()
+        val results = runCatching {
+            json.decodeFromString<List<TraktSearchResultDto>>(response.body)
+        }.getOrNull().orEmpty()
+
+        val candidates = results.mapNotNull { entry ->
+            val media = if (searchType == "movie") entry.movie else entry.show
+            val ids = media?.ids?.toExternalIds()?.takeIf { it.hasAnyId() } ?: return@mapNotNull null
+            TraktSearchMatchCandidate(
+                title = media.title,
+                year = media.year,
+                ids = ids,
+            )
+        }
+        val best = selectBestTraktSearchMatch(
+            candidates = candidates,
+            queryTitle = title,
+            queryYear = year,
+        ) ?: return TraktIdsDto()
+
+        return TraktIdsDto(
+            trakt = best.trakt,
+            imdb = best.imdb,
+            tmdb = best.tmdb,
         )
     }
 
@@ -792,10 +1014,25 @@ object TraktLibraryRepository {
 
     private fun allContentKeys(entry: LibraryItem): Set<String> {
         val type = normalizeType(entry.type)
-        val keys = mutableSetOf(contentKey(entry.id, entry.type))
-        entry.imdbId?.takeIf { it.isNotBlank() }?.let { keys.add("$type:$it") }
+        val primaryKey = contentKey(entry.id, entry.type)
+        val keys = mutableSetOf(primaryKey)
+        entry.imdbId?.takeIf { it.isNotBlank() }?.let { imdb ->
+            val normalizedImdb = parseTraktContentIds(imdb).imdb ?: imdb.trim()
+            keys.add("$type:$normalizedImdb")
+        }
         entry.tmdbId?.let { keys.add("$type:tmdb:$it") }
         entry.traktId?.let { keys.add("$type:trakt:$it") }
+        resolvedIdsByContentKey.value[primaryKey]?.let { cached ->
+            keys.addAll(keysForIds(type, cached))
+        }
+        return keys
+    }
+
+    private fun keysForIds(normalizedType: String, ids: TraktIdsDto): Set<String> {
+        val keys = mutableSetOf<String>()
+        ids.imdb?.takeIf { it.isNotBlank() }?.let { keys.add("$normalizedType:$it") }
+        ids.tmdb?.let { keys.add("$normalizedType:tmdb:$it") }
+        ids.trakt?.let { keys.add("$normalizedType:trakt:$it") }
         return keys
     }
 
@@ -932,4 +1169,11 @@ private data class TraktListShowRequestItemDto(
     val title: String? = null,
     val year: Int? = null,
     val ids: TraktIdsDto? = null,
+)
+
+@Serializable
+private data class TraktSearchResultDto(
+    val type: String? = null,
+    val movie: TraktMediaDto? = null,
+    val show: TraktMediaDto? = null,
 )

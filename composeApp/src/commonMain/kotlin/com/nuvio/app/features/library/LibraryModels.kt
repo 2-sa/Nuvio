@@ -4,6 +4,9 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.tracking.TrackingAttributedItem
+import com.nuvio.app.features.trakt.hasAnyId
+import com.nuvio.app.features.trakt.mergeMissing
+import com.nuvio.app.features.trakt.parseTraktContentIds
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -65,8 +68,15 @@ data class LibraryUiState(
     val errorMessage: String? = null,
 )
 
-fun MetaDetails.toLibraryItem(savedAtEpochMs: Long): LibraryItem =
-    LibraryItem(
+fun MetaDetails.toLibraryItem(savedAtEpochMs: Long): LibraryItem {
+    val videoIds = videos.firstNotNullOfOrNull { video ->
+        parseTraktContentIds(video.id).takeIf { it.hasAnyId() }
+    }
+    val resolvedIds = parseTraktContentIds(id)
+        .mergeMissing(parseTraktContentIds(imdbId))
+        .mergeMissing(parseTraktContentIds(defaultVideoId))
+        .let { current -> if (videoIds != null) current.mergeMissing(videoIds) else current }
+    return LibraryItem(
         id = id,
         type = type,
         name = name,
@@ -78,12 +88,16 @@ fun MetaDetails.toLibraryItem(savedAtEpochMs: Long): LibraryItem =
         imdbRating = imdbRating,
         genres = genres,
         posterShape = PosterShape.Poster,
-        imdbId = id.takeIf { it.startsWith("tt") },
+        imdbId = resolvedIds.imdb,
+        tmdbId = resolvedIds.tmdb,
+        traktId = resolvedIds.trakt,
         savedAtEpochMs = savedAtEpochMs,
     )
+}
 
-fun MetaPreview.toLibraryItem(savedAtEpochMs: Long): LibraryItem =
-    LibraryItem(
+fun MetaPreview.toLibraryItem(savedAtEpochMs: Long): LibraryItem {
+    val resolvedIds = parseTraktContentIds(id)
+    return LibraryItem(
         id = id,
         type = type,
         name = name,
@@ -95,9 +109,12 @@ fun MetaPreview.toLibraryItem(savedAtEpochMs: Long): LibraryItem =
         imdbRating = imdbRating,
         genres = genres,
         posterShape = posterShape,
-        imdbId = id.takeIf { it.startsWith("tt") },
+        imdbId = resolvedIds.imdb,
+        tmdbId = resolvedIds.tmdb,
+        traktId = resolvedIds.trakt,
         savedAtEpochMs = savedAtEpochMs,
     )
+}
 
 fun LibraryItem.toMetaPreview(): MetaPreview =
     MetaPreview(

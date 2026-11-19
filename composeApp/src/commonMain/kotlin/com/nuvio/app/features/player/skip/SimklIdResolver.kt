@@ -23,6 +23,7 @@ internal object SimklIdResolver {
         val anilist: String? = null,
         val kitsu: String? = null,
         val imdb: String? = null,
+        val tmdb: Int? = null,
         val tvdbSeason: Int? = null
     )
 
@@ -87,6 +88,7 @@ internal object SimklIdResolver {
                 anilist = ids?.get("anilist")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
                 kitsu = ids?.get("kitsu")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
                 imdb = ids?.get("imdb")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+                tmdb = ids?.get("tmdb")?.jsonPrimitive?.content?.toIntOrNull()?.takeIf { it > 0 },
                 tvdbSeason = details["season"]?.jsonPrimitive?.int?.takeIf { it > 0 }
             ).also { idsCache[cacheKey] = it }
         } catch (_: Exception) {
@@ -193,6 +195,7 @@ internal object SimklIdResolver {
                 anilist = ids?.get("anilist")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
                 kitsu = ids?.get("kitsu")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
                 imdb = ids?.get("imdb")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+                tmdb = ids?.get("tmdb")?.jsonPrimitive?.content?.toIntOrNull()?.takeIf { it > 0 },
                 tvdbSeason = details["season"]?.jsonPrimitive?.int?.takeIf { it > 0 }
             ).also { idsCache[cacheKey] = it }
         } catch (_: Exception) {

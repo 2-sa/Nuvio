@@ -97,6 +97,7 @@ interface TrackingLibraryProvider {
     suspend fun refresh(intent: TrackingRefreshIntent)
     fun snapshot(): TrackingLibrarySnapshot
     fun contains(contentId: String, contentType: String? = null): Boolean
+    fun contains(item: LibraryItem): Boolean = contains(item.id, item.type)
     fun find(contentId: String): LibraryItem?
     suspend fun membership(item: LibraryItem): Map<String, Boolean>
     fun toggledDefaultMembership(currentMembership: Map<String, Boolean>): Map<String, Boolean>

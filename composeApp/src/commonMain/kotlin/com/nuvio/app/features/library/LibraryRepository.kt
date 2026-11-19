@@ -411,6 +411,14 @@ object LibraryRepository {
         }
     }
 
+    fun isSaved(item: LibraryItem): Boolean {
+        ensureLoaded()
+
+        activeLibraryProvider()?.let { provider -> return provider.contains(item) }
+
+        return localState.contains(item.id, item.type)
+    }
+
     fun savedItem(id: String): LibraryItem? {
         ensureLoaded()
 

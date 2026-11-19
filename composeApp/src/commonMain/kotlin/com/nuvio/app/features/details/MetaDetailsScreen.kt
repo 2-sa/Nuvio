@@ -552,8 +552,9 @@ fun MetaDetailsScreen(
                     libraryUiState.sourceMode,
                     meta.id,
                     meta.type,
+                    meta.imdbId,
                 ) {
-                    LibraryRepository.isSaved(meta.id, meta.type)
+                    LibraryRepository.isSaved(meta.toLibraryItem(savedAtEpochMs = 0L))
                 }
                 val isWatched = remember(watchedUiState.watchedKeys, fullyWatchedSeriesKeys, metaPreview) {
                     WatchingState.isPosterWatched(

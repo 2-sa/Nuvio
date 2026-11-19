@@ -14,16 +14,37 @@ internal fun parseTraktContentIds(contentId: String?): TraktExternalIds {
     if (contentId.isNullOrBlank()) return TraktExternalIds()
     val raw = contentId.trim()
 
-    if (raw.startsWith("tt")) {
-        return TraktExternalIds(imdb = raw.substringBefore(':'))
+    if (raw.startsWith("tt", ignoreCase = true)) {
+        val imdb = raw.substringBefore(':').lowercase()
+        if (imdb.length > 2) return TraktExternalIds(imdb = imdb)
+    }
+
+    if (raw.startsWith("imdb:", ignoreCase = true)) {
+        val candidate = raw.substringAfter(':').substringBefore(':').trim()
+        if (candidate.startsWith("tt", ignoreCase = true) && candidate.length > 2) {
+            return TraktExternalIds(imdb = candidate.lowercase())
+        }
     }
 
     if (raw.startsWith("tmdb:", ignoreCase = true)) {
-        return TraktExternalIds(tmdb = raw.substringAfter(':').toIntOrNull())
+        val tmdbPart = raw.substringAfter(':').trim()
+            .let { value ->
+                when {
+                    value.startsWith("movie:", ignoreCase = true) -> value.substringAfter(':')
+                    value.startsWith("tv:", ignoreCase = true) -> value.substringAfter(':')
+                    value.startsWith("series:", ignoreCase = true) -> value.substringAfter(':')
+                    value.startsWith("show:", ignoreCase = true) -> value.substringAfter(':')
+                    else -> value
+                }
+            }
+            .substringBefore(':')
+            .trim()
+        return TraktExternalIds(tmdb = tmdbPart.toIntOrNull())
     }
 
     if (raw.startsWith("trakt:", ignoreCase = true)) {
-        return TraktExternalIds(trakt = raw.substringAfter(':').toIntOrNull())
+        val traktPart = raw.substringAfter(':').substringBefore(':').trim()
+        return TraktExternalIds(trakt = traktPart.toIntOrNull())
     }
 
     val numeric = raw.substringBefore(':').toIntOrNull()
@@ -33,6 +54,58 @@ internal fun parseTraktContentIds(contentId: String?): TraktExternalIds {
         TraktExternalIds()
     }
 }
+
+internal fun TraktExternalIds.mergeMissing(other: TraktExternalIds): TraktExternalIds =
+    TraktExternalIds(
+        trakt = trakt ?: other.trakt,
+        imdb = imdb?.takeIf { it.isNotBlank() } ?: other.imdb?.takeIf { it.isNotBlank() },
+        tmdb = tmdb ?: other.tmdb,
+        slug = slug?.takeIf { it.isNotBlank() } ?: other.slug?.takeIf { it.isNotBlank() },
+    )
+
+internal data class TraktSearchMatchCandidate(
+    val title: String?,
+    val year: Int?,
+    val ids: TraktExternalIds,
+)
+
+internal fun selectBestTraktSearchMatch(
+    candidates: List<TraktSearchMatchCandidate>,
+    queryTitle: String,
+    queryYear: Int?,
+): TraktExternalIds? {
+    val valid = candidates.filter { it.ids.hasAnyId() }
+    if (valid.isEmpty()) return null
+
+    val normalizedQuery = normalizeTraktSearchTitle(queryTitle)
+    if (normalizedQuery.isNotBlank()) {
+        if (queryYear != null) {
+            valid.firstOrNull { candidate ->
+                candidate.year == queryYear &&
+                    normalizeTraktSearchTitle(candidate.title.orEmpty()) == normalizedQuery
+            }?.let { return it.ids }
+        }
+        valid.firstOrNull { candidate ->
+            normalizeTraktSearchTitle(candidate.title.orEmpty()) == normalizedQuery &&
+                (queryYear == null || candidate.year == null || kotlin.math.abs(candidate.year - queryYear) <= 1)
+        }?.let { return it.ids }
+    }
+
+    if (queryYear != null) {
+        val exactYearMatches = valid.filter { it.year == queryYear }
+        if (exactYearMatches.size == 1) {
+            return exactYearMatches.first().ids
+        }
+        if (exactYearMatches.isNotEmpty() && valid.first().year == queryYear) {
+            return valid.first().ids
+        }
+    }
+
+    return null
+}
+
+private fun normalizeTraktSearchTitle(value: String): String =
+    value.trim().lowercase().filter { it.isLetterOrDigit() }
 
 internal fun normalizeTraktContentId(ids: TraktExternalIds?, fallback: String? = null): String {
     val imdb = ids?.imdb?.takeIf { it.isNotBlank() }
@@ -62,17 +135,8 @@ internal fun TraktExternalIds.hasAnyId(): Boolean =
  * preserved locally rather than being discarded when absent from Trakt
  * remote responses.
  */
-internal fun isTraktCompatibleId(contentId: String?): Boolean {
-    if (contentId.isNullOrBlank()) return false
-    val raw = contentId.trim()
-    if (raw.startsWith("tt")) return true
-    if (raw.startsWith("tmdb:", ignoreCase = true)) return true
-    if (raw.startsWith("trakt:", ignoreCase = true)) return true
-    // Pure numeric IDs are treated as Trakt IDs
-    val beforeColon = raw.substringBefore(':')
-    if (beforeColon.toIntOrNull() != null) return true
-    return false
-}
+internal fun isTraktCompatibleId(contentId: String?): Boolean =
+    parseTraktContentIds(contentId).hasAnyId()
 
 /**
  * If [contentId] is not Trakt-resolvable but [videoId] contains a valid
