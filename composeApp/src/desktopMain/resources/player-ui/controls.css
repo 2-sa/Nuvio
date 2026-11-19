@@ -436,7 +436,7 @@ button:disabled {
   max-width: min(760px, 100%);
   width: fit-content;
   font-size: var(--title);
-  line-height: 1.16;
+  line-height: 1.28;
   font-weight: 700;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -639,6 +639,7 @@ button:disabled {
 .skip-prompt-row {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 12px 18px;
 }
 
@@ -649,9 +650,8 @@ button:disabled {
 }
 
 .skip-prompt-label {
-  padding-left: 8px;
   font-size: 14px;
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
 }
 
@@ -1593,7 +1593,7 @@ button:disabled {
 .chapter-title {
   max-width: min(760px, 100%);
   width: fit-content;
-  padding-bottom: 6px;
+  padding-bottom: 10px;
   font-size: var(--meta);
   line-height: 1.3;
   color: rgba(255, 255, 255, .9);

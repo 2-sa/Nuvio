@@ -36,6 +36,8 @@ const fullscreenIcon = document.getElementById("fullscreenIcon");
 const title = document.getElementById("title");
 const episode = document.getElementById("episode");
 const playbackMetadata = document.querySelector(".metadata");
+const progressSection = document.querySelector(".progress");
+const playbackMetaRow = document.querySelector(".meta-row");
 const streamTitle = document.getElementById("streamTitle");
 const providerName = document.getElementById("providerName");
 const playerBadges = document.getElementById("playerBadges");
@@ -889,8 +891,14 @@ const renderPlayerBadges = () => {
     const image = document.createElement("img");
     image.alt = badge.name || "";
     image.draggable = false;
-    image.addEventListener("error", () => chip.remove());
-    image.addEventListener("load", () => { playerBadges.hidden = !playerBadges.childElementCount; });
+    image.addEventListener("error", () => {
+      chip.remove();
+      syncSkipPromptPlacement(skipPrompt.classList.contains("visible"));
+    });
+    image.addEventListener("load", () => {
+      playerBadges.hidden = !playerBadges.childElementCount;
+      syncSkipPromptPlacement(skipPrompt.classList.contains("visible"));
+    });
     image.src = badge.imageUrl;
     chip.appendChild(image);
     playerBadges.appendChild(chip);
@@ -1287,6 +1295,7 @@ window.addEventListener("resize", () => {
   if (activeModal && popoverConfigByName[activeModal]) {
     positionActivePopover();
   }
+  syncSkipPromptPlacement(skipPrompt.classList.contains("visible"));
 });
 
 const setModalVisibility = (modal, visible, animated = true) => {
@@ -2684,7 +2693,12 @@ const renderChapterMarks = () => {
     }
   }
   const index = currentChapterIndex(chapters);
-  setText(chapterTitle, index >= 0 && state.chapterTitleEnabled !== false ? chapters[index].title : "");
+  const nextChapterText = index >= 0 && state.chapterTitleEnabled !== false ? chapters[index].title : "";
+  const chapterChanged = chapterTitle.textContent !== (nextChapterText || "") || chapterTitle.hidden !== !nextChapterText;
+  setText(chapterTitle, nextChapterText);
+  if (chapterChanged && skipPrompt.classList.contains("visible")) {
+    syncSkipPromptPlacement(true);
+  }
 };
 
 const renderActiveModal = (modalOpened = false) => {
@@ -2806,18 +2820,69 @@ const startSkipPromptAutoHide = () => {
   }, prefersReducedMotion ? 1 : 10000);
 };
 
+const computeSkipPromptLift = ({
+  rootHeight,
+  overlayTop,
+  skipPromptHeight,
+  baseOverlayBottom,
+  gapPx = 16,
+  topMarginPx = 12,
+}) => {
+  if (
+    !Number.isFinite(rootHeight) || rootHeight <= 0 ||
+    !Number.isFinite(overlayTop) ||
+    !Number.isFinite(skipPromptHeight) || skipPromptHeight <= 0 ||
+    !Number.isFinite(baseOverlayBottom)
+  ) {
+    return 0;
+  }
+  const requiredBottom = (rootHeight - overlayTop) + gapPx;
+  const requiredLift = Math.max(0, Math.ceil(requiredBottom - baseOverlayBottom));
+  const availableLift = Math.max(0, Math.floor(rootHeight - baseOverlayBottom - skipPromptHeight - topMarginPx));
+  return Math.min(requiredLift, availableLift);
+};
+
+const resolveSkipPromptBaseBottom = () => {
+  const styles = window.getComputedStyle(root);
+  const sliderBottom = Number.parseFloat(styles.getPropertyValue("--slider-bottom")) || 16;
+  const sliderTouch = Number.parseFloat(styles.getPropertyValue("--slider-touch")) || 22;
+  return sliderBottom + sliderTouch + 98;
+};
+
+const resolveBottomMetadataTop = rootRect => {
+  let top = Number.POSITIVE_INFINITY;
+  const candidates = [playbackMetadata, chapterTitle, seekWrap];
+  for (const el of candidates) {
+    if (!el || el.hidden) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.height <= 0 && rect.width <= 0) continue;
+    const relTop = rect.top - rootRect.top;
+    if (Number.isFinite(relTop) && relTop < top) {
+      top = relTop;
+    }
+  }
+  return Number.isFinite(top) ? top : null;
+};
+
 const syncSkipPromptPlacement = showSkip => {
   const currentLift = Math.max(0, Number.parseFloat(
     skipPrompt.style.getPropertyValue("--skip-prompt-lift"),
   ) || 0);
   let targetLift = 0;
-  if (showSkip && state.controlsVisible && (title.textContent || episode.textContent)) {
-    const rootTop = root.getBoundingClientRect().top;
-    const metadataTop = playbackMetadata.getBoundingClientRect().top - rootTop;
-    const promptBottom = skipPrompt.offsetTop + skipPrompt.offsetHeight + currentLift;
-    const requiredLift = Math.max(0, Math.ceil(promptBottom - metadataTop + 14));
-    const availableLift = Math.max(0, skipPrompt.offsetTop + currentLift - 12);
-    targetLift = Math.min(requiredLift, availableLift);
+  if (showSkip && state.controlsVisible) {
+    const rootRect = root.getBoundingClientRect();
+    const overlayTop = resolveBottomMetadataTop(rootRect);
+    const skipPromptHeight = skipPrompt.offsetHeight || skipPrompt.getBoundingClientRect().height;
+    if (overlayTop != null && rootRect.height > 0 && skipPromptHeight > 0) {
+      targetLift = computeSkipPromptLift({
+        rootHeight: rootRect.height,
+        overlayTop,
+        skipPromptHeight,
+        baseOverlayBottom: resolveSkipPromptBaseBottom(),
+        gapPx: 16,
+        topMarginPx: 12,
+      });
+    }
   }
 
   window.clearTimeout(skipPromptLiftTimer);
@@ -2831,6 +2896,37 @@ const syncSkipPromptPlacement = showSkip => {
     }, 240);
   }
 };
+
+let skipPromptLayoutFrame = 0;
+const scheduleSkipPromptPlacementSync = () => {
+  if (!skipPrompt.classList.contains("visible")) return;
+  if (skipPromptLayoutFrame) return;
+  skipPromptLayoutFrame = window.requestAnimationFrame(() => {
+    skipPromptLayoutFrame = 0;
+    syncSkipPromptPlacement(skipPrompt.classList.contains("visible"));
+  });
+};
+
+if (window.ResizeObserver) {
+  const skipPromptLayoutObserver = new ResizeObserver(() => {
+    scheduleSkipPromptPlacementSync();
+  });
+  [progressSection, playbackMetadata, chapterTitle, skipPrompt].forEach(el => {
+    if (el) skipPromptLayoutObserver.observe(el);
+  });
+}
+
+if (playbackMetaRow) {
+  playbackMetaRow.addEventListener("transitionend", () => {
+    scheduleSkipPromptPlacementSync();
+  });
+}
+
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => {
+    scheduleSkipPromptPlacementSync();
+  }).catch(() => {});
+}
 
 const renderNativePlaybackPrompts = () => {
   const nextSkipKey = [
