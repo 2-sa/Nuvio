@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -50,14 +50,22 @@ jobs:
         run: |
           set -euo pipefail
           test_args=()
-          if [[ "${TEST_FILTER}" != "all" ]]; then
-            test_args+=(--tests "${TEST_FILTER}")
+          if [ -n "${TEST_FILTER:-}" ]; then
+            read -r -a filter_patterns <<< "${TEST_FILTER}"
+            for pattern in "${filter_patterns[@]+"${filter_patterns[@]}"}"; do
+              if [ -n "${pattern}" ]; then
+                test_args+=(--tests "${pattern}")
+              fi
+            done
           fi
           ./gradlew \
             :composeApp:desktopMainClasses \
             :composeApp:desktopTest \
-            "${test_args[@]}" \
+            ${test_args[@]+"${test_args[@]}"} \
+            -x :composeMediaPlayer:buildNativeLinux \
+            -x :composeApp:buildLinuxPlayerBridge \
             -Pcompose.desktop.packaging.checkJdkVendor=false \
+            --no-configuration-cache \
             --no-daemon \
             --stacktrace
 
