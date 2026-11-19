@@ -1640,10 +1640,44 @@ private fun formatEpisodeRating(rating: Double): String {
     return "$whole.$tenth"
 }
 
+internal data class DesktopWheelScrollDecision(
+    val dispatchDelta: Float,
+    val consume: Boolean,
+)
+
+internal fun resolveDesktopWheelHorizontalScroll(
+    deltaX: Float,
+    deltaY: Float,
+    isRtl: Boolean,
+    canScrollForward: Boolean,
+    canScrollBackward: Boolean,
+): DesktopWheelScrollDecision {
+    if (!deltaX.isFinite() || !deltaY.isFinite()) {
+        return DesktopWheelScrollDecision(dispatchDelta = 0f, consume = false)
+    }
+    val rawDelta = if (deltaY.absoluteValue >= deltaX.absoluteValue) {
+        deltaY
+    } else if (isRtl) {
+        -deltaX
+    } else {
+        deltaX
+    }
+    val isOverflowing = canScrollForward || canScrollBackward
+    if (rawDelta == 0f || !isOverflowing) {
+        return DesktopWheelScrollDecision(dispatchDelta = 0f, consume = false)
+    }
+    val canAdvance = (rawDelta > 0f && canScrollForward) || (rawDelta < 0f && canScrollBackward)
+    return DesktopWheelScrollDecision(
+        dispatchDelta = if (canAdvance) rawDelta else 0f,
+        consume = true,
+    )
+}
+
 /**
  * Maps vertical mouse wheel rotation (Scroll Up / Scroll Down) while hovering over
- * the seasons or episodes horizontal rows into horizontal scrolling, consuming the
- * event so the outer vertical detail screen does not jump vertically.
+ * an overflowing seasons or episodes horizontal row into horizontal scrolling, and
+ * consumes wheel events at the row boundaries so the outer vertical detail screen
+ * does not jump vertically. Yields cleanly when the row fits without overflow.
  */
 @Composable
 private fun Modifier.nuvioDesktopWheelHorizontalScroll(
@@ -1657,21 +1691,21 @@ private fun Modifier.nuvioDesktopWheelHorizontalScroll(
         awaitEachGesture {
             val event = awaitPointerEvent(pass = PointerEventPass.Initial)
             if (event.type == PointerEventType.Scroll) {
-                val scrollDelta = event.changes.fold(0f) { acc, change ->
-                    acc + if (change.scrollDelta.y.absoluteValue >= change.scrollDelta.x.absoluteValue) {
-                        change.scrollDelta.y
-                    } else if (isRtl) {
-                        -change.scrollDelta.x
-                    } else {
-                        change.scrollDelta.x
-                    }
+                val (totalDeltaX, totalDeltaY) = event.changes.fold(0f to 0f) { (accX, accY), change ->
+                    (accX + change.scrollDelta.x) to (accY + change.scrollDelta.y)
                 }
-                val canScrollInDirection =
-                    (scrollDelta > 0f && state.canScrollForward) ||
-                        (scrollDelta < 0f && state.canScrollBackward)
-                if (canScrollInDirection) {
+                val decision = resolveDesktopWheelHorizontalScroll(
+                    deltaX = totalDeltaX,
+                    deltaY = totalDeltaY,
+                    isRtl = isRtl,
+                    canScrollForward = state.canScrollForward,
+                    canScrollBackward = state.canScrollBackward,
+                )
+                if (decision.dispatchDelta != 0f) {
                     val stepPx = 96.dp.toPx()
-                    state.dispatchRawDelta(scrollDelta * stepPx)
+                    state.dispatchRawDelta(decision.dispatchDelta * stepPx)
+                }
+                if (decision.consume) {
                     event.changes.forEach { it.consume() }
                 }
             }
