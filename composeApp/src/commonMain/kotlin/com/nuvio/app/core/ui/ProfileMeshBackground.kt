@@ -34,6 +34,7 @@ fun ProfileMeshBackground(
         modifier = modifier
             .fillMaxSize()
             .drawBehind {
+                if (size.width <= 0f || size.height <= 0f) return@drawBehind
                 val maxDimension = maxOf(size.width, size.height)
 
                 drawRect(color = baseColor, size = size)
@@ -46,7 +47,7 @@ fun ProfileMeshBackground(
                             1f to Color.Transparent,
                         ),
                         center = Offset(size.width * -0.08f, size.height * -0.02f),
-                        radius = maxDimension * 0.7f,
+                        radius = (maxDimension * 0.7f).coerceAtLeast(1f),
                     ),
                     size = size,
                 )
@@ -59,7 +60,7 @@ fun ProfileMeshBackground(
                             1f to Color.Transparent,
                         ),
                         center = Offset(size.width * 0.16f, size.height * 0.18f),
-                        radius = maxDimension * 0.46f,
+                        radius = (maxDimension * 0.46f).coerceAtLeast(1f),
                     ),
                     size = size,
                 )
@@ -71,7 +72,7 @@ fun ProfileMeshBackground(
                             1f to Color.Transparent,
                         ),
                         center = Offset(size.width * 0.9f, size.height * 0.12f),
-                        radius = maxDimension * 0.36f,
+                        radius = (maxDimension * 0.36f).coerceAtLeast(1f),
                     ),
                     size = size,
                 )
@@ -83,7 +84,7 @@ fun ProfileMeshBackground(
                             1f to Color.Transparent,
                         ),
                         center = Offset(size.width * 0.28f, size.height * 0.4f),
-                        radius = maxDimension * 0.28f,
+                        radius = (maxDimension * 0.28f).coerceAtLeast(1f),
                     ),
                     size = size,
                 )

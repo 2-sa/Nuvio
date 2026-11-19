@@ -1,4 +1,6 @@
 const root = document.getElementById("playerRoot");
+const playerHeader = document.querySelector(".header");
+const seekWrap = document.getElementById("seekWrap");
 const seek = document.getElementById("seek");
 const seekTooltip = document.getElementById("seekTooltip");
 const seekTooltipChapter = document.getElementById("seekTooltipChapter");
@@ -1032,6 +1034,261 @@ const modalByName = {
 const modalElements = Object.values(modalByName);
 const modalCloseTimers = new Map();
 
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+let partyPopoverAnchoredToPill = false;
+
+const hasVisibleRect = element => {
+  if (!element || element.hidden) return false;
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+};
+
+const isPartyPillActive = pill => {
+  if (!pill || pill.hidden) return false;
+  const rect = pill.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const opacity = Number.parseFloat(window.getComputedStyle(pill).opacity);
+  return (Number.isFinite(opacity) ? opacity > 0 : pill.classList.contains("visible")) ||
+    (activeModal === "party" && partyPopoverAnchoredToPill);
+};
+
+const resolvePartyPopoverAnchor = () => {
+  const button = typeof partyButton !== "undefined" ? partyButton : document.getElementById("partyButton");
+  const pill = typeof partyPill !== "undefined" ? partyPill : document.getElementById("partyPill");
+  if (!hasVisibleRect(button) && isPartyPillActive(pill)) {
+    return pill;
+  }
+  return button;
+};
+
+const popoverConfigByName = {
+  speed: {
+    modal: speedModal,
+    panel: speedModal ? speedModal.querySelector(".track-panel") : null,
+    placement: "above",
+    preferredMaxHeight: 440,
+    getAnchor: () => document.querySelector('[data-command="speed"]'),
+  },
+  subtitles: {
+    modal: subtitleModal,
+    panel: subtitleModal ? subtitleModal.querySelector(".track-panel") : null,
+    placement: "above",
+    preferredMaxHeight: 440,
+    getAnchor: () => document.querySelector('[data-command="subtitles"]'),
+  },
+  audio: {
+    modal: audioModal,
+    panel: audioModal ? audioModal.querySelector(".track-panel") : null,
+    placement: "above",
+    preferredMaxHeight: 440,
+    getAnchor: () => document.querySelector('[data-command="audio"]'),
+  },
+  sources: {
+    modal: sourceModal,
+    panel: sourceModal ? sourceModal.querySelector(".track-panel") : null,
+    placement: "above",
+    preferredMaxHeight: 520,
+    getAnchor: () => sourcesButton,
+  },
+  episodes: {
+    modal: episodesModal,
+    panel: episodesModal ? episodesModal.querySelector(".track-panel") : null,
+    placement: "above",
+    preferredMaxHeight: 520,
+    getAnchor: () => episodesButton,
+  },
+  chapters: {
+    modal: chaptersModal,
+    panel: chaptersModal ? chaptersModal.querySelector(".track-panel") : null,
+    placement: "above",
+    preferredMaxHeight: 520,
+    getAnchor: () => chaptersButton,
+  },
+  streamInfo: {
+    modal: streamInfoModal,
+    panel: streamInfoContent,
+    placement: "above",
+    preferredMaxHeight: 420,
+    getAnchor: () => streamInfoButton,
+  },
+  party: {
+    modal: partyModal,
+    panel: partyModal ? partyModal.querySelector(".track-panel") : null,
+    placement: "below",
+    preferredMaxHeight: 540,
+    getAnchor: resolvePartyPopoverAnchor,
+  },
+};
+
+const computePopoverLayout = ({
+  viewportWidth,
+  viewportHeight,
+  panelWidth,
+  anchorRect,
+  seekWrapRect,
+  headerRect,
+  placement,
+  preferredMaxHeight,
+}) => {
+  const safeViewportWidth = Math.max(32, Number(viewportWidth) || 0);
+  const safeViewportHeight = Math.max(160, Number(viewportHeight) || 0);
+  const edgeMargin = 16;
+  const effectiveWidth = Math.min(
+    Math.max(0, Number(panelWidth) || 0),
+    Math.max(0, safeViewportWidth - edgeMargin * 2),
+  );
+  const maxLeft = Math.max(edgeMargin, safeViewportWidth - effectiveWidth - edgeMargin);
+  const hasAnchor = Boolean(anchorRect && anchorRect.width > 0 && anchorRect.height > 0);
+  const hasSeekWrap = Boolean(seekWrapRect && seekWrapRect.height > 0);
+
+  let left;
+  if (hasAnchor) {
+    left = Math.round(clamp(anchorRect.left + anchorRect.width / 2 - effectiveWidth / 2, edgeMargin, maxLeft));
+  } else if (placement === "below") {
+    left = Math.round(clamp(safeViewportWidth - effectiveWidth - 20, edgeMargin, maxLeft));
+  } else {
+    left = Math.round(clamp((safeViewportWidth - effectiveWidth) / 2, edgeMargin, maxLeft));
+  }
+
+  if (placement === "below") {
+    const panelTop = hasAnchor
+      ? Math.round(anchorRect.bottom + 10)
+      : (headerRect && headerRect.height > 0 ? Math.round(headerRect.bottom + 10) : 72);
+    const bottomBoundary = hasSeekWrap ? seekWrapRect.top - 12 : safeViewportHeight;
+    const maxHeight = Math.max(
+      200,
+      Math.min(preferredMaxHeight || 540, Math.floor(bottomBoundary - panelTop - 16)),
+    );
+    return {
+      left: `${left}px`,
+      right: "auto",
+      top: `${panelTop}px`,
+      bottom: "auto",
+      maxHeight: `${maxHeight}px`,
+    };
+  }
+
+  const anchorTop = hasAnchor
+    ? (hasSeekWrap ? Math.min(anchorRect.top, seekWrapRect.top) : anchorRect.top)
+    : (hasSeekWrap ? seekWrapRect.top : Math.max(160, safeViewportHeight - 96));
+  const bottom = Math.round(Math.max(edgeMargin, safeViewportHeight - anchorTop + 12));
+  const maxHeight = Math.max(
+    160,
+    Math.min(preferredMaxHeight || 440, Math.floor(anchorTop - 28)),
+  );
+  return {
+    left: `${left}px`,
+    right: "auto",
+    top: "auto",
+    bottom: `${bottom}px`,
+    maxHeight: `${maxHeight}px`,
+  };
+};
+
+const relativeRect = (element, originLeft, originTop) => {
+  if (!element) return null;
+  const rect = element.getBoundingClientRect();
+  return {
+    left: rect.left - originLeft,
+    top: rect.top - originTop,
+    right: rect.right - originLeft,
+    bottom: rect.bottom - originTop,
+    width: rect.width,
+    height: rect.height,
+  };
+};
+
+const applyPopoverStyle = (panel, property, value) => {
+  if (panel.style[property] !== value) {
+    panel.style[property] = value;
+    return true;
+  }
+  return false;
+};
+
+const positionActivePopover = () => {
+  const config = popoverConfigByName[activeModal];
+  if (!config || !config.modal || config.modal.hidden || !config.panel) return;
+  const panel = config.panel;
+  const rootRect = root ? root.getBoundingClientRect() : null;
+  const originLeft = rootRect && rootRect.width > 0 ? rootRect.left : 0;
+  const originTop = rootRect && rootRect.height > 0 ? rootRect.top : 0;
+  const viewportWidth = rootRect && rootRect.width > 0 ? rootRect.width : window.innerWidth;
+  const viewportHeight = rootRect && rootRect.height > 0 ? rootRect.height : window.innerHeight;
+  if (viewportWidth <= 0 || viewportHeight <= 0) return;
+
+  const panelWidth = panel.offsetWidth || panel.getBoundingClientRect().width;
+  const anchor = config.getAnchor ? config.getAnchor() : null;
+  const anchorRect = anchor && !anchor.hidden ? relativeRect(anchor, originLeft, originTop) : null;
+  const seekWrapRect = seekWrap ? relativeRect(seekWrap, originLeft, originTop) : null;
+  const headerRect = playerHeader ? relativeRect(playerHeader, originLeft, originTop) : null;
+
+  const layout = computePopoverLayout({
+    viewportWidth,
+    viewportHeight,
+    panelWidth,
+    anchorRect,
+    seekWrapRect,
+    headerRect,
+    placement: config.placement,
+    preferredMaxHeight: config.preferredMaxHeight,
+  });
+
+  applyPopoverStyle(panel, "left", layout.left);
+  applyPopoverStyle(panel, "right", layout.right);
+  applyPopoverStyle(panel, "top", layout.top);
+  applyPopoverStyle(panel, "bottom", layout.bottom);
+  const maxHeightChanged = applyPopoverStyle(panel, "maxHeight", layout.maxHeight);
+  if (activeModal === "sources" && maxHeightChanged && sourceVirtualSpacer) {
+    requestSourceVirtualRender();
+  }
+};
+
+const popoverTriggerElements = () => [
+  document.querySelector('[data-command="speed"]'),
+  document.querySelector('[data-command="subtitles"]'),
+  document.querySelector('[data-command="audio"]'),
+  sourcesButton,
+  episodesButton,
+  chaptersButton,
+  streamInfoButton,
+  typeof partyButton !== "undefined" ? partyButton : document.getElementById("partyButton"),
+  typeof partyPill !== "undefined" ? partyPill : document.getElementById("partyPill"),
+].filter(Boolean);
+
+const syncPopoverTriggerStates = () => {
+  const config = popoverConfigByName[activeModal];
+  const anchor = config && config.getAnchor ? config.getAnchor() : null;
+  const activeTrigger = anchor && hasVisibleRect(anchor) ? anchor : null;
+  popoverTriggerElements().forEach(element => {
+    element.classList.toggle("popover-active", element === activeTrigger);
+  });
+};
+
+let popoverResizeFrame = 0;
+if (window.ResizeObserver) {
+  const popoverResizeObserver = new ResizeObserver(entries => {
+    const config = popoverConfigByName[activeModal];
+    if (!config || !config.panel || !config.modal || config.modal.hidden) return;
+    if (!entries.some(entry => entry.target === config.panel)) return;
+    if (popoverResizeFrame) return;
+    popoverResizeFrame = window.requestAnimationFrame(() => {
+      popoverResizeFrame = 0;
+      positionActivePopover();
+    });
+  });
+  Object.values(popoverConfigByName).forEach(config => {
+    if (config.panel) popoverResizeObserver.observe(config.panel);
+  });
+}
+
+window.addEventListener("resize", () => {
+  if (activeModal && popoverConfigByName[activeModal]) {
+    positionActivePopover();
+  }
+});
+
 const setModalVisibility = (modal, visible, animated = true) => {
   const pendingTimer = modalCloseTimers.get(modal);
   if (pendingTimer) {
@@ -1072,6 +1329,7 @@ const setModalVisibility = (modal, visible, animated = true) => {
 const closePlayerModal = (notifyDismiss = false, animated = true) => {
   const closingModal = activeModal;
   activeModal = "";
+  partyPopoverAnchoredToPill = false;
   if (fontPickerOpen) setFontPickerOpen(false);
   modalElements.forEach(modal => {
     setModalVisibility(modal, false, animated);
@@ -1095,8 +1353,18 @@ const openPlayerModal = modal => {
     closePlayerModal(false);
     return;
   }
+  if (fontPickerOpen) setFontPickerOpen(false);
   if (activeModal === "party" && modal !== "party") onPartyModalClosed();
   if (modal === "party" && activeModal !== "party") onPartyModalOpened();
+  if (modal === "party") {
+    const button = typeof partyButton !== "undefined" ? partyButton : document.getElementById("partyButton");
+    const pill = typeof partyPill !== "undefined" ? partyPill : document.getElementById("partyPill");
+    if (activeModal !== "party") {
+      partyPopoverAnchoredToPill = Boolean(!hasVisibleRect(button) && isPartyPillActive(pill));
+    }
+  } else {
+    partyPopoverAnchoredToPill = false;
+  }
   activeModal = modal;
   if (modal === "submitIntro") {
     const contentKey = state.submitIntroContentKey || "";
@@ -1118,6 +1386,7 @@ const openPlayerModal = modal => {
     setModalVisibility(modalElement, modalElement === targetModal);
   });
   renderChrome();
+  positionActivePopover();
 };
 
 const onEpisodesModalClosed = () => {
@@ -1163,6 +1432,29 @@ const speedOptions = [
   { value: 2.0, label: "2x" },
 ];
 
+const parsePlaybackSpeedValue = value => {
+  const match = String(value ?? "").match(/\d+(?:\.\d+)?/);
+  const parsed = match ? Number.parseFloat(match[0]) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1.0;
+};
+
+const currentSpeedOptionIndex = () => {
+  if (pendingSpeedIndex !== null) return pendingSpeedIndex;
+  const speed = parsePlaybackSpeedValue(state.playbackSpeedLabel || "1x");
+  const exactIndex = speedOptions.findIndex(o => Math.abs(o.value - speed) < 0.001);
+  if (exactIndex >= 0) return exactIndex;
+  let nearestIndex = 0;
+  let nearestDiff = Infinity;
+  speedOptions.forEach((o, index) => {
+    const diff = Math.abs(o.value - speed);
+    if (diff < nearestDiff) {
+      nearestDiff = diff;
+      nearestIndex = index;
+    }
+  });
+  return nearestIndex;
+};
+
 const renderSpeedOptionList = () => {
   if (!speedOptionList) return;
   speedOptionList.textContent = "";
@@ -1172,11 +1464,10 @@ const renderSpeedOptionList = () => {
 
   const isArabicUi = /[\u0600-\u06FF]/.test(state.speedPanelTitle || "")
     || /[\u0600-\u06FF]/.test(state.playLabel || "");
-  const currentSpeedStr = String(state.playbackSpeedLabel || "1x");
-  const currentSpeedNum = parseFloat(currentSpeedStr.replace("x", "")) || 1.0;
+  const currentSpeedNum = parsePlaybackSpeedValue(state.playbackSpeedLabel || "1x");
 
   speedOptions.forEach(opt => {
-    const isSelected = Math.abs(currentSpeedNum - opt.value) < 0.05;
+    const isSelected = Math.abs(currentSpeedNum - opt.value) < 0.001;
     const row = document.createElement("button");
     row.type = "button";
     row.className = `track-row${isSelected ? " selected" : ""}`;
@@ -1523,7 +1814,10 @@ const renderSubtitleStylePanel = () => {
   shadowSizeLabel.textContent = state.shadowSizeLabel || "Shadow size";
   shadowSizeValue.textContent = String(Number(style.shadowSize) || 1);
   renderSwatches(subtitleColorSwatches, state.subtitleColorSwatches, style.textColor, "subtitleTextColor");
-  renderSwatches(outlineColorSwatches, state.subtitleColorSwatches, style.outlineColor, "subtitleOutlineColor");
+  const outlineSwatches = Array.isArray(state.subtitleOutlineColorSwatches) && state.subtitleOutlineColorSwatches.length > 0
+    ? state.subtitleOutlineColorSwatches
+    : state.subtitleColorSwatches;
+  renderSwatches(outlineColorSwatches, outlineSwatches, style.outlineColor, "subtitleOutlineColor");
   backgroundColorLabel.textContent = state.backgroundColorLabel || "Background Color";
   backgroundOpacityLabel.textContent = state.backgroundOpacityLabel || "Background opacity";
   backgroundOpacityValue.textContent = `${Math.round((parseArgb(style.backgroundColor).alpha / 255) * 100)}%`;
@@ -1595,6 +1889,7 @@ const renderSubtitleModal = () => {
   subtitleOptionsRailTitle.textContent = state.subtitlesPanelTitle || "Subtitles";
   subtitleStyleRailTitle.textContent = state.subtitleStyleTabLabel || "Style";
   renderSubtitleSelectionRails();
+  if (activeModal === "subtitles") positionActivePopover();
 };
 
 const filterRows = document.querySelectorAll(".filter-row");
@@ -2403,25 +2698,7 @@ const renderActiveModal = (modalOpened = false) => {
   if (activeModal === "submitIntro") renderSubmitIntroModal();
   if (activeModal === "p2pConsent") renderP2pConsentModal();
   if (activeModal === "party") renderPartyModal();
-};
-
-window.nuvioNativeViewportChanged = () => {
-  root.classList.add("native-resizing");
-  window.clearTimeout(nativeViewportTimer);
-  const timeoutMs = state.isInPip ? 5000 : 180;
-  nativeViewportTimer = window.setTimeout(() => {
-    root.classList.remove("native-resizing");
-  }, timeoutMs);
-  syncSkipPromptPlacement(skipPrompt.classList.contains("visible"));
-  if (activeModal) renderActiveModal();
-};
-
-window.nuvioNativeResizeEnded = () => {
-  window.clearTimeout(nativeViewportTimer);
-  root.classList.remove("native-resizing");
-  noteChromeActivity(true);
-  syncSkipPromptPlacement(skipPrompt.classList.contains("visible"));
-  if (activeModal) renderActiveModal();
+  if (activeModal && popoverConfigByName[activeModal]) positionActivePopover();
 };
 
 const trackListSignature = tracks =>
@@ -2747,9 +3024,9 @@ const renderChrome = () => {
   const showError = renderPlaybackError();
   root.classList.toggle("pip-mode", Boolean(state.isInPip));
   root.classList.toggle("chrome-hidden", Boolean(showError || !state.controlsVisible));
-  const isBottomPopover = activeModal === "speed" || activeModal === "audio" || activeModal === "subtitles" || activeModal === "streamInfo" || activeModal === "sources" || activeModal === "episodes" || activeModal === "chapters" || activeModal === "party";
+  const isPopover = Boolean(popoverConfigByName[activeModal]);
   root.classList.toggle("modal-open", Boolean(activeModal));
-  root.classList.toggle("popover-open", isBottomPopover);
+  root.classList.toggle("popover-open", isPopover);
   root.classList.toggle("info-open", activeModal === "streamInfo");
   root.classList.toggle("source-visible", Boolean(!showError && !isPlaying && !state.isLoading && (state.streamTitle || state.providerName)));
   if (showError || !state.controlsVisible || durationMs <= 0) hideSeekTooltip();
@@ -2839,6 +3116,7 @@ const renderChrome = () => {
     renderNativePlaybackPrompts();
   }
   renderPartyChrome();
+  syncPopoverTriggerStates();
   syncChromeAutoHideTimer(showOpening);
 };
 
@@ -3842,24 +4120,43 @@ const clearSuppressNextRootClick = () => {
   }
 };
 
+let rootPointerStartX = 0;
+let rootPointerStartY = 0;
+let pipPointerStartX = 0;
+let pipPointerStartY = 0;
+let pipPointerDown = false;
+
 window.nuvioNativeViewportChanged = () => {
   root.classList.add("native-resizing");
+  window.clearTimeout(nativeViewportTimer);
+  const timeoutMs = state.isInPip ? 5000 : 180;
+  nativeViewportTimer = window.setTimeout(() => {
+    nativeViewportTimer = 0;
+    root.classList.remove("native-resizing");
+  }, timeoutMs);
+  syncSkipPromptPlacement(skipPrompt.classList.contains("visible"));
+  if (activeModal) {
+    renderActiveModal();
+    positionActivePopover();
+  }
 };
 
 window.nuvioNativeResizeEnded = () => {
+  window.clearTimeout(nativeViewportTimer);
+  nativeViewportTimer = 0;
   pipPointerDown = false;
   clearSuppressNextRootClick();
   root.classList.remove("native-resizing");
   if (document.body.style.cursor && document.body.style.cursor.includes("resize")) {
     document.body.style.cursor = "";
   }
+  noteChromeActivity(true);
+  syncSkipPromptPlacement(skipPrompt.classList.contains("visible"));
+  if (activeModal) {
+    renderActiveModal();
+    positionActivePopover();
+  }
 };
-
-let rootPointerStartX = 0;
-let rootPointerStartY = 0;
-let pipPointerStartX = 0;
-let pipPointerStartY = 0;
-let pipPointerDown = false;
 let spaceHoldTimer = null;
 let isSpaceBoosting = false;
 let pausedBeforeSpeedBoosting = false;
@@ -3911,8 +4208,7 @@ const formatSpeedBoostString = (speedValue) => {
 };
 
 const getCurrentPlaybackSpeed = () => {
-  const currentSpeedStr = String(state.playbackSpeedLabel || "1x");
-  return parseFloat(currentSpeedStr.replace("x", "")) || 1.0;
+  return parsePlaybackSpeedValue(state.playbackSpeedLabel || "1x");
 };
 
 const canSpeedBoostStart = () => {
@@ -4137,6 +4433,11 @@ document.addEventListener("keydown", event => {
     closePartyConfirm();
     return;
   }
+  if (event.key === "Escape" && fontPickerOpen) {
+    event.preventDefault();
+    setFontPickerOpen(false);
+    return;
+  }
   if (event.key === "Escape" && activeModal) {
     clearSpaceHoldTimerAndStopSpeedBoost();
     event.preventDefault();
@@ -4212,8 +4513,7 @@ document.addEventListener("keydown", event => {
 
   if (activeModal === "speed" && (event.code === "ArrowUp" || event.code === "ArrowDown")) {
     event.preventDefault();
-    const currentSpeedStr = String(state.playbackSpeedLabel || "1x");
-    let currentIndex = pendingSpeedIndex !== null ? pendingSpeedIndex : speedOptions.findIndex(o => currentSpeedStr.startsWith(o.label.split(" ")[0]));
+    let currentIndex = currentSpeedOptionIndex();
     if (currentIndex >= 0) {
       if (event.code === "ArrowUp") {
         currentIndex = currentIndex > 0 ? currentIndex - 1 : speedOptions.length - 1;
@@ -4418,8 +4718,7 @@ document.addEventListener("keydown", event => {
   }
   if (event.shiftKey && event.code === "Comma") {
     event.preventDefault();
-    const currentSpeedStr = String(state.playbackSpeedLabel || "1x");
-    let currentIndex = pendingSpeedIndex !== null ? pendingSpeedIndex : speedOptions.findIndex(o => currentSpeedStr.startsWith(o.label.split(" ")[0]));
+    let currentIndex = currentSpeedOptionIndex();
     if (currentIndex > 0) {
       pendingSpeedIndex = currentIndex - 1;
       window.clearTimeout(pendingSpeedTimer);
@@ -4431,8 +4730,7 @@ document.addEventListener("keydown", event => {
   }
   if (event.shiftKey && event.code === "Period") {
     event.preventDefault();
-    const currentSpeedStr = String(state.playbackSpeedLabel || "1x");
-    let currentIndex = pendingSpeedIndex !== null ? pendingSpeedIndex : speedOptions.findIndex(o => currentSpeedStr.startsWith(o.label.split(" ")[0]));
+    let currentIndex = currentSpeedOptionIndex();
     if (currentIndex >= 0 && currentIndex < speedOptions.length - 1) {
       pendingSpeedIndex = currentIndex + 1;
       window.clearTimeout(pendingSpeedTimer);

@@ -1540,6 +1540,8 @@ object ControllerFocusEngine {
             }
         }
 
+        if (composedRows.isEmpty()) return false
+
         val rawRowIndex = composedRows.indexOfFirst { row -> row.nodes.any { it.id == current.id } }
         val effectiveRowIndex = if (rawRowIndex != -1) {
             rawRowIndex

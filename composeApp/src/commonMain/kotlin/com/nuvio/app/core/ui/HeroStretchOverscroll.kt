@@ -51,8 +51,12 @@ class HeroStretchState internal constructor(
 
     val stretchPx: Float get() = stretchAnim.value
 
+    private val isDisabled: Boolean
+        get() = maxStretchPx <= 0f || !maxStretchPx.isFinite()
+
     val nestedScrollConnection: NestedScrollConnection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+            if (isDisabled) return Offset.Zero
             if (source == NestedScrollSource.UserInput) {
                 flingAbsorbed = false
             }
@@ -70,6 +74,7 @@ class HeroStretchState internal constructor(
             available: Offset,
             source: NestedScrollSource,
         ): Offset {
+            if (isDisabled) return Offset.Zero
             if (available.y <= 0f || !isAtTop()) return Offset.Zero
 
             if (source == NestedScrollSource.UserInput) {
@@ -87,6 +92,7 @@ class HeroStretchState internal constructor(
         }
 
         override suspend fun onPreFling(available: Velocity): Velocity {
+            if (isDisabled) return Velocity.Zero
             if (stretchAnim.value <= 0.5f) return Velocity.Zero
             if (settleJob?.isActive != true) {
                 settle(available.y * HERO_STRETCH_RELEASE_ABSORB, HeroStretchReleaseSpring)
@@ -95,6 +101,7 @@ class HeroStretchState internal constructor(
         }
 
         override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+            if (isDisabled) return Velocity.Zero
             flingAbsorbed = false
             if (stretchAnim.value > 0.5f && settleJob?.isActive != true) {
                 settle(0f, HeroStretchReleaseSpring)
@@ -108,15 +115,18 @@ class HeroStretchState internal constructor(
     }
 
     private fun snapTo(value: Float) {
+        if (isDisabled || !value.isFinite()) return
         scope.launch { stretchAnim.snapTo(value.coerceIn(0f, maxStretchPx)) }
     }
 
     private fun settle(initialVelocity: Float, spec: SpringSpec<Float>) {
+        if (isDisabled) return
+        val safeVelocity = if (initialVelocity.isFinite()) initialVelocity else 0f
         settleJob = scope.launch {
             stretchAnim.animateTo(
                 targetValue = 0f,
                 animationSpec = spec,
-                initialVelocity = initialVelocity,
+                initialVelocity = safeVelocity,
             )
         }
     }
@@ -133,7 +143,8 @@ fun rememberHeroStretchState(listState: LazyListState): HeroStretchState {
 
 fun Modifier.heroStretchHeight(baseHeight: Dp, stretchPx: () -> Float): Modifier =
     layout { measurable, constraints ->
-        val height = baseHeight.roundToPx() + stretchPx().coerceAtLeast(0f).roundToInt()
+        val safeStretch = stretchPx().let { if (it.isFinite()) it.coerceAtLeast(0f) else 0f }
+        val height = baseHeight.roundToPx() + safeStretch.roundToInt()
         val placeable = measurable.measure(
             constraints.copy(minHeight = height, maxHeight = height),
         )
@@ -141,7 +152,9 @@ fun Modifier.heroStretchHeight(baseHeight: Dp, stretchPx: () -> Float): Modifier
     }
 
 fun Modifier.heroStretchZoom(stretchPx: () -> Float): Modifier = graphicsLayer {
-    val zoom = 1f + stretchPx().coerceAtLeast(0f) / size.height.coerceAtLeast(1f)
+    val safeStretch = stretchPx().let { if (it.isFinite()) it.coerceAtLeast(0f) else 0f }
+    val safeHeight = if (size.height.isFinite() && size.height > 0f) size.height.coerceAtLeast(1f) else 1f
+    val zoom = 1f + safeStretch / safeHeight
     transformOrigin = TransformOrigin(0.5f, 0f)
     scaleX = zoom
     scaleY = zoom

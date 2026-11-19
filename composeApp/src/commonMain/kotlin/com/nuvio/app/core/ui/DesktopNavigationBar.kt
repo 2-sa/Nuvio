@@ -45,7 +45,7 @@ internal fun DesktopNavigationBar(
     isHeroEnabled: Boolean = false,
     profileSwitcherOpen: Boolean = false,
     windowWidth: Dp? = null,
-    glowEnabled: Boolean = true,
+    @Suppress("UNUSED_PARAMETER") glowEnabled: Boolean = true,
 ) {
     if (items.isEmpty()) return
     val interactionSource = remember { MutableInteractionSource() }
@@ -71,7 +71,6 @@ internal fun DesktopNavigationBar(
         animationSpec = tween(140, easing = FastOutSlowInEasing),
         label = "desktop_nav_sheen",
     )
-    val glowStrength = 0f
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth().nuvioTrackTopBarFocus().padding(contentPadding).padding(horizontal = 16.dp),
         contentAlignment = Alignment.TopCenter,
@@ -86,7 +85,7 @@ internal fun DesktopNavigationBar(
         JellyNavigationBar(
             items = items,
             labelFraction = labelFraction,
-            glowStrength = glowStrength,
+            glowStrength = 0f,
             horizontalLabels = true,
             iconSize = iconSize,
             modifier = Modifier
@@ -120,6 +119,7 @@ internal fun DesktopNavigationBar(
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 internal fun desktopNavigationLabelFraction(
     style: NavBarStyle,
     isHomeSelected: Boolean,

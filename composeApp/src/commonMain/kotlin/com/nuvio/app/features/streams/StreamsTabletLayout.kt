@@ -145,7 +145,11 @@ internal fun TabletStreamsLayout(
         label = "stream_dominant_backdrop_color",
     )
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val aspectRatio = maxWidth.value / maxHeight.value
+        val aspectRatio = if (maxHeight.value > 0f) {
+            maxWidth.value / maxHeight.value
+        } else {
+            StandardDesktopViewportAspectRatio
+        }
         val isWideLayout = aspectRatio >= 2f
         val useWideArtworkFrame = aspectRatio > StandardDesktopViewportAspectRatio
         val cropWideArtwork = aspectRatio > StreamResultsWideArtworkAspectRatio

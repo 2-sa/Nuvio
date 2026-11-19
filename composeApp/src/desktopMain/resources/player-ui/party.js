@@ -818,6 +818,10 @@ if (window.ResizeObserver) {
 partyButton.addEventListener("click", event => {
   event.stopPropagation();
   noteChromeActivity(true);
+  if (activeModal === "party") {
+    closePlayerModal(true);
+    return;
+  }
   openPlayerModal("party");
 });
 

@@ -47,10 +47,12 @@ fun DisintegratingContainer(
         }
         return
     }
+    val onDisintegratedState = rememberUpdatedState(onDisintegrated)
+    val onDisintegrationStartedState = rememberUpdatedState(onDisintegrationStarted)
     if (isDesktop) {
         LaunchedEffect(Unit) {
-            onDisintegrationStarted()
-            onDisintegrated()
+            onDisintegrationStartedState.value()
+            onDisintegratedState.value()
         }
         return
     }
@@ -59,8 +61,6 @@ fun DisintegratingContainer(
     val progress = remember { Animatable(0f) }
     var field by remember { mutableStateOf<AshField?>(null) }
     val seed = remember { Random.nextLong() }
-    val onDisintegratedState = rememberUpdatedState(onDisintegrated)
-    val onDisintegrationStartedState = rememberUpdatedState(onDisintegrationStarted)
 
     LaunchedEffect(disintegrating) {
         if (!disintegrating) return@LaunchedEffect

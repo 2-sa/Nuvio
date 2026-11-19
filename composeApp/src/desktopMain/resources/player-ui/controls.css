@@ -181,7 +181,8 @@ button:disabled {
 .player.native-resizing .center-controls,
 .player.native-resizing .progress,
 .player.native-resizing .modal-layer,
-.player.native-resizing .track-panel {
+.player.native-resizing .track-panel,
+.player.native-resizing .stream-info-content {
   transition-duration: 1ms !important;
 }
 
@@ -896,6 +897,17 @@ button:disabled {
 .play-control:hover,
 .action:hover {
   background: var(--theme-selected-surface);
+}
+
+.header-button.popover-active,
+.action.popover-active {
+  background: var(--theme-selected-surface);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 0 0 2px var(--theme-selected-ring);
+}
+
+.header-button.popover-active:hover,
+.action.popover-active:hover {
+  background: var(--theme-selected-surface-hover);
 }
 
 .header-button svg {
@@ -1960,6 +1972,17 @@ button:disabled {
     background: var(--theme-selected-surface-hover);
   }
 
+  .action.popover-active,
+  .action.focused.popover-active {
+    background: var(--theme-selected-surface);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 0 0 2px var(--theme-selected-ring);
+  }
+
+  .action.popover-active:hover,
+  .action.focused.popover-active:hover {
+    background: var(--theme-selected-surface-hover);
+  }
+
   .action.focused svg {
     color: currentColor;
   }
@@ -2043,20 +2066,20 @@ button:disabled {
 }
 
 .player-rail-modal {
-  /* Room for the bottom bar, which stays visible under the popover: the seek bar's top sits
-     --slider-bottom + 74px above the bottom. */
-  --rail-bottom-clearance: calc(var(--slider-bottom) + 74px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
-  padding: 20px var(--hp) var(--rail-bottom-clearance);
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: 0;
   background: transparent;
 }
 
 .player-rail-modal .track-panel {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
   width: auto;
-  max-width: calc(100vw - 48px);
-  max-height: min(440px, calc(100vh - var(--rail-bottom-clearance) - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: min(440px, calc(100vh - 110px));
   overflow: hidden;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -2077,36 +2100,39 @@ button:disabled {
 }
 
 .audio-rail-panel {
-  width: min(320px, calc(100vw - 48px)) !important;
+  width: min(320px, calc(100vw - 32px)) !important;
 }
 
 #speedModal .audio-rail-panel {
-  width: 220px !important;
+  width: min(220px, calc(100vw - 32px)) !important;
 }
 
 #audioModal .audio-rail-panel {
-  width: min(320px, calc(100vw - 48px)) !important;
+  width: min(320px, calc(100vw - 32px)) !important;
 }
 
 .subtitle-rail-panel,
 #subtitleModal .subtitle-rail-panel {
-  width: auto !important;
-  max-width: min(860px, calc(100vw - 48px)) !important;
+  width: max-content !important;
+  max-width: min(860px, calc(100vw - 32px)) !important;
 }
 
 .player-side-modal {
-  --rail-bottom-clearance: calc(var(--slider-bottom) + 74px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding: 20px var(--hp) var(--rail-bottom-clearance);
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: 0;
   background: transparent;
 }
 
 .player-side-modal .player-side-panel {
-  width: min(440px, calc(100vw - 48px));
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: min(440px, calc(100vw - 32px));
   height: auto;
-  max-height: min(520px, calc(100vh - var(--rail-bottom-clearance) - 28px));
+  max-height: min(520px, calc(100vh - 110px));
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
@@ -2126,6 +2152,7 @@ button:disabled {
 }
 
 .track-header {
+  flex: 0 0 auto;
   padding: 20px;
   font-size: 18px;
   line-height: 1.25;
@@ -2143,6 +2170,7 @@ button:disabled {
 }
 
 .track-header-row {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2193,6 +2221,7 @@ button:disabled {
 }
 
 .episode-stream-toolbar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2323,7 +2352,7 @@ button:disabled {
   display: grid;
   grid-template-columns: 180px 260px;
   grid-template-rows: minmax(0, 1fr);
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
   align-items: stretch;
   gap: 14px;
@@ -2344,6 +2373,7 @@ button:disabled {
 .subtitle-rail {
   min-width: 0;
   min-height: 0;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2365,14 +2395,17 @@ button:disabled {
 }
 
 .style-panel {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: auto;
-  max-height: min(332px, calc(100vh - var(--rail-bottom-clearance) - 124px));
+  max-height: none;
   padding: 0 8px 8px 0;
 }
 
 .style-card {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2564,37 +2597,40 @@ button:disabled {
 }
 
 .player-rail-modal .track-list {
-  max-height: min(360px, calc(100vh - var(--rail-bottom-clearance) - 96px));
+  max-height: none;
   gap: 3px;
   padding: 2px 0 0;
 }
 
 .audio-rail-panel .track-list {
-  max-height: min(360px, calc(100vh - var(--rail-bottom-clearance) - 96px));
+  max-height: none;
   gap: 3px;
 }
 
 #subtitleModal .track-list {
-  max-height: min(332px, calc(100vh - var(--rail-bottom-clearance) - 124px));
+  max-height: none;
 }
 
 
 .audio-rail-panel .track-list,
 .subtitle-rail-panel .track-list,
-.subtitle-rail-panel .style-panel {
+.subtitle-rail-panel .style-panel,
+.player-side-panel .track-list {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, .3) transparent;
 }
 
 .audio-rail-panel .track-list::-webkit-scrollbar,
 .subtitle-rail-panel .track-list::-webkit-scrollbar,
-.subtitle-rail-panel .style-panel::-webkit-scrollbar {
+.subtitle-rail-panel .style-panel::-webkit-scrollbar,
+.player-side-panel .track-list::-webkit-scrollbar {
   width: 6px;
 }
 
 .audio-rail-panel .track-list::-webkit-scrollbar-thumb,
 .subtitle-rail-panel .track-list::-webkit-scrollbar-thumb,
-.subtitle-rail-panel .style-panel::-webkit-scrollbar-thumb {
+.subtitle-rail-panel .style-panel::-webkit-scrollbar-thumb,
+.player-side-panel .track-list::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(255, 255, 255, .3);
 }
@@ -3240,7 +3276,7 @@ button.action:focus-visible {
   }
 
   .player-side-modal .player-side-panel {
-    width: min(460px, calc(100vw - 48px));
+    width: min(460px, calc(100vw - 32px));
     padding: 14px;
   }
 
@@ -3325,18 +3361,16 @@ button.action:focus-visible {
     padding: 14px;
   }
 
-  .player-side-modal {
-    padding: 16px var(--hp) var(--rail-bottom-clearance);
+  .player-rail-modal,
+  .player-side-modal,
+  .stream-info-modal {
+    padding: 0;
   }
 
   .player-side-modal .player-side-panel {
-    width: min(420px, calc(100vw - 28px));
+    width: min(420px, calc(100vw - 32px));
     padding: 12px;
     border-radius: 16px;
-  }
-
-  .player-rail-modal {
-    padding: 16px var(--hp) var(--rail-bottom-clearance);
   }
 
   .subtitle-rails {
@@ -3358,23 +3392,8 @@ button.action:focus-visible {
 }
 
 @media (max-height: 680px) {
-  .player-rail-modal {
-    padding-top: 16px;
-    padding-bottom: var(--rail-bottom-clearance);
-  }
-
-  .player-rail-modal .track-list {
-    max-height: calc(100vh - var(--rail-bottom-clearance) - 96px);
-  }
-
-  #subtitleModal .track-list,
-  .style-panel {
-    max-height: calc(100vh - var(--rail-bottom-clearance) - 124px);
-  }
-
   .player-side-modal .player-side-panel {
-    padding-top: 18px;
-    padding-bottom: 18px;
+    padding: 12px;
   }
 }
 
@@ -3401,6 +3420,7 @@ button.action:focus-visible {
   .image-loading::before,
   .modal-layer,
   .track-panel,
+  .stream-info-content,
   .header-button,
   .opening-button,
   .side-control,
@@ -3428,18 +3448,19 @@ svg {
 }
 
 .stream-info-modal {
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
-  padding: 20px var(--hp) calc(var(--slider-bottom) + 74px);
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: 0;
   background: transparent;
 }
 
 .stream-info-content {
+  position: absolute;
   display: flex;
-  width: min(540px, calc(100vw - 48px));
-  max-width: 100%;
-  max-height: min(420px, calc(100vh - var(--slider-bottom) - 110px));
+  width: min(540px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: min(420px, calc(100vh - 110px));
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;

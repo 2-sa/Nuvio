@@ -130,6 +130,15 @@ private fun applyNavigationCursor(hidden: Boolean) {
     }
 }
 
+private fun isTextInputFocused(): Boolean {
+    val focusOwner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
+        ?: return false
+    if (focusOwner is javax.swing.text.JTextComponent) {
+        return focusOwner.isEditable
+    }
+    return focusOwner.inputMethodRequests != null
+}
+
 @Composable
 actual fun PlatformKeyboardNavigationHost() {
     val focusManager = LocalFocusManager.current
@@ -207,6 +216,10 @@ actual fun PlatformKeyboardNavigationHost() {
     DisposableEffect(Unit) {
         val dispatcher = java.awt.KeyEventDispatcher { event: KeyEvent ->
             if (event.id != KeyEvent.KEY_PRESSED) return@KeyEventDispatcher false
+            if (isTextInputFocused()) return@KeyEventDispatcher false
+            if (event.isShiftDown || event.isControlDown || event.isAltDown || event.isMetaDown) {
+                return@KeyEventDispatcher false
+            }
 
             val isPlayerActive = ControllerManager.screenContext.value.screenType ==
                 ControllerScreenType.Player

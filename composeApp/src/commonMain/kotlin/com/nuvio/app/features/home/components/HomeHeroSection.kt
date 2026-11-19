@@ -102,7 +102,6 @@ private const val HERO_BACKGROUND_PARALLAX = 0.055f
 private const val HERO_BACKGROUND_SCALE = 1.14f
 private const val HERO_CONTENT_PARALLAX = 0.18f
 private const val HERO_SCROLL_PARALLAX = 0.3f
-private const val DESKTOP_HERO_SCROLL_PARALLAX = 0.38f
 private const val HERO_SCROLL_DOWN_SCALE_MULTIPLIER = 0.0001f
 private const val HERO_SCROLL_UP_SCALE_MULTIPLIER = 0.002f
 private const val HERO_SCROLL_MAX_SCALE = 1.3f
@@ -410,7 +409,6 @@ private fun HeroDesktopContentLayers(
     items: List<MetaPreview>,
     pagerState: PagerState,
     layout: HomeHeroLayout,
-    heroWidthPx: Float,
     showImdbRating: Boolean,
     showMdbListRatings: Boolean,
     onItemClick: ((MetaPreview) -> Unit)?,
@@ -677,7 +675,6 @@ private fun DesktopHomeHeroFrame(
                     items = items,
                     pagerState = pagerState,
                     layout = layout,
-                    heroWidthPx = heroWidthPx,
                     showImdbRating = showImdbRating,
                     showMdbListRatings = showMdbListRatings,
                     onItemClick = onItemClick,
@@ -1265,10 +1262,6 @@ private fun heroBackgroundScrollScale(scrollOffsetPx: Float): Float {
 
 private fun heroBackgroundScrollTranslationY(scrollOffsetPx: Float): Float {
     return scrollOffsetPx * HERO_SCROLL_PARALLAX
-}
-
-private fun heroDesktopBackgroundScrollTranslationY(scrollOffsetPx: Float): Float {
-    return scrollOffsetPx * DESKTOP_HERO_SCROLL_PARALLAX
 }
 
 private fun Modifier.homeHeroPagerGesture(

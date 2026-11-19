@@ -123,7 +123,12 @@ fun DesktopDetailBackdrop(
             .fillMaxSize()
             .background(sideGradientColor),
     ) {
-        val aspectRatio = maxWidth.value / viewportHeight.value
+        val hasValidViewportHeight = viewportHeight.value > 0f
+        val aspectRatio = if (hasValidViewportHeight) {
+            maxWidth.value / viewportHeight.value
+        } else {
+            StandardDesktopViewportAspectRatio
+        }
         val useWideArtworkFrame = aspectRatio > StandardDesktopViewportAspectRatio
         val cropSideBackdrop = aspectRatio > WideDesktopViewportAspectRatio
         val backdropWidth = if (useWideArtworkFrame) {
@@ -136,7 +141,11 @@ fun DesktopDetailBackdrop(
             .width(backdropWidth)
             .fillMaxHeight()
         val artworkModifier = if (blurBackdrop) backdropModifier.blur(30.dp) else backdropModifier
-        val bottomSpreadStrength = ((21f / 9f - aspectRatio) / (5f / 9f)).coerceIn(0f, 1f)
+        val bottomSpreadStrength = if (hasValidViewportHeight) {
+            ((21f / 9f - aspectRatio) / (5f / 9f)).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
         val baseSideFade = Brush.horizontalGradient(
             colorStops = arrayOf(
                 0.00f to sideGradientColor,
@@ -180,6 +189,9 @@ fun DesktopDetailBackdrop(
         Box(
             modifier = backdropModifier
                 .drawWithCache {
+                    if (size.width <= 0f || size.height <= 0f) {
+                        return@drawWithCache onDrawBehind {}
+                    }
                     val bottomSpread = Brush.radialGradient(
                         colorStops = arrayOf(
                             0.00f to sideGradientColor.copy(alpha = 0.12f * gradientIntensity * bottomSpreadStrength),
@@ -187,7 +199,7 @@ fun DesktopDetailBackdrop(
                             1.00f to Color.Transparent,
                         ),
                         center = Offset(0f, size.height * 1.15f),
-                        radius = size.width * 0.72f,
+                        radius = (size.width * 0.72f).coerceAtLeast(1f),
                     )
                     onDrawBehind {
                         drawRect(baseSideFade)

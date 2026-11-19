@@ -221,6 +221,9 @@ private fun BackdropArtwork(
             modifier = Modifier
                 .fillMaxSize()
                 .drawWithCache {
+                    if (size.width <= 0f || size.height <= 0f) {
+                        return@drawWithCache onDrawBehind {}
+                    }
                     val sideFade = Brush.horizontalGradient(
                         colorStops = arrayOf(
                             0.00f to gradientColor,
@@ -240,7 +243,7 @@ private fun BackdropArtwork(
                             1.00f to Color.Transparent,
                         ),
                         center = Offset(if (isRtl) size.width else 0f, size.height * 1.15f),
-                        radius = size.width * 0.72f,
+                        radius = (size.width * 0.72f).coerceAtLeast(1f),
                     )
                     onDrawBehind {
                         drawRect(sideFade)

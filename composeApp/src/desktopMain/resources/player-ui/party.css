@@ -184,7 +184,19 @@
 }
 
 .player-side-modal .party-panel {
-  width: min(390px, calc(100vw - 48px));
+  width: min(390px, calc(100vw - 32px));
+}
+
+#partyModal .party-panel {
+  transform: translateY(-10px);
+}
+
+#partyModal.modal-visible .party-panel {
+  transform: translateY(0);
+}
+
+#partyModal.modal-closing .party-panel {
+  transform: translateY(-8px);
 }
 
 .party-body {
@@ -872,7 +884,7 @@
 
 .party-chat-viewport {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 1 320px;
   min-height: 0;
   overflow: hidden;
 }

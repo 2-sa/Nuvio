@@ -1,0 +1,71 @@
+name: Desktop Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: Gradle --tests filter (pass "all" for the full desktopTest suite)
+        required: false
+        type: string
+        default: com.nuvio.app.core.ui.*
+
+jobs:
+  desktop-tests:
+    name: Desktop Compile, Lint & Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Validate Player Web UI JS & Windows MSI WiX XML
+        run: |
+          node --check composeApp/src/desktopMain/resources/player-ui/controls.js
+          node --check composeApp/src/desktopMain/resources/player-ui/party.js
+          python3 -c "import xml.etree.ElementTree as ET; ET.parse('composeApp/packaging/windows/main.wxs'); print('WXS_XML_OK')"
+
+      - name: Ensure local.properties exists
+        run: |
+          if [[ ! -f local.properties ]]; then
+            : > local.properties
+          fi
+
+      - name: Compile Desktop & Run Unit Tests
+        env:
+          TEST_FILTER: ${{ inputs.test_filter || 'com.nuvio.app.core.ui.*' }}
+        run: |
+          set -euo pipefail
+          test_args=()
+          if [[ "${TEST_FILTER}" != "all" ]]; then
+            test_args+=(--tests "${TEST_FILTER}")
+          fi
+          ./gradlew \
+            :composeApp:desktopMainClasses \
+            :composeApp:desktopTest \
+            "${test_args[@]}" \
+            -Pcompose.desktop.packaging.checkJdkVendor=false \
+            --no-daemon \
+            --stacktrace
+
+      - name: Upload Desktop Test Report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-report
+          path: composeApp/build/reports/tests/desktopTest
+          if-no-files-found: ignore
+          retention-days: 7

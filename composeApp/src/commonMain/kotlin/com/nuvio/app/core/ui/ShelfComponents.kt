@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,8 +64,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -261,53 +264,26 @@ private fun ShelfCarouselArrowButton(
     }
 }
 
+@Composable
 internal fun Modifier.nuvioDesktopDragScroll(
     state: LazyListState,
-): Modifier {
-    if (!isDesktop) return this
+): Modifier = nuvioDesktopDragScrollImpl(state)
 
-    return pointerInput(state) {
-        awaitEachGesture {
-            val down = awaitFirstDown(pass = PointerEventPass.Initial)
-            var totalDx = 0f
-            var totalDy = 0f
-            var dragging = false
-
-            while (true) {
-                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                if (!change.pressed) break
-
-                val delta = change.position - change.previousPosition
-                totalDx += delta.x
-                totalDy += delta.y
-
-                if (!dragging) {
-                    val horizontalDrag =
-                        abs(totalDx) > viewConfiguration.touchSlop && abs(totalDx) > abs(totalDy)
-                    val verticalDrag =
-                        abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
-
-                    when {
-                        verticalDrag -> break
-                        horizontalDrag -> dragging = true
-                        else -> continue
-                    }
-                }
-
-                state.dispatchRawDelta(-delta.x)
-                change.consume()
-            }
-        }
-    }
-}
-
+@Composable
 internal fun Modifier.nuvioDesktopDragScroll(
     state: ScrollState,
+): Modifier = nuvioDesktopDragScrollImpl(state)
+
+@Composable
+private fun Modifier.nuvioDesktopDragScrollImpl(
+    state: ScrollableState,
 ): Modifier {
     if (!isDesktop) return this
 
-    return pointerInput(state) {
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val horizontalDirection = if (isRtl) 1f else -1f
+
+    return pointerInput(state, isRtl) {
         awaitEachGesture {
             val down = awaitFirstDown(pass = PointerEventPass.Initial)
             var totalDx = 0f
@@ -336,7 +312,7 @@ internal fun Modifier.nuvioDesktopDragScroll(
                     }
                 }
 
-                state.dispatchRawDelta(-delta.x)
+                state.dispatchRawDelta(delta.x * horizontalDirection)
                 change.consume()
             }
         }

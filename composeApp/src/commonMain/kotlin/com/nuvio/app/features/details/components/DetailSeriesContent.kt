@@ -64,10 +64,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
@@ -1643,18 +1645,23 @@ private fun formatEpisodeRating(rating: Double): String {
  * the seasons or episodes horizontal rows into horizontal scrolling, consuming the
  * event so the outer vertical detail screen does not jump vertically.
  */
+@Composable
 private fun Modifier.nuvioDesktopWheelHorizontalScroll(
     state: ScrollableState,
 ): Modifier {
     if (!isDesktop) return this
 
-    return pointerInput(state) {
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+
+    return pointerInput(state, isRtl) {
         awaitEachGesture {
             val event = awaitPointerEvent(pass = PointerEventPass.Initial)
             if (event.type == PointerEventType.Scroll) {
                 val scrollDelta = event.changes.fold(0f) { acc, change ->
                     acc + if (change.scrollDelta.y.absoluteValue >= change.scrollDelta.x.absoluteValue) {
                         change.scrollDelta.y
+                    } else if (isRtl) {
+                        -change.scrollDelta.x
                     } else {
                         change.scrollDelta.x
                     }

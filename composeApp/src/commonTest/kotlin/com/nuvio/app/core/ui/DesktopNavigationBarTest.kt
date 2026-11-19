@@ -15,17 +15,17 @@ class DesktopNavigationBarTest {
     }
 
     @Test
-    fun adaptiveHomeWithHeroExpandsForHoverAndProfilePopup() {
-        assertEquals(0f, labels(hero = true))
+    fun adaptiveHomeKeepsLabelsStableAcrossHeroHoverPopupAndScroll() {
+        assertEquals(1f, labels(hero = true))
         assertEquals(1f, labels(hero = true, hovered = true))
         assertEquals(1f, labels(hero = true, popup = true))
-        assertEquals(0f, labels(hero = true, scrolled = true))
+        assertEquals(1f, labels(hero = true, scrolled = true))
     }
 
     @Test
-    fun adaptiveHomeWithoutHeroCollapsesAfterScrolling() {
+    fun adaptiveHomeWithoutHeroKeepsLabelsStableWhileScrolling() {
         assertEquals(1f, labels())
-        assertEquals(0f, labels(scrolled = true))
+        assertEquals(1f, labels(scrolled = true))
         assertEquals(1f, labels(scrolled = true, hovered = true))
     }
 

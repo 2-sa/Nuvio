@@ -55,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -308,6 +310,13 @@ fun ProfileSelectionScreen(
                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                             shape = RoundedCornerShape(24.dp),
                         )
+                        .then(
+                            if (isDesktop && interactionEnabled) {
+                                Modifier.pointerHoverIcon(PointerIcon.Hand)
+                            } else {
+                                Modifier
+                            },
+                        )
                         .clickable(enabled = interactionEnabled) { isEditMode = !isEditMode }
                         .padding(horizontal = 24.dp, vertical = 10.dp),
                 ) {
@@ -422,7 +431,9 @@ private fun ProfileAvatarCard(
             .clip(profileShape)
             .then(
                 if (isDesktop) {
-                    Modifier.hoverable(interactionSource)
+                    Modifier
+                        .hoverable(interactionSource)
+                        .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
                 } else {
                     Modifier
                 },
@@ -581,6 +592,7 @@ private fun AddProfileCard(
                 translationY = animOffset.value
             }
             .clip(addProfileShape)
+            .then(if (isDesktop && enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
             .nuvioFocusBorder(addProfileShape)
             .clickable(
                 enabled = enabled,
