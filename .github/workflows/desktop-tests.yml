@@ -7,7 +7,7 @@ on:
         description: Space-separated Gradle --tests filter patterns (pass "all" for the full desktopTest suite)
         required: false
         type: string
-        default: com.nuvio.app.core.ui.*
+        default: com.nuvio.app.core.ui.HeroStretchOverscrollTest com.nuvio.app.features.details.components.DetailSeriesContentWheelScrollTest com.nuvio.app.features.trakt.TraktIdUtilsTest com.nuvio.app.features.trakt.TraktTrackingLibraryProviderTest
 
 jobs:
   desktop-tests:
@@ -46,7 +46,7 @@ jobs:
 
       - name: Compile Desktop & Run Unit Tests
         env:
-          TEST_FILTER: ${{ inputs.test_filter || 'com.nuvio.app.core.ui.*' }}
+          TEST_FILTER: ${{ inputs.test_filter || 'com.nuvio.app.core.ui.HeroStretchOverscrollTest com.nuvio.app.features.details.components.DetailSeriesContentWheelScrollTest com.nuvio.app.features.trakt.TraktIdUtilsTest com.nuvio.app.features.trakt.TraktTrackingLibraryProviderTest' }}
         run: |
           set -euo pipefail
           test_args=()
