@@ -1690,7 +1690,7 @@ private fun Modifier.nuvioDesktopWheelHorizontalScroll(
     return pointerInput(state, isRtl) {
         awaitEachGesture {
             val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-            if (event.type == PointerEventType.Scroll) {
+            if (event.type == PointerEventType.Scroll && event.changes.none { it.isConsumed }) {
                 val (totalDeltaX, totalDeltaY) = event.changes.fold(0f to 0f) { (accX, accY), change ->
                     (accX + change.scrollDelta.x) to (accY + change.scrollDelta.y)
                 }

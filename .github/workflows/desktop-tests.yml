@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       test_filter:
-        description: Gradle --tests filter (pass "all" for the full desktopTest suite)
+        description: Space-separated Gradle --tests filter patterns (pass "all" for the full desktopTest suite)
         required: false
         type: string
         default: com.nuvio.app.core.ui.*
@@ -25,7 +25,7 @@ jobs:
           java-version: 17
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
 
@@ -50,13 +50,15 @@ jobs:
         run: |
           set -euo pipefail
           test_args=()
-          if [ -n "${TEST_FILTER:-}" ] && [ "${TEST_FILTER}" != "all" ]; then
+          if [ -n "${TEST_FILTER:-}" ]; then
             read -r -a filter_patterns <<< "${TEST_FILTER}"
-            for pattern in "${filter_patterns[@]+"${filter_patterns[@]}"}"; do
-              if [ -n "${pattern}" ]; then
-                test_args+=(--tests "${pattern}")
-              fi
-            done
+            if ! ( [ "${#filter_patterns[@]}" -eq 1 ] && [ "${filter_patterns[0]}" = "all" ] ); then
+              for pattern in ${filter_patterns[@]+"${filter_patterns[@]}"}; do
+                if [ -n "${pattern}" ]; then
+                  test_args+=(--tests "${pattern}")
+                fi
+              done
+            fi
           fi
           ./gradlew \
             :composeApp:desktopMainClasses \
