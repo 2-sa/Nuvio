@@ -1,9 +1,15 @@
 package com.nuvio.app.features.settings
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,11 +29,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -36,27 +43,32 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.nuvio.app.core.ui.NuvioTokens
-import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioSectionLabel
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
 import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_homescreen_collection_with_addon
 import nuvio.composeapp.generated.resources.settings_homescreen_display_name
@@ -77,12 +89,13 @@ private fun SettingsCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(NuvioTokens.Radius.xl)
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = tokens.colors.surface,
-        shape = tokens.shapes.card,
+        color = tokens.colors.surfaceCard,
+        shape = cardShape,
         border = BorderStroke(
-            tokens.borders.hairline,
+            tokens.borders.thin,
             tokens.colors.borderSubtle,
         ),
     ) {
@@ -108,7 +121,7 @@ internal fun SettingsGroup(
 internal fun SettingsGroupDivider(isTablet: Boolean) {
     val tokens = MaterialTheme.nuvio
     HorizontalDivider(
-        modifier = Modifier.padding(start = if (isTablet) NuvioTokens.Space.s80 - NuvioTokens.Space.s2 else NuvioTokens.Space.s64 + NuvioTokens.Space.s2),
+        modifier = Modifier.padding(horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16),
         thickness = tokens.borders.hairline,
         color = tokens.colors.borderSubtle,
     )
@@ -137,10 +150,10 @@ internal fun TabletPageHeader(
             if (showBack) {
                 NuvioBackButton(
                     onClick = onBack,
-                    modifier = Modifier
-                        .size(36.dp),
+                    modifier = Modifier.size(NuvioTokens.Space.s36),
                     shape = tokens.shapes.compactCard,
-                    containerColor = tokens.colors.surface,
+                    containerColor = tokens.colors.surfaceCard,
+                    showContainerOnDesktop = true,
                     contentColor = tokens.colors.textPrimary,
                     buttonSize = NuvioTokens.Space.s36,
                     iconSize = tokens.icons.md,
@@ -165,22 +178,73 @@ internal fun SettingsSidebarItem(
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
-    val primary = tokens.colors.accent
-    val background = if (selected) primary.copy(alpha = tokens.opacity.hover) else Color.Transparent
-    val iconChip = if (selected) primary.copy(alpha = tokens.opacity.selected) else Color.Transparent
-    val contentColor = if (selected) tokens.colors.textPrimary else tokens.colors.textMuted
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val accent = tokens.colors.accent
+    val background by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.focusBackground
+            isDesktop && isHovered -> tokens.colors.overlayHover
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "sidebarItemBg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            selected -> accent.copy(alpha = 0.35f)
+            isDesktop && isHovered -> tokens.colors.borderSubtle
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "sidebarItemBorder",
+    )
+    val iconChip = if (selected) accent.copy(alpha = tokens.opacity.selected) else Color.Transparent
+    val contentColor = when {
+        selected -> tokens.colors.textPrimary
+        isDesktop && isHovered -> tokens.colors.textSecondary
+        else -> tokens.colors.textMuted
+    }
 
-    val sidebarItemShape = RoundedCornerShape(NuvioTokens.Space.s10)
+    val sidebarItemShape = RoundedCornerShape(NuvioTokens.Radius.lg)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = tokens.spacing.listGap, vertical = NuvioTokens.Space.s2)
+            .clip(sidebarItemShape)
             .background(background, sidebarItemShape)
+            .border(tokens.borders.thin, borderColor, sidebarItemShape)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
             .nuvioFocusBorder(sidebarItemShape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = tokens.spacing.screenHorizontal, vertical = tokens.spacing.listGap),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(
+                start = NuvioTokens.Space.s10,
+                end = NuvioTokens.Space.s14,
+                top = NuvioTokens.Space.s10,
+                bottom = NuvioTokens.Space.s10,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            modifier = Modifier
+                .width(NuvioTokens.Space.s3)
+                .height(NuvioTokens.Space.s20)
+                .clip(RoundedCornerShape(NuvioTokens.Radius.full))
+                .background(if (selected) accent else Color.Transparent),
+        )
+        Spacer(modifier = Modifier.width(NuvioTokens.Space.s10))
         Surface(
             modifier = Modifier.size(tokens.icons.xl),
             color = iconChip,
@@ -194,7 +258,8 @@ internal fun SettingsSidebarItem(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (selected) primary else contentColor,
+                    tint = if (selected) accent else contentColor,
+                    modifier = Modifier.size(tokens.icons.md),
                 )
             }
         }
@@ -204,6 +269,8 @@ internal fun SettingsSidebarItem(
             style = MaterialTheme.typography.bodyLarge,
             color = contentColor,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -220,7 +287,7 @@ internal fun SettingsSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = NuvioTokens.Radius.card),
+                .padding(horizontal = NuvioTokens.Space.s6),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -248,15 +315,37 @@ internal fun SettingsNavigationRow(
     onClick: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val iconSize = if (isTablet) 42.dp else 36.dp
-    val verticalPadding = if (isTablet) 16.dp else 14.dp
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val iconSize = if (isTablet) 40.dp else 36.dp
+    val verticalPadding = if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s14
+    val horizontalPadding = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
+    val rowBackground by animateColorAsState(
+        targetValue = if (isDesktop && enabled && isHovered) tokens.colors.overlayHover else Color.Transparent,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "navRowBg",
+    )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(rowBackground)
+            .then(
+                if (isDesktop && enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
             .nuvioFocusBorder(RoundedCornerShape(NuvioTokens.Space.s4))
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
             .padding(horizontal = horizontalPadding, vertical = verticalPadding)
             .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),
         horizontalArrangement = Arrangement.Start,
@@ -265,15 +354,24 @@ internal fun SettingsNavigationRow(
         Row(
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 12.dp)
+                .padding(end = NuvioTokens.Space.s12)
                 .widthIn(max = if (isTablet) 560.dp else Dp.Unspecified),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null || iconPainter != null) {
                 Surface(
                     modifier = Modifier.size(iconSize),
-                    color = tokens.colors.accent.copy(alpha = tokens.opacity.pressed),
+                    color = if (isDesktop && enabled && isHovered) {
+                        tokens.colors.focusBackground
+                    } else {
+                        tokens.colors.accent.copy(alpha = tokens.opacity.pressed)
+                    },
                     shape = tokens.shapes.compactCard,
+                    border = if (isDesktop && enabled && isHovered) {
+                        BorderStroke(tokens.borders.hairline, tokens.colors.accent.copy(alpha = 0.25f))
+                    } else {
+                        null
+                    },
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
@@ -284,7 +382,7 @@ internal fun SettingsNavigationRow(
                             androidx.compose.foundation.Image(
                                 painter = iconPainter,
                                 contentDescription = null,
-                                modifier = Modifier.size(if (isTablet) 28.dp else 24.dp),
+                                modifier = Modifier.size(if (isTablet) 26.dp else 24.dp),
                                 contentScale = ContentScale.Fit,
                             )
                         } else if (icon != null) {
@@ -292,11 +390,12 @@ internal fun SettingsNavigationRow(
                                 imageVector = icon,
                                 contentDescription = null,
                                 tint = tokens.colors.accent,
+                                modifier = Modifier.size(tokens.icons.md),
                             )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.width(if (isTablet) 16.dp else 14.dp))
+                Spacer(modifier = Modifier.width(if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s14))
             }
             Column {
                 Text(
@@ -306,17 +405,25 @@ internal fun SettingsNavigationRow(
                     fontWeight = FontWeight.Medium,
                 )
                 if (!description.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(NuvioTokens.Space.s2))
                     Text(
                         text = description,
                         style = MaterialTheme.typography.bodyMedium,
                         color = tokens.colors.textMuted,
-                        modifier = Modifier.alpha(0.92f),
                     )
                 }
             }
         }
-        trailingContent?.invoke(this)
+        if (trailingContent != null) {
+            trailingContent.invoke(this)
+        } else {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = if (isDesktop && enabled && isHovered) tokens.colors.accent else tokens.colors.textMuted,
+                modifier = Modifier.size(tokens.icons.md),
+            )
+        }
     }
 }
 
@@ -331,13 +438,34 @@ internal fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val verticalPadding = if (isTablet) 16.dp else 14.dp
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val verticalPadding = if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s14
+    val rowBackground by animateColorAsState(
+        targetValue = if (isDesktop && enabled && isHovered) tokens.colors.overlayHover else Color.Transparent,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "switchRowBg",
+    )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(rowBackground)
+            .then(
+                if (isDesktop && enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
             .nuvioFocusBorder(RoundedCornerShape(NuvioTokens.Space.s4))
-            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+            ) { onCheckedChange(!checked) }
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
@@ -345,10 +473,10 @@ internal fun SettingsSwitchRow(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 12.dp)
+                .padding(end = NuvioTokens.Space.s12)
                 .widthIn(max = if (isTablet) 560.dp else Dp.Unspecified)
                 .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
         ) {
             Text(
                 text = title,
@@ -368,12 +496,18 @@ internal fun SettingsSwitchRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,
-            modifier = Modifier.padding(start = 4.dp),
+            modifier = Modifier.padding(start = NuvioTokens.Space.s4),
             colors = SwitchDefaults.colors(
                 checkedThumbColor = tokens.colors.onAccent,
                 checkedTrackColor = tokens.colors.accent,
-                uncheckedThumbColor = tokens.colors.textMuted,
-                uncheckedTrackColor = tokens.colors.borderDefault,
+                uncheckedThumbColor = tokens.colors.textSecondary,
+                uncheckedTrackColor = tokens.colors.surfaceElevated,
+                uncheckedBorderColor = tokens.colors.borderDefault,
+                disabledCheckedThumbColor = tokens.colors.onAccent.copy(alpha = tokens.opacity.disabled),
+                disabledCheckedTrackColor = tokens.colors.accent.copy(alpha = tokens.opacity.disabled),
+                disabledUncheckedThumbColor = tokens.colors.textDisabled,
+                disabledUncheckedTrackColor = tokens.colors.surfaceElevated.copy(alpha = tokens.opacity.disabled),
+                disabledUncheckedBorderColor = tokens.colors.borderSubtle,
             ),
         )
     }
@@ -438,14 +572,34 @@ internal fun HomescreenCatalogRow(
     onPinnedDragAttempt: () -> Unit = {},
 ) {
     val tokens = MaterialTheme.nuvio
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalPadding = if (isTablet) 18.dp else 16.dp
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val horizontalPadding = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
+    val verticalPadding = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16
     val hapticFeedback = LocalHapticFeedback.current
+    val rowBackground by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) tokens.colors.overlayHover else Color.Transparent,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "homescreenRowBg",
+    )
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onExpandedChange(!expanded) }
+            .background(rowBackground)
+            .then(
+                if (isDesktop && !item.isCollection) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+            ) { onExpandedChange(!expanded) }
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -517,8 +671,9 @@ internal fun HomescreenCatalogRow(
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = tokens.colors.onAccent,
                         checkedTrackColor = tokens.colors.accent,
-                        uncheckedThumbColor = tokens.colors.textMuted,
-                        uncheckedTrackColor = tokens.colors.borderDefault,
+                        uncheckedThumbColor = tokens.colors.textSecondary,
+                        uncheckedTrackColor = tokens.colors.surfaceElevated,
+                        uncheckedBorderColor = tokens.colors.borderDefault,
                     ),
                 )
                 if (item.isPinnedToTop) {
@@ -534,14 +689,16 @@ internal fun HomescreenCatalogRow(
                 } else {
                     IconButton(
                         modifier = with(dragHandleScope) {
-                            Modifier.draggableHandle(
-                                onDragStarted = {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                },
-                                onDragStopped = {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                },
-                            )
+                            Modifier
+                                .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                                .draggableHandle(
+                                    onDragStarted = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDragStopped = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    },
+                                )
                         },
                         onClick = {},
                     ) {
@@ -564,14 +721,21 @@ internal fun HomescreenCatalogRow(
                     onValueChange = onTitleChange,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    shape = RoundedCornerShape(NuvioTokens.Radius.lg),
                     label = { Text(stringResource(Res.string.settings_homescreen_display_name)) },
                     placeholder = { Text(item.defaultTitle) },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = tokens.colors.textPrimary),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = tokens.colors.borderFocus.copy(alpha = tokens.opacity.strong),
-                        unfocusedBorderColor = tokens.colors.borderDefault.copy(alpha = tokens.opacity.medium),
-                        focusedContainerColor = tokens.colors.surface,
-                        unfocusedContainerColor = tokens.colors.surface,
-                        disabledContainerColor = tokens.colors.surface,
+                        focusedBorderColor = tokens.colors.accent,
+                        unfocusedBorderColor = tokens.colors.borderDefault,
+                        focusedContainerColor = tokens.colors.surfaceElevated,
+                        unfocusedContainerColor = tokens.colors.surfaceElevated,
+                        disabledContainerColor = tokens.colors.surfaceElevated,
+                        focusedLabelColor = tokens.colors.accent,
+                        unfocusedLabelColor = tokens.colors.textMuted,
+                        focusedPlaceholderColor = tokens.colors.textMuted,
+                        unfocusedPlaceholderColor = tokens.colors.textMuted,
+                        cursorColor = tokens.colors.accent,
                     ),
                 )
             }

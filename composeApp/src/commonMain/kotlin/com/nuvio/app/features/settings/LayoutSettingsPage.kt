@@ -29,6 +29,7 @@ import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.cd_selected
@@ -180,6 +181,7 @@ internal fun LazyListScope.layoutSettingsContent(
                         )
                     }
                     if (isDesktop) {
+                        if (liquidGlassNativeTabBarSupported) SettingsGroupDivider(isTablet = isTablet)
                         SettingsNavigationRow(
                             title = stringResource(Res.string.settings_appearance_desktop_navigation),
                             description = if (isTablet) {
@@ -286,21 +288,24 @@ private fun DesktopNavigationLayoutBottomSheet(
                 .padding(bottom = 16.dp),
         ) {
             item {
+                val tokens = MaterialTheme.nuvio
                 Text(
                     text = stringResource(Res.string.settings_appearance_desktop_navigation_sheet_title),
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 )
             }
 
             itemsIndexed(DesktopNavigationLayout.entries) { index, layout ->
+                val tokens = MaterialTheme.nuvio
                 if (index > 0) {
                     NuvioBottomSheetDivider()
                 }
                 NuvioBottomSheetActionRow(
                     title = stringResource(layout.labelRes),
+                    selected = layout == selectedLayout,
                     onClick = {
                         onLayoutSelected(layout)
                         coroutineScope.launch {
@@ -312,7 +317,7 @@ private fun DesktopNavigationLayoutBottomSheet(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = stringResource(Res.string.cd_selected),
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = tokens.colors.accent,
                             )
                         }
                     },
@@ -356,6 +361,7 @@ private fun NavBarStyleBottomSheet(
                 .padding(bottom = 16.dp),
         ) {
             item {
+                val tokens = MaterialTheme.nuvio
                 Text(
                     text = if (isSidebarActive) {
                         stringResource(Res.string.settings_appearance_sidebar_style_sheet_title)
@@ -365,19 +371,21 @@ private fun NavBarStyleBottomSheet(
                         stringResource(Res.string.settings_appearance_nav_bar_style_sheet_title)
                     },
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 )
             }
 
             itemsIndexed(availableStyles) { index, style ->
+                val tokens = MaterialTheme.nuvio
                 if (index > 0) {
                     NuvioBottomSheetDivider()
                 }
                 val rowTitle = stringResource(style.labelRes)
                 NuvioBottomSheetActionRow(
                     title = rowTitle,
+                    selected = style == selectedStyle,
                     onClick = {
                         onStyleSelected(style)
                         coroutineScope.launch {
@@ -389,7 +397,7 @@ private fun NavBarStyleBottomSheet(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = stringResource(Res.string.cd_selected),
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = tokens.colors.accent,
                             )
                         }
                     },

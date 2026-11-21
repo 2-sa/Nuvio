@@ -1,6 +1,8 @@
 package com.nuvio.app.features.auth
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -10,6 +12,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,9 +46,10 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import com.nuvio.app.core.ui.NuvioLoadingIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -57,8 +63,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
@@ -66,6 +74,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -87,11 +97,14 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.DeviceLinkAuthRepository
 import com.nuvio.app.core.auth.DeviceLinkAuthState
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.accentBrush
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.settings.AppBrandWordmark
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.PI
-import kotlin.math.sin
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_auth_already_have_account
@@ -112,19 +125,10 @@ import nuvio.composeapp.generated.resources.compose_auth_terms_prefix
 import nuvio.composeapp.generated.resources.compose_auth_welcome_back
 import org.jetbrains.compose.resources.stringResource
 
-internal val AuthTextPrimary = Color(0xFFF5F7F8)
-internal val AuthTextSecondary = Color(0xFF969CA3)
-private val AuthTextMuted = Color(0xFF6E7178)
-private val AuthPrimaryButtonBackground = Color(0xFFF5F5F5)
-private val AuthPrimaryButtonText = Color(0xFF111111)
-internal val AuthFieldBackground = Color.White.copy(alpha = 0.04f)
-private val AuthFieldBackgroundMobile = Color.White.copy(alpha = 0.035f)
-internal val AuthFieldBorder = Color.White.copy(alpha = 0.08f)
-private val AuthPaneBackground = Color.White.copy(alpha = 0.022f)
-private val AuthPaneBorder = Color.White.copy(alpha = 0.07f)
-private val AuthDividerColor = Color.White.copy(alpha = 0.10f)
-private val AuthSecondaryButtonBackground = Color.White.copy(alpha = 0.05f)
-private val AuthSecondaryButtonBorder = Color.White.copy(alpha = 0.09f)
+internal val AuthTextPrimary = Color(0xFFF8FAFC)
+internal val AuthTextSecondary = Color(0xFF94A3B8)
+internal val AuthFieldBackground = Color(0xFF111622)
+internal val AuthFieldBorder = Color(0xFF24324A)
 
 private data class AuthFormMetrics(
     val fieldHeight: Dp,
@@ -137,51 +141,32 @@ private data class AuthFormMetrics(
     val dividerTop: Dp,
     val secondaryTop: Dp,
     val secondaryHeight: Dp,
-    val fieldBackground: Color,
 )
 
 private val MobileAuthFormMetrics = AuthFormMetrics(
-    fieldHeight = 56.dp,
+    fieldHeight = 54.dp,
     fieldHorizontalPadding = 16.dp,
     iconSize = 19.dp,
     passwordIconSize = 20.dp,
-    primaryTop = 22.dp,
-    primaryHeight = 54.dp,
-    toggleTop = 18.dp,
-    dividerTop = 28.dp,
-    secondaryTop = 24.dp,
-    secondaryHeight = 54.dp,
-    fieldBackground = AuthFieldBackgroundMobile,
+    primaryTop = 20.dp,
+    primaryHeight = 52.dp,
+    toggleTop = 16.dp,
+    dividerTop = 24.dp,
+    secondaryTop = 22.dp,
+    secondaryHeight = 52.dp,
 )
 
-private val LargeAuthFormMetrics = AuthFormMetrics(
-    fieldHeight = 58.dp,
-    fieldHorizontalPadding = 18.dp,
-    iconSize = 20.dp,
-    passwordIconSize = 21.dp,
-    primaryTop = 24.dp,
-    primaryHeight = 56.dp,
-    toggleTop = 18.dp,
-    dividerTop = 30.dp,
-    secondaryTop = 26.dp,
-    secondaryHeight = 56.dp,
-    fieldBackground = AuthFieldBackground,
-)
-
-private fun largeAuthScale(screenWidth: Dp): Float =
-    (screenWidth.value / 1194f).coerceIn(1f, 1.32f)
-
-private fun largeAuthFormMetrics(scale: Float): AuthFormMetrics = LargeAuthFormMetrics.copy(
-    fieldHeight = 58.dp * scale,
-    fieldHorizontalPadding = 18.dp * scale,
-    iconSize = 20.dp * scale,
-    passwordIconSize = 21.dp * scale,
-    primaryTop = 24.dp * scale,
-    primaryHeight = 56.dp * scale,
-    toggleTop = 18.dp * scale,
-    dividerTop = 30.dp * scale,
-    secondaryTop = 26.dp * scale,
-    secondaryHeight = 56.dp * scale,
+private val DesktopAuthFormMetrics = AuthFormMetrics(
+    fieldHeight = 52.dp,
+    fieldHorizontalPadding = 16.dp,
+    iconSize = 19.dp,
+    passwordIconSize = 20.dp,
+    primaryTop = 20.dp,
+    primaryHeight = 50.dp,
+    toggleTop = 16.dp,
+    dividerTop = 24.dp,
+    secondaryTop = 20.dp,
+    secondaryHeight = 48.dp,
 )
 
 @Composable
@@ -241,10 +226,11 @@ fun AuthScreen(
         onDispose(DeviceLinkAuthRepository::cancel)
     }
 
+    val tokens = MaterialTheme.nuvio
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(tokens.colors.background)
             .pointerInput(emailFieldBounds, passwordFieldBounds) {
                 awaitEachGesture {
                     val down = awaitFirstDown(
@@ -263,21 +249,17 @@ fun AuthScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             val screenWidth = maxWidth
-            val largeScreen = screenWidth >= 900.dp
-            val compactLargeScreen = screenWidth < 1100.dp
+            val largeScreen = screenWidth >= 720.dp
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .authGradientBackground(largeScreen = largeScreen),
+                    .authObsidianBackdrop(
+                        background = tokens.colors.background,
+                        accent = tokens.colors.accent,
+                    ),
             ) {
                 if (largeScreen) {
-                    val largeScale = largeAuthScale(screenWidth)
-                    val formPaneWidth = (screenWidth * 0.30f).coerceIn(460.dp * largeScale, 720.dp * largeScale)
-                    val brandHorizontalPadding = (screenWidth * 0.055f).coerceIn(56.dp * largeScale, 128.dp * largeScale)
-                    val formHorizontalPadding = (formPaneWidth * 0.14f).coerceIn(48.dp, 96.dp)
-                    val formMetrics = largeAuthFormMetrics(largeScale)
-
                     AuthLargeLayout(
                         modifier = Modifier.fillMaxSize(),
                         isSignUp = isSignUp,
@@ -288,11 +270,7 @@ fun AuthScreen(
                         authError = authError,
                         deviceLinkAuthState = deviceLinkAuthState,
                         deviceLinkEnabled = serverConnectionState.activeServer.capabilities.tvLogin,
-                        formPaneWidth = if (compactLargeScreen) 460.dp else formPaneWidth,
-                        brandHorizontalPadding = brandHorizontalPadding,
-                        formHorizontalPadding = formHorizontalPadding,
-                        formMetrics = formMetrics,
-                        scale = largeScale,
+                        statusBarTop = statusBarTop,
                         onEmailChange = {
                             email = it
                             AuthRepository.clearError()
@@ -433,45 +411,46 @@ private fun AuthMobileLayout(
     onEmailBoundsChange: (Rect) -> Unit,
     onPasswordBoundsChange: (Rect) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(
-                start = 30.dp,
-                top = statusBarTop + 48.dp,
-                end = 30.dp,
-                bottom = 40.dp,
+                start = NuvioTokens.Space.s24,
+                top = statusBarTop + NuvioTokens.Space.s48,
+                end = NuvioTokens.Space.s24,
+                bottom = NuvioTokens.Space.s36,
             ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 342.dp)
+                .widthIn(max = 360.dp)
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AuthBrandLockup(logoHeight = 38.dp)
 
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(NuvioTokens.Space.s40))
 
             AuthHeading(
                 isSignUp = isSignUp,
                 headingStyle = MaterialTheme.typography.headlineLarge.copy(
-                    color = AuthTextPrimary,
-                    fontSize = 28.sp,
-                    lineHeight = 31.sp,
+                    color = tokens.colors.textPrimary,
+                    fontSize = 26.sp,
+                    lineHeight = 30.sp,
                     fontWeight = FontWeight.SemiBold,
                 ),
                 subtitleStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = AuthTextSecondary,
+                    color = tokens.colors.textSecondary,
                     fontSize = 15.sp,
                     lineHeight = 21.sp,
                     fontWeight = FontWeight.Normal,
                 ),
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(NuvioTokens.Space.s24))
 
             AuthForm(
                 isSignUp = isSignUp,
@@ -509,11 +488,7 @@ private fun AuthLargeLayout(
     authError: String?,
     deviceLinkAuthState: DeviceLinkAuthState,
     deviceLinkEnabled: Boolean,
-    formPaneWidth: Dp,
-    brandHorizontalPadding: Dp,
-    formHorizontalPadding: Dp,
-    formMetrics: AuthFormMetrics,
-    scale: Float,
+    statusBarTop: Dp,
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onPasswordVisibilityToggle: () -> Unit,
@@ -525,82 +500,62 @@ private fun AuthLargeLayout(
     onEmailBoundsChange: (Rect) -> Unit,
     onPasswordBoundsChange: (Rect) -> Unit,
 ) {
-    Row(
-        modifier = modifier,
+    val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(NuvioTokens.Space.s20)
+    Box(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = NuvioTokens.Space.s32,
+                top = statusBarTop + NuvioTokens.Space.s32,
+                end = NuvioTokens.Space.s32,
+                bottom = NuvioTokens.Space.s32,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Column(
+        Surface(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .padding(horizontal = brandHorizontalPadding),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.Start,
-        ) {
-            AppBrandWordmark(
-                contentDescription = null,
-                modifier = Modifier.height(60.dp * scale),
-            )
-            Spacer(modifier = Modifier.height(32.dp * scale))
-            Text(
-                text = stringResource(Res.string.compose_auth_tagline),
-                modifier = Modifier.widthIn(max = 440.dp * scale),
-                style = MaterialTheme.typography.displayLarge.copy(
-                    color = AuthTextPrimary,
-                    fontSize = (40f * scale).sp,
-                    lineHeight = (45f * scale).sp,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-            )
-            Spacer(modifier = Modifier.height(18.dp * scale))
-            Text(
-                text = stringResource(Res.string.compose_auth_sign_up_subtitle),
-                modifier = Modifier.widthIn(max = 400.dp * scale),
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    color = AuthTextSecondary,
-                    fontSize = (17f * scale).sp,
-                    lineHeight = (26f * scale).sp,
-                    fontWeight = FontWeight.Normal,
-                ),
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .width(formPaneWidth)
-                .fillMaxHeight()
-                .background(AuthPaneBackground)
-                .drawBehind {
-                    drawLine(
-                        color = AuthPaneBorder,
-                        start = Offset(0f, 0f),
-                        end = Offset(0f, size.height),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                },
-            contentAlignment = Alignment.Center,
+                .widthIn(max = 440.dp)
+                .fillMaxWidth(),
+            shape = cardShape,
+            color = tokens.colors.surfaceCard,
+            border = BorderStroke(tokens.borders.thin, tokens.colors.borderDefault),
+            shadowElevation = tokens.elevation.modal,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = formHorizontalPadding),
+                    .padding(horizontal = NuvioTokens.Space.s32, vertical = NuvioTokens.Space.s32),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                AuthBrandLockup(logoHeight = 36.dp)
+
+                Spacer(modifier = Modifier.height(NuvioTokens.Space.s24))
+
+                HorizontalDivider(
+                    thickness = tokens.borders.hairline,
+                    color = tokens.colors.borderSubtle,
+                )
+
+                Spacer(modifier = Modifier.height(NuvioTokens.Space.s24))
+
                 AuthHeading(
                     isSignUp = isSignUp,
                     headingStyle = MaterialTheme.typography.headlineLarge.copy(
-                        color = AuthTextPrimary,
-                        fontSize = (30f * scale).sp,
-                        lineHeight = (33f * scale).sp,
+                        color = tokens.colors.textPrimary,
+                        fontSize = 26.sp,
+                        lineHeight = 30.sp,
                         fontWeight = FontWeight.SemiBold,
                     ),
-                    subtitleStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = AuthTextSecondary,
-                        fontSize = (15f * scale).sp,
-                        lineHeight = (21f * scale).sp,
+                    subtitleStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = tokens.colors.textSecondary,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
                         fontWeight = FontWeight.Normal,
                     ),
                 )
 
-                Spacer(modifier = Modifier.height(32.dp * scale))
+                Spacer(modifier = Modifier.height(NuvioTokens.Space.s24))
 
                 AuthForm(
                     isSignUp = isSignUp,
@@ -611,8 +566,8 @@ private fun AuthLargeLayout(
                     authError = authError,
                     deviceLinkAuthState = deviceLinkAuthState,
                     deviceLinkEnabled = deviceLinkEnabled,
-                    metrics = formMetrics,
-                    scale = scale,
+                    metrics = DesktopAuthFormMetrics,
+                    scale = 1f,
                     onEmailChange = onEmailChange,
                     onPasswordChange = onPasswordChange,
                     onPasswordVisibilityToggle = onPasswordVisibilityToggle,
@@ -633,6 +588,7 @@ private fun AuthLargeLayout(
 private fun AuthBrandLockup(
     logoHeight: Dp,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -640,15 +596,16 @@ private fun AuthBrandLockup(
             contentDescription = null,
             modifier = Modifier.height(logoHeight),
         )
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(NuvioTokens.Space.s10))
         Text(
             text = stringResource(Res.string.compose_auth_tagline),
             style = MaterialTheme.typography.bodyMedium.copy(
-                color = AuthTextSecondary,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
+                color = tokens.colors.textMuted,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
                 fontWeight = FontWeight.Normal,
             ),
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -659,9 +616,10 @@ private fun AuthHeading(
     headingStyle: TextStyle,
     subtitleStyle: TextStyle,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
     ) {
         AnimatedContent(
             targetState = isSignUp,
@@ -672,7 +630,7 @@ private fun AuthHeading(
                 text = if (signUp) stringResource(Res.string.compose_auth_create_account)
                 else stringResource(Res.string.compose_auth_welcome_back),
                 style = headingStyle,
-                color = AuthTextPrimary,
+                color = tokens.colors.textPrimary,
             )
         }
         AnimatedContent(
@@ -684,7 +642,7 @@ private fun AuthHeading(
                 text = if (signUp) stringResource(Res.string.compose_auth_sign_up_subtitle)
                 else stringResource(Res.string.compose_auth_sign_in_subtitle),
                 style = subtitleStyle,
-                color = AuthTextSecondary,
+                color = tokens.colors.textSecondary,
             )
         }
     }
@@ -713,6 +671,7 @@ private fun AuthForm(
     onEmailBoundsChange: (Rect) -> Unit,
     onPasswordBoundsChange: (Rect) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val uriHandler = LocalUriHandler.current
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -762,7 +721,7 @@ private fun AuthForm(
             Text(
                 text = errorText,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.error,
+                    color = tokens.colors.danger,
                     fontSize = (13f * scale).sp,
                     lineHeight = (18f * scale).sp,
                 ),
@@ -830,7 +789,7 @@ private fun AuthForm(
             text = stringResource(Res.string.compose_auth_store_locally),
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodyMedium.copy(
-                color = AuthTextMuted,
+                color = tokens.colors.textMuted,
                 fontSize = (13f * scale).sp,
                 lineHeight = (18f * scale).sp,
                 fontWeight = FontWeight.Normal,
@@ -845,6 +804,7 @@ private fun AuthTermsAcknowledgement(
     scale: Float,
     onTermsClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
@@ -853,7 +813,7 @@ private fun AuthTermsAcknowledgement(
         Text(
             text = stringResource(Res.string.compose_auth_terms_prefix),
             style = MaterialTheme.typography.bodyMedium.copy(
-                color = AuthTextSecondary,
+                color = tokens.colors.textSecondary,
                 fontSize = (13f * scale).sp,
                 lineHeight = (18f * scale).sp,
                 fontWeight = FontWeight.Normal,
@@ -862,9 +822,11 @@ private fun AuthTermsAcknowledgement(
         Spacer(modifier = Modifier.width(4.dp * scale))
         Text(
             text = stringResource(Res.string.compose_auth_terms_link),
-            modifier = Modifier.clickable(onClick = onTermsClick),
+            modifier = Modifier
+                .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                .clickable(onClick = onTermsClick),
             style = MaterialTheme.typography.bodyMedium.copy(
-                color = AuthTextPrimary,
+                color = tokens.colors.accent,
                 fontSize = (13f * scale).sp,
                 lineHeight = (18f * scale).sp,
                 fontWeight = FontWeight.SemiBold,
@@ -888,13 +850,39 @@ private fun AuthTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(NuvioTokens.Radius.lg + NuvioTokens.Space.s2)
+    val focusRequester = remember { FocusRequester() }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    var isFocused by remember { mutableStateOf(false) }
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isFocused -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderDefault
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "authFieldBorder",
+    )
+    val containerColor by animateColorAsState(
+        targetValue = if (isFocused) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "authFieldBg",
+    )
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(metrics.fieldHeight)
-            .background(metrics.fieldBackground, shape)
-            .border(1.dp, AuthFieldBorder, shape)
+            .clip(shape)
+            .background(containerColor, shape)
+            .border(tokens.borders.thin, borderColor, shape)
+            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+            ) { focusRequester.requestFocus() }
             .padding(horizontal = metrics.fieldHorizontalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -902,23 +890,25 @@ private fun AuthTextField(
             imageVector = icon,
             contentDescription = null,
             modifier = Modifier.size(metrics.iconSize),
-            tint = AuthTextMuted,
+            tint = if (isFocused) tokens.colors.accent else tokens.colors.textMuted,
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(NuvioTokens.Space.s12))
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .focusRequester(focusRequester)
+                .onFocusChanged { isFocused = it.isFocused },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = AuthTextPrimary,
-                fontSize = (16f * scale).sp,
-                lineHeight = (22f * scale).sp,
+                color = tokens.colors.textPrimary,
+                fontSize = (15f * scale).sp,
+                lineHeight = (20f * scale).sp,
                 fontWeight = FontWeight.Normal,
             ),
-            cursorBrush = SolidColor(AuthTextPrimary),
+            cursorBrush = SolidColor(tokens.colors.accent),
             visualTransformation = if (isPassword && !passwordVisible) {
                 PasswordVisualTransformation()
             } else {
@@ -935,9 +925,9 @@ private fun AuthTextField(
                         Text(
                             text = placeholder,
                             style = MaterialTheme.typography.bodyLarge.copy(
-                                color = AuthTextMuted,
-                                fontSize = (16f * scale).sp,
-                                lineHeight = (22f * scale).sp,
+                                color = tokens.colors.textMuted,
+                                fontSize = (15f * scale).sp,
+                                lineHeight = (20f * scale).sp,
                                 fontWeight = FontWeight.Normal,
                             ),
                         )
@@ -947,11 +937,12 @@ private fun AuthTextField(
             },
         )
         if (isPassword) {
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(NuvioTokens.Space.s10))
             Box(
                 modifier = Modifier
                     .size(30.dp)
                     .clip(RoundedCornerShape(15.dp))
+                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
                     .clickable(onClick = onPasswordVisibilityToggle),
                 contentAlignment = Alignment.Center,
             ) {
@@ -960,7 +951,7 @@ private fun AuthTextField(
                     else Icons.Rounded.Visibility,
                     contentDescription = null,
                     modifier = Modifier.size(metrics.passwordIconSize),
-                    tint = AuthTextSecondary,
+                    tint = tokens.colors.textSecondary,
                 )
             }
         }
@@ -976,39 +967,54 @@ internal fun AuthPrimaryButton(
     scale: Float,
     onClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
+    val shape = RoundedCornerShape(NuvioTokens.Radius.xl)
     Button(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(height),
+            .height(height)
+            .then(if (isDesktop && enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+            .nuvioFocusBorder(shape),
         enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
+        shape = shape,
         contentPadding = PaddingValues(0.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = AuthPrimaryButtonBackground,
-            contentColor = AuthPrimaryButtonText,
-            disabledContainerColor = if (isLoading) {
-                AuthPrimaryButtonBackground
-            } else {
-                AuthPrimaryButtonBackground.copy(alpha = 0.45f)
-            },
-            disabledContentColor = AuthPrimaryButtonText.copy(alpha = 0.55f),
+            containerColor = Color.Transparent,
+            contentColor = tokens.colors.onAccent,
+            disabledContainerColor = Color.Transparent,
+            disabledContentColor = if (isLoading) tokens.colors.onAccent else tokens.colors.textDisabled,
         ),
     ) {
-        if (isLoading) {
-            NuvioLoadingIndicator(
-                modifier = Modifier.size(20.dp * scale),
-                color = AuthPrimaryButtonText,
-            )
-        } else {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = (16f * scale).sp,
-                    lineHeight = (22f * scale).sp,
-                    fontWeight = FontWeight.SemiBold,
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .then(
+                    if (enabled || isLoading) {
+                        Modifier.background(palette.accentBrush())
+                    } else {
+                        Modifier.background(tokens.colors.surfaceElevated)
+                    },
                 ),
-            )
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isLoading) {
+                NuvioLoadingIndicator(
+                    modifier = Modifier.size(20.dp * scale),
+                    color = tokens.colors.onAccent,
+                )
+            } else {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = (15f * scale).sp,
+                        lineHeight = (20f * scale).sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                )
+            }
         }
     }
 }
@@ -1019,6 +1025,7 @@ private fun AuthModeToggle(
     scale: Float,
     onToggleAuthMode: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
@@ -1036,14 +1043,14 @@ private fun AuthModeToggle(
                     stringResource(Res.string.compose_auth_dont_have_account).trimEnd()
                 },
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = AuthTextSecondary,
+                    color = tokens.colors.textSecondary,
                     fontSize = (14f * scale).sp,
                     lineHeight = (20f * scale).sp,
                     fontWeight = FontWeight.Normal,
                 ),
             )
         }
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(NuvioTokens.Space.s6))
         AnimatedContent(
             targetState = isSignUp,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -1052,9 +1059,11 @@ private fun AuthModeToggle(
             Text(
                 text = if (signUp) stringResource(Res.string.compose_auth_sign_in)
                 else stringResource(Res.string.compose_auth_sign_up),
-                modifier = Modifier.clickable(onClick = onToggleAuthMode),
+                modifier = Modifier
+                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                    .clickable(onClick = onToggleAuthMode),
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = AuthTextPrimary,
+                    color = tokens.colors.accent,
                     fontSize = (14f * scale).sp,
                     lineHeight = (20f * scale).sp,
                     fontWeight = FontWeight.SemiBold,
@@ -1066,6 +1075,7 @@ private fun AuthModeToggle(
 
 @Composable
 private fun AuthDivider(scale: Float) {
+    val tokens = MaterialTheme.nuvio
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -1073,14 +1083,14 @@ private fun AuthDivider(scale: Float) {
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(1.dp)
-                .background(AuthDividerColor),
+                .height(tokens.borders.hairline)
+                .background(tokens.colors.borderSubtle),
         )
         Text(
             text = stringResource(Res.string.compose_auth_or_separator).trim(),
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = NuvioTokens.Space.s16),
             style = MaterialTheme.typography.bodyMedium.copy(
-                color = AuthTextMuted,
+                color = tokens.colors.textMuted,
                 fontSize = (13f * scale).sp,
                 lineHeight = (18f * scale).sp,
                 fontWeight = FontWeight.Normal,
@@ -1089,8 +1099,8 @@ private fun AuthDivider(scale: Float) {
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(1.dp)
-                .background(AuthDividerColor),
+                .height(tokens.borders.hairline)
+                .background(tokens.colors.borderSubtle),
         )
     }
 }
@@ -1103,27 +1113,45 @@ internal fun AuthSecondaryButton(
     scale: Float,
     onClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val shape = RoundedCornerShape(NuvioTokens.Radius.xl)
     Button(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(height),
+            .height(height)
+            .then(
+                if (isDesktop && enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .nuvioFocusBorder(shape),
         enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, AuthSecondaryButtonBorder),
+        interactionSource = interactionSource,
+        shape = shape,
+        border = BorderStroke(
+            tokens.borders.thin,
+            if (isDesktop && enabled && isHovered) tokens.colors.borderStrong else tokens.colors.borderDefault,
+        ),
         contentPadding = PaddingValues(0.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = AuthSecondaryButtonBackground,
-            contentColor = AuthTextPrimary,
-            disabledContainerColor = AuthSecondaryButtonBackground.copy(alpha = 0.45f),
-            disabledContentColor = AuthTextPrimary.copy(alpha = 0.55f),
+            containerColor = if (isDesktop && enabled && isHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+            contentColor = tokens.colors.textPrimary,
+            disabledContainerColor = tokens.colors.surfaceElevated.copy(alpha = tokens.opacity.disabled),
+            disabledContentColor = tokens.colors.textDisabled,
         ),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontSize = (15f * scale).sp,
-                lineHeight = (21f * scale).sp,
+                lineHeight = (20f * scale).sp,
                 fontWeight = FontWeight.Medium,
             ),
             textAlign = TextAlign.Center,
@@ -1131,51 +1159,32 @@ internal fun AuthSecondaryButton(
     }
 }
 
-private fun Modifier.authGradientBackground(largeScreen: Boolean): Modifier = drawWithCache {
-    val angleDegrees = if (largeScreen) 122.0 else 148.0
-    val angleRadians = angleDegrees * PI / 180.0
-    val directionX = sin(angleRadians).toFloat()
-    val directionY = (-cos(angleRadians)).toFloat()
-    val halfLength = (abs(size.width * directionX) + abs(size.height * directionY)) / 2f
-    val center = Offset(size.width / 2f, size.height / 2f)
-    val start = Offset(
-        x = center.x - directionX * halfLength,
-        y = center.y - directionY * halfLength,
+private fun Modifier.authObsidianBackdrop(
+    background: Color,
+    accent: Color,
+): Modifier = drawWithCache {
+    val maxDim = maxOf(size.width, size.height).coerceAtLeast(1f)
+    val topCenter = Offset(size.width / 2f, size.height * 0.14f)
+    val radialBrush = Brush.radialGradient(
+        colorStops = arrayOf(
+            0f to accent.copy(alpha = 0.08f),
+            0.45f to accent.copy(alpha = 0.035f),
+            1f to Color.Transparent,
+        ),
+        center = topCenter,
+        radius = maxDim * 0.55f,
     )
-    val end = Offset(
-        x = center.x + directionX * halfLength,
-        y = center.y + directionY * halfLength,
-    )
-    val colorStops = if (largeScreen) {
-        arrayOf(
-            0f to Color(0xFF21113B),
-            0.14f to Color(0xFF21113B),
-            0.26f to Color(0xFF1A0E2F),
-            0.36f to Color(0xFF130A23),
-            0.48f to Color(0xFF0A060F),
-            0.60f to Color(0xFF050408),
-            0.70f to Color.Black,
-            1f to Color.Black,
-        )
-    } else {
-        arrayOf(
-            0f to Color(0xFF21113B),
-            0.12f to Color(0xFF21113B),
-            0.24f to Color(0xFF1A0E2F),
-            0.34f to Color(0xFF130A23),
-            0.44f to Color(0xFF0A060F),
-            0.58f to Color(0xFF050408),
-            0.64f to Color.Black,
-            1f to Color.Black,
-        )
-    }
-    val brush = Brush.linearGradient(
-        colorStops = colorStops,
-        start = start,
-        end = end,
+    val verticalGlow = Brush.verticalGradient(
+        colorStops = arrayOf(
+            0f to accent.copy(alpha = 0.08f),
+            0.35f to accent.copy(alpha = 0.02f),
+            0.7f to Color.Transparent,
+        ),
     )
     onDrawBehind {
-        drawRect(brush = brush)
+        drawRect(color = background)
+        drawRect(brush = verticalGlow)
+        drawRect(brush = radialBrush)
     }
 }
 

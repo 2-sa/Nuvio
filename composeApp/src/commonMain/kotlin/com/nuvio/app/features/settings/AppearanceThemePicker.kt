@@ -1,7 +1,14 @@
 package com.nuvio.app.features.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -14,11 +21,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,9 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,13 +52,24 @@ import com.nuvio.app.core.ui.ThemeColors
 import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.labelRes
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.availableAppThemes
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.cd_selected
+import nuvio.composeapp.generated.resources.community_membership_tier_supporter
 import nuvio.composeapp.generated.resources.custom_theme_edit
 import org.jetbrains.compose.resources.stringResource
+
+private val SupporterThemes = setOf(
+    AppTheme.GOLD,
+    AppTheme.JADE,
+    AppTheme.ROSE_GOLD,
+    AppTheme.ARCTIC_BLUE,
+    AppTheme.GRAPHITE,
+)
 
 @Composable
 internal fun AppearanceThemePicker(
@@ -65,8 +86,12 @@ internal fun AppearanceThemePicker(
     val profileId = profileState.activeProfile?.profileIndex
     val gradientEnabled = memberAccess.tier != null
     var showEditor by rememberSaveable(profileId, gradientEnabled) { mutableStateOf(false) }
-    val themes = availableAppThemes(memberAccess.entitlements)
-    val themeSpacing = if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s12
+    val availableThemes = availableAppThemes(memberAccess.entitlements)
+    val themes = remember(availableThemes) {
+        listOfNotNull(availableThemes.firstOrNull { it == AppTheme.CINEMA_OBSIDIAN }) +
+            availableThemes.filterNot { it == AppTheme.CINEMA_OBSIDIAN }
+    }
+    val themeSpacing = if (isTablet) NuvioTokens.Space.s14 else NuvioTokens.Space.s10
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -75,8 +100,8 @@ internal fun AppearanceThemePicker(
                 vertical = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s14,
             ),
     ) {
-        val preferredColumns = if (isTablet) 4 else 3
-        val minThemeCellWidth = if (isTablet) 92.dp else 78.dp
+        val preferredColumns = if (isTablet) 3 else 2
+        val minThemeCellWidth = if (isTablet) 172.dp else 136.dp
         val themeColumns = ((maxWidth + themeSpacing) / (minThemeCellWidth + themeSpacing))
             .toInt().coerceIn(1, preferredColumns)
         Column(verticalArrangement = Arrangement.spacedBy(themeSpacing)) {
@@ -86,10 +111,11 @@ internal fun AppearanceThemePicker(
                     horizontalArrangement = Arrangement.spacedBy(themeSpacing),
                 ) {
                     rowThemes.forEach { theme ->
-                        ThemeChip(
+                        ThemeSwatchCard(
                             theme = theme,
                             customColors = customColors,
                             isSelected = theme == selectedTheme,
+                            isSupporter = theme in SupporterThemes,
                             onClick = {
                                 if (theme == AppTheme.CUSTOM) showEditor = true else onThemeSelected(theme)
                             },
@@ -112,58 +138,194 @@ internal fun AppearanceThemePicker(
 }
 
 @Composable
-private fun ThemeChip(
+private fun ThemeSwatchCard(
     theme: AppTheme,
     customColors: CustomThemeColors,
     isSelected: Boolean,
+    isSupporter: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
     val palette = remember(theme, customColors) { ThemeColors.getColorPalette(theme, customColors) }
-    Column(
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val cardShape = RoundedCornerShape(NuvioTokens.Radius.lg + NuvioTokens.Space.s2)
+    val borderWidth by animateDpAsState(
+        targetValue = if (isSelected) NuvioTokens.Border.medium else tokens.borders.thin,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "themeSwatchBorderWidth",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isSelected -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "themeSwatchBorderColor",
+    )
+
+    Surface(
         modifier = modifier
-            .clip(tokens.shapes.compactCard)
-            .selectable(selected = isSelected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = NuvioTokens.Space.s4, vertical = NuvioTokens.Space.s8),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier.size(NuvioTokens.Space.s56).then(
-                if (isSelected) Modifier.border(tokens.borders.medium, palette.focusRing, CircleShape)
-                else Modifier,
+            .clip(cardShape)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .nuvioFocusBorder(cardShape)
+            .selectable(
+                selected = isSelected,
+                role = Role.RadioButton,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
             ),
-            contentAlignment = Alignment.Center,
-        ) {
+        shape = cardShape,
+        color = palette.background,
+        border = BorderStroke(borderWidth, borderColor),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
-                    .size(NuvioTokens.Space.s40 + NuvioTokens.Space.s4)
-                    .clip(CircleShape)
-                    .background(palette.accentBrush()),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .background(palette.background)
+                    .padding(NuvioTokens.Space.s12),
             ) {
-                if (isSelected || theme == AppTheme.CUSTOM) {
-                    Icon(
-                        imageVector = if (isSelected) Icons.Default.Check else Icons.Default.Edit,
-                        contentDescription = stringResource(
-                            if (isSelected) Res.string.cd_selected else Res.string.custom_theme_edit,
-                        ),
-                        tint = palette.onSecondary,
-                        modifier = Modifier.size(NuvioTokens.Space.s22),
-                    )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(NuvioTokens.Space.s12)
+                                    .clip(CircleShape)
+                                    .background(palette.accentBrush()),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(width = NuvioTokens.Space.s36, height = NuvioTokens.Space.s6)
+                                    .clip(CircleShape)
+                                    .background(palette.accentBrush()),
+                            )
+                        }
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .size(NuvioTokens.Space.s20)
+                                    .clip(CircleShape)
+                                    .background(tokens.colors.accent),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = stringResource(Res.string.cd_selected),
+                                    tint = tokens.colors.onAccent,
+                                    modifier = Modifier.size(NuvioTokens.Space.s12),
+                                )
+                            }
+                        } else if (theme == AppTheme.CUSTOM) {
+                            Box(
+                                modifier = Modifier
+                                    .size(NuvioTokens.Space.s20)
+                                    .clip(CircleShape)
+                                    .background(palette.backgroundElevated)
+                                    .border(tokens.borders.thin, palette.borderSubtle, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = stringResource(Res.string.custom_theme_edit),
+                                    tint = palette.textSecondary,
+                                    modifier = Modifier.size(NuvioTokens.Space.s12),
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.size(NuvioTokens.Space.s20))
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(NuvioTokens.Radius.md))
+                            .background(palette.backgroundCard)
+                            .border(tokens.borders.thin, palette.borderSubtle, RoundedCornerShape(NuvioTokens.Radius.md))
+                            .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s8),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.72f)
+                                    .height(NuvioTokens.Space.s6)
+                                    .clip(CircleShape)
+                                    .background(palette.textPrimary.copy(alpha = 0.72f)),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.46f)
+                                    .height(NuvioTokens.Space.s4)
+                                    .clip(CircleShape)
+                                    .background(palette.textMuted.copy(alpha = 0.45f)),
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(palette.backgroundElevated)
+                    .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s8),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(theme.labelRes),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isSelected) palette.textPrimary else palette.textSecondary,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (isSupporter) {
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(palette.secondary.copy(alpha = 0.16f))
+                            .border(
+                                tokens.borders.thin,
+                                palette.secondary.copy(alpha = 0.35f),
+                                CircleShape,
+                            )
+                            .padding(horizontal = NuvioTokens.Space.s6, vertical = NuvioTokens.Space.s2),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.community_membership_tier_supporter),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = palette.secondary,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(NuvioTokens.Space.s6))
-        Text(
-            text = stringResource(theme.labelRes),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) tokens.colors.textPrimary else tokens.colors.textSecondary,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }

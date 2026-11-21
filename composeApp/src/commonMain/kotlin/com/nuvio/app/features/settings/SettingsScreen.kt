@@ -3,6 +3,8 @@ package com.nuvio.app.features.settings
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.isDesktop
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,8 +17,8 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,22 +30,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -51,20 +53,23 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nuvio.app.core.ui.ContentEntry
-import com.nuvio.app.core.ui.LocalScreenActive
-import com.nuvio.app.core.ui.ScreenActivityEffect
-import com.nuvio.app.core.ui.nuvioContentEntry
 import com.nuvio.app.core.ui.AppTheme
+import com.nuvio.app.core.ui.ContentEntry
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
+import com.nuvio.app.core.ui.LocalScreenActive
 import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PlatformBackHandler
+import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.isLiquidGlassNativeTabBarSupported
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioContentEntry
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
@@ -917,15 +922,20 @@ private fun TabletSettingsScreen(
         onPageChange(page)
     }
 
+    val tokens = MaterialTheme.nuvio
     val saveableStateHolder = rememberSaveableStateHolder()
     val categoryEntryRequester = remember { FocusRequester() }
 
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(tokens.colors.background),
+    ) {
         Surface(
             modifier = Modifier
                 .width(280.dp)
-                .fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface,
+                .fillMaxHeight(),
+            color = tokens.colors.surfaceElevated,
         ) {
             Column(
                 modifier = Modifier
@@ -936,15 +946,18 @@ private fun TabletSettingsScreen(
                     text = stringResource(Res.string.compose_settings_page_root),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 20.dp),
+                        .padding(horizontal = NuvioTokens.Space.s24)
+                        .padding(bottom = NuvioTokens.Space.s20),
                     style = MaterialTheme.typography.displayLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.Bold,
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                HorizontalDivider(
+                    thickness = tokens.borders.hairline,
+                    color = tokens.colors.borderSubtle,
+                )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(NuvioTokens.Space.s12))
                 SettingsCategory.entries.forEach { category ->
                     SettingsSidebarItem(
                         label = stringResource(category.labelRes),
@@ -977,6 +990,13 @@ private fun TabletSettingsScreen(
                 }
             }
         }
+
+        Box(
+            modifier = Modifier
+                .width(tokens.borders.thin)
+                .fillMaxHeight()
+                .background(tokens.colors.borderSubtle),
+        )
 
         saveableStateHolder.SaveableStateProvider(page.name) {
             var settingsSearchQuery by rememberSaveable { mutableStateOf("") }
@@ -1027,19 +1047,49 @@ private fun TabletSettingsScreen(
                 }
             }
             val watchPartyRowClick = watchPartyRow(onWatchPartyClick)
-            Box(modifier = Modifier.fillMaxSize().nuvioContentEntry()) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(tokens.colors.background)
+                    .nuvioContentEntry(),
+            ) {
+                if (isDesktop) {
+                    val ambientAlpha = if (tokens.colors.background == Color.Black) 0.03f else 0.055f
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .align(Alignment.TopCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        tokens.colors.accent.copy(alpha = ambientAlpha),
+                                        Color.Transparent,
+                                    ),
+                                ),
+                            ),
+                    )
+                }
+                val baseHorizontalPadding = NuvioTokens.Space.s40
+                val maxContentWidth = 820.dp
+                val contentHorizontalPadding = if (maxWidth > maxContentWidth + baseHorizontalPadding * 2) {
+                    (maxWidth - maxContentWidth) / 2
+                } else {
+                    baseHorizontalPadding
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(rootSearchRevealConnection),
                     contentPadding = PaddingValues(
-                        start = 40.dp,
+                        start = contentHorizontalPadding,
                         top = topOffset,
-                        end = 40.dp,
-                        bottom = 40.dp + bottomOverlayPadding,
+                        end = contentHorizontalPadding,
+                        bottom = NuvioTokens.Space.s40 + bottomOverlayPadding,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s18),
                 ) {
                     if (showInternalHeader) {
                         item {

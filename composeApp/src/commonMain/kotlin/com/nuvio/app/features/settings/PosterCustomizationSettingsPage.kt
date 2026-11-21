@@ -1,20 +1,24 @@
 package com.nuvio.app.features.settings
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,16 +27,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -52,24 +59,35 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
-import com.nuvio.app.core.ui.Slider
+import com.nuvio.app.core.poster.CustomPosterScreen
+import com.nuvio.app.core.poster.CustomPosterUrlRepository
+import com.nuvio.app.core.ui.AnimatedArtworkMode
 import com.nuvio.app.core.ui.CardDepthStyleRepository
 import com.nuvio.app.core.ui.CardDepthStyleUiState
-import com.nuvio.app.core.poster.CustomPosterUrlRepository
+import com.nuvio.app.core.ui.Chip
 import com.nuvio.app.core.ui.DefaultCardDepthEdgeCoverage
 import com.nuvio.app.core.ui.DefaultCardDepthEdgeStrength
 import com.nuvio.app.core.ui.DefaultCardDepthSheenStrength
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
-import com.nuvio.app.core.ui.AnimatedArtworkMode
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleUiState
+import com.nuvio.app.core.ui.Slider
+import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.cardDepthVisual
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
+import com.nuvio.app.core.ui.themePalette
+import com.nuvio.app.isDesktop
+import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_reset
 import nuvio.composeapp.generated.resources.settings_card_depth_apply_to
@@ -202,19 +220,23 @@ internal fun LazyListScope.posterCustomizationSettingsContent(
             },
         ) {
             SettingsGroup(isTablet = isTablet) {
+                val tokens = MaterialTheme.nuvio
+                val horizontalPadding = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
+                val verticalPadding = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
                 ) {
                     Text(
                         text = stringResource(Res.string.settings_custom_poster_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = tokens.colors.textMuted,
                     )
                     OutlinedTextField(
                         value = editingPattern,
                         onValueChange = { editingPattern = it },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(NuvioTokens.Radius.lg),
                         placeholder = {
                             Text(
                                 text = stringResource(Res.string.settings_custom_poster_placeholder),
@@ -222,46 +244,95 @@ internal fun LazyListScope.posterCustomizationSettingsContent(
                             )
                         },
                         textStyle = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontFamily = FontFamily.Monospace,
+                            color = tokens.colors.textPrimary,
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = tokens.colors.accent,
+                            unfocusedBorderColor = tokens.colors.borderDefault,
+                            focusedContainerColor = tokens.colors.surfaceElevated,
+                            unfocusedContainerColor = tokens.colors.surfaceElevated,
+                            focusedPlaceholderColor = tokens.colors.textMuted,
+                            unfocusedPlaceholderColor = tokens.colors.textMuted,
+                            cursorColor = tokens.colors.accent,
                         ),
                         singleLine = false,
                         maxLines = 4,
                     )
+                    val canSave = editingPattern.trim() != currentPattern
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Button(
                             onClick = {
                                 CustomPosterUrlRepository.setPattern(editingPattern)
                             },
-                            enabled = editingPattern.trim() != currentPattern,
+                            enabled = canSave,
+                            modifier = Modifier.then(
+                                if (isDesktop && canSave) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier,
+                            ),
+                            shape = RoundedCornerShape(NuvioTokens.Radius.lg),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = tokens.colors.accent,
+                                contentColor = tokens.colors.onAccent,
+                                disabledContainerColor = tokens.colors.surfaceElevated,
+                                disabledContentColor = tokens.colors.textDisabled,
+                            ),
                         ) {
-                            Text(text = stringResource(Res.string.settings_custom_poster_save))
+                            Text(
+                                text = stringResource(Res.string.settings_custom_poster_save),
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        if (isActive) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(tokens.colors.focusBackground)
+                                    .border(
+                                        tokens.borders.thin,
+                                        tokens.colors.accent.copy(alpha = 0.35f),
+                                        CircleShape,
+                                    )
+                                    .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s6),
+                            ) {
+                                Text(
+                                    text = "✓ ${stringResource(Res.string.settings_custom_poster_active)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = tokens.colors.accent,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
                         }
                     }
                     if (isActive) {
-                        Text(
-                            text = "✓ ${stringResource(Res.string.settings_custom_poster_active)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                        HorizontalDivider(
+                            thickness = tokens.borders.hairline,
+                            color = tokens.colors.borderSubtle,
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = stringResource(Res.string.settings_custom_poster_apply_to),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = tokens.colors.textPrimary,
                             fontWeight = FontWeight.SemiBold,
                         )
                         val enabledScreens by CustomPosterUrlRepository.enabledScreens.collectAsState()
                         val screenEntries = listOf(
-                            com.nuvio.app.core.poster.CustomPosterScreen.HOME to stringResource(Res.string.settings_custom_poster_screen_home),
-                            com.nuvio.app.core.poster.CustomPosterScreen.CONTINUE_WATCHING to stringResource(Res.string.settings_custom_poster_screen_continue_watching),
-                            com.nuvio.app.core.poster.CustomPosterScreen.COLLECTIONS to stringResource(Res.string.settings_custom_poster_screen_collections),
-                            com.nuvio.app.core.poster.CustomPosterScreen.LIBRARY to stringResource(Res.string.settings_custom_poster_screen_library),
-                            com.nuvio.app.core.poster.CustomPosterScreen.SEARCH to stringResource(Res.string.settings_custom_poster_screen_search),
-                            com.nuvio.app.core.poster.CustomPosterScreen.DETAILS to stringResource(Res.string.settings_custom_poster_screen_details),
+                            CustomPosterScreen.HOME to stringResource(Res.string.settings_custom_poster_screen_home),
+                            CustomPosterScreen.CONTINUE_WATCHING to stringResource(Res.string.settings_custom_poster_screen_continue_watching),
+                            CustomPosterScreen.COLLECTIONS to stringResource(Res.string.settings_custom_poster_screen_collections),
+                            CustomPosterScreen.LIBRARY to stringResource(Res.string.settings_custom_poster_screen_library),
+                            CustomPosterScreen.SEARCH to stringResource(Res.string.settings_custom_poster_screen_search),
+                            CustomPosterScreen.DETAILS to stringResource(Res.string.settings_custom_poster_screen_details),
                         )
-                        screenEntries.forEach { (screen, label) ->
+                        screenEntries.forEachIndexed { index, (screen, label) ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    thickness = tokens.borders.hairline,
+                                    color = tokens.colors.borderSubtle,
+                                )
+                            }
                             PosterToggleRow(
                                 title = label,
                                 checked = screen in enabledScreens,
@@ -328,16 +399,20 @@ private fun CardDepthStyleControls(
         stringResource(Res.string.settings_card_depth_surface_trailers) to NuvioCardDepthSurface.Trailers,
     )
 
+    val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = if (isTablet) 18.dp else 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(
+                horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                vertical = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16,
+            ),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
     ) {
         Text(
             text = stringResource(Res.string.settings_card_depth_description),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textMuted,
         )
         PosterToggleRow(
             title = stringResource(Res.string.settings_card_depth_enabled),
@@ -363,30 +438,58 @@ private fun CardDepthStyleControls(
                 options = coverageOptions,
                 onSelected = CardDepthStyleRepository::setEdgeCoverage,
             )
-            Row(
+            val fineTuneInteraction = remember { MutableInteractionSource() }
+            val isFineTuneHovered by fineTuneInteraction.collectIsHoveredAsState()
+            val fineTuneShape = RoundedCornerShape(NuvioTokens.Radius.lg)
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { showFineTune = true },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                    .clip(fineTuneShape)
+                    .then(
+                        if (isDesktop) {
+                            Modifier
+                                .hoverable(fineTuneInteraction)
+                                .pointerHoverIcon(PointerIcon.Hand)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .nuvioFocusBorder(fineTuneShape)
+                    .clickable(
+                        interactionSource = fineTuneInteraction,
+                        indication = null,
+                    ) { showFineTune = true },
+                shape = fineTuneShape,
+                color = if (isDesktop && isFineTuneHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+                border = BorderStroke(
+                    tokens.borders.thin,
+                    if (isDesktop && isFineTuneHovered) tokens.colors.borderStrong else tokens.colors.borderSubtle,
+                ),
             ) {
-                Text(
-                    text = stringResource(Res.string.settings_card_depth_fine_tune),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
-                )
-                Icon(
-                    imageVector = Icons.Rounded.Tune,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = NuvioTokens.Space.s14, vertical = NuvioTokens.Space.s12),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(Res.string.settings_card_depth_fine_tune),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = tokens.colors.textPrimary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.Tune,
+                        contentDescription = null,
+                        tint = tokens.colors.accent,
+                    )
+                }
             }
             Text(
                 text = stringResource(Res.string.settings_card_depth_apply_to),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = tokens.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             surfaceRows.forEach { (title, surface) ->
@@ -419,6 +522,7 @@ private fun CardDepthFineTuneSheet(
     initialEdgeCoverage: Int,
     onDismiss: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var draftEdge by remember { mutableFloatStateOf(initialEdgeStrength.toFloat()) }
     var draftSheen by remember { mutableFloatStateOf(initialSheenStrength.toFloat()) }
@@ -452,7 +556,7 @@ private fun CardDepthFineTuneSheet(
                 Text(
                     text = stringResource(Res.string.settings_card_depth_fine_tune_title),
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 NuvioActionLabel(
@@ -468,7 +572,7 @@ private fun CardDepthFineTuneSheet(
             Text(
                 text = stringResource(Res.string.settings_card_depth_fine_tune_hint),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
             )
             CardDepthPreviewCard(
                 edgeStrength = draftEdge,
@@ -482,12 +586,12 @@ private fun CardDepthFineTuneSheet(
                 Text(
                     text = "${stringResource(Res.string.settings_card_depth_edge_value)}: ${formatDepthPercentage(draftEdge)}",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                 )
                 Text(
                     text = "${stringResource(Res.string.settings_card_depth_sheen_value)}: ${formatDepthPercentage(draftSheen)}",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                 )
             }
             CardDepthTuningPad(
@@ -505,7 +609,7 @@ private fun CardDepthFineTuneSheet(
             Text(
                 text = "${stringResource(Res.string.settings_card_depth_coverage_value)}: ${formatDepthPercentage(draftCoverage)}",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = tokens.colors.textPrimary,
             )
             Slider(
                 value = draftCoverage,
@@ -531,7 +635,8 @@ private fun CardDepthPreviewCard(
     sheenStrength: Float,
     edgeCoverage: Float,
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(NuvioTokens.Radius.lg + NuvioTokens.Space.s2)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -540,12 +645,13 @@ private fun CardDepthPreviewCard(
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFF33415C),
-                        Color(0xFF232D42),
-                        Color(0xFF141A28),
+                        tokens.colors.surfaceCard,
+                        tokens.colors.surfaceElevated,
+                        tokens.colors.background,
                     ),
                 ),
             )
+            .border(tokens.borders.thin, tokens.colors.borderSubtle, shape)
             .cardDepthVisual(
                 shape = shape,
                 edgeStrength = edgeStrength,
@@ -558,30 +664,28 @@ private fun CardDepthPreviewCard(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0f to Color.Transparent,
+                        0f to tokens.colors.accent.copy(alpha = 0.12f),
                         0.42f to Color.Transparent,
-                        0.56f to Color.Black.copy(alpha = 0.20f),
-                        0.70f to Color.Black.copy(alpha = 0.45f),
-                        0.84f to Color.Black.copy(alpha = 0.68f),
-                        1f to Color.Black.copy(alpha = 0.92f),
+                        0.68f to Color.Black.copy(alpha = 0.42f),
+                        1f to Color.Black.copy(alpha = 0.88f),
                     ),
                 ),
         )
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(NuvioTokens.Space.s14),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
         ) {
             Text(
                 text = stringResource(Res.string.settings_card_depth_preview_meta),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.78f),
+                color = tokens.colors.textSecondary,
             )
             Text(
                 text = stringResource(Res.string.settings_card_depth_preview_title),
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                color = tokens.colors.textPrimary,
                 fontWeight = FontWeight.ExtraBold,
             )
         }
@@ -595,11 +699,12 @@ private fun CardDepthTuningPad(
     onChange: (Float, Float) -> Unit,
     onCommit: (Float, Float) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val maxEdge = 70f
     val maxSheen = 25f
-    val shape = RoundedCornerShape(16.dp)
-    val thumbColor = MaterialTheme.colorScheme.primary
-    val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    val shape = RoundedCornerShape(NuvioTokens.Radius.xl)
+    val thumbColor = tokens.colors.accent
+    val gridColor = tokens.colors.borderSubtle
     val currentEdge by rememberUpdatedState(edgeStrength)
     val currentSheen by rememberUpdatedState(sheenStrength)
     val currentOnChange by rememberUpdatedState(onChange)
@@ -610,10 +715,10 @@ private fun CardDepthTuningPad(
             .fillMaxWidth()
             .height(200.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .background(tokens.colors.surfaceElevated)
             .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                width = tokens.borders.thin,
+                color = tokens.colors.borderDefault,
                 shape = shape,
             )
             .pointerInput(Unit) {
@@ -695,7 +800,7 @@ private fun CardDepthTuningPad(
                 center = Offset(thumbX, thumbY),
             )
             drawCircle(
-                color = Color.White,
+                color = tokens.colors.onAccent,
                 radius = 4.dp.toPx(),
                 center = Offset(thumbX, thumbY),
             )
@@ -703,7 +808,7 @@ private fun CardDepthTuningPad(
         Text(
             text = stringResource(Res.string.settings_card_depth_pad_sheen_axis),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textMuted,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(10.dp),
@@ -711,7 +816,7 @@ private fun CardDepthTuningPad(
         Text(
             text = stringResource(Res.string.settings_card_depth_pad_edge_axis),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textMuted,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(10.dp),
@@ -757,16 +862,20 @@ private fun PosterCardStyleControls(
         PresetOption(stringResource(Res.string.settings_poster_radius_pill), 16),
     )
 
+    val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = if (isTablet) 18.dp else 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(
+                horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                vertical = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16,
+            ),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
     ) {
         Text(
             text = stringResource(Res.string.settings_poster_description),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textMuted,
         )
         PosterCardLivePreview(
             widthDp = widthDp,
@@ -827,26 +936,54 @@ private fun PosterToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val rowShape = RoundedCornerShape(NuvioTokens.Radius.md)
+    val rowBackground by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) tokens.colors.overlayHover else Color.Transparent,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "posterToggleBg",
+    )
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(rowShape)
+            .background(rowBackground)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+            ) { onCheckedChange(!checked) }
+            .padding(vertical = NuvioTokens.Space.s4),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f).padding(end = 16.dp),
+            modifier = Modifier.weight(1f).padding(end = NuvioTokens.Space.s16),
         )
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
+                checkedThumbColor = tokens.colors.onAccent,
+                checkedTrackColor = tokens.colors.accent,
+                uncheckedThumbColor = tokens.colors.textSecondary,
+                uncheckedTrackColor = tokens.colors.surfaceElevated,
+                uncheckedBorderColor = tokens.colors.borderDefault,
             ),
         )
     }
@@ -857,6 +994,8 @@ private fun PosterCardLivePreview(
     widthDp: Int,
     cornerRadiusDp: Int,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
     val targetHeightDp = (widthDp * 3) / 2
     val previewFrameWidthDp = 140
     val previewFrameHeightDp = 210
@@ -876,68 +1015,103 @@ private fun PosterCardLivePreview(
         label = "posterPreviewCornerRadius",
     )
 
-    Column(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        color = tokens.colors.surfaceElevated,
+        shape = RoundedCornerShape(NuvioTokens.Radius.xl),
+        border = BorderStroke(tokens.borders.thin, tokens.colors.borderSubtle),
     ) {
-        Text(
-            text = stringResource(Res.string.settings_poster_live_preview),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.Top,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(NuvioTokens.Space.s16),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
         ) {
-            Box(
-                modifier = Modifier
-                    .width(previewFrameWidthDp.dp)
-                    .height(previewFrameHeightDp.dp),
+            Text(
+                text = stringResource(Res.string.settings_poster_live_preview),
+                style = MaterialTheme.typography.bodyLarge,
+                color = tokens.colors.textPrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s16),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     modifier = Modifier
-                        .width(animatedWidth.value)
-                        .height(animatedHeight.value)
-                        .clip(RoundedCornerShape(animatedCornerRadius.value))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                            shape = RoundedCornerShape(animatedCornerRadius.value),
-                        ),
-                )
-            }
+                        .width(previewFrameWidthDp.dp)
+                        .height(previewFrameHeightDp.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    val posterShape = RoundedCornerShape(animatedCornerRadius.value)
+                    Box(
+                        modifier = Modifier
+                            .width(animatedWidth.value)
+                            .height(animatedHeight.value)
+                            .clip(posterShape)
+                            .background(tokens.colors.surfaceCard)
+                            .border(
+                                width = NuvioTokens.Border.medium,
+                                color = tokens.colors.accent.copy(alpha = 0.75f),
+                                shape = posterShape,
+                            ),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(NuvioTokens.Space.s4)
+                                .align(Alignment.TopCenter)
+                                .background(palette.accentBrush()),
+                        )
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(NuvioTokens.Space.s10),
+                            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.75f)
+                                    .height(NuvioTokens.Space.s6)
+                                    .clip(CircleShape)
+                                    .background(tokens.colors.textPrimary.copy(alpha = 0.35f)),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.45f)
+                                    .height(NuvioTokens.Space.s4)
+                                    .clip(CircleShape)
+                                    .background(tokens.colors.textMuted.copy(alpha = 0.35f)),
+                            )
+                        }
+                    }
+                }
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = stringResource(Res.string.settings_poster_preview_width, widthDp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(Res.string.settings_poster_preview_corner_radius, cornerRadiusDp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(Res.string.settings_poster_preview_height, targetHeightDp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.settings_poster_preview_width, widthDp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = tokens.colors.textPrimary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = stringResource(Res.string.settings_poster_preview_corner_radius, cornerRadiusDp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = tokens.colors.textPrimary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = stringResource(Res.string.settings_poster_preview_height, targetHeightDp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = tokens.colors.textMuted,
+                    )
+                }
             }
         }
-
-        Spacer(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-        )
     }
 }
 
@@ -949,32 +1123,29 @@ private fun PosterStyleOptionRow(
     options: List<PresetOption>,
     onSelected: (Int) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val selectedLabel = options.firstOrNull { it.value == selectedValue }?.label
         ?: stringResource(Res.string.settings_poster_custom)
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
     ) {
         Text(
             text = stringResource(Res.string.settings_poster_option_with_value, title, selectedLabel),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
 
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
         ) {
             options.forEach { option ->
-                FilterChip(
+                Chip(
+                    label = option.label,
                     selected = option.value == selectedValue,
                     onClick = { onSelected(option.value) },
-                    label = { Text(option.label) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
                 )
             }
         }

@@ -1,8 +1,14 @@
 package com.nuvio.app.features.settings
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,23 +30,28 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
 import nuvio.composeapp.generated.resources.action_reset
@@ -66,7 +77,6 @@ import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_descri
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
 import org.jetbrains.compose.resources.stringResource
-import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -205,18 +215,44 @@ private fun HeroSourcesDropdown(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val noSourcesSelected = stringResource(Res.string.settings_homescreen_no_sources_selected)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val headerBg by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) tokens.colors.overlayHover else Color.Transparent,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "heroSourcesDropdownBg",
+    )
+
     SettingsGroup(isTablet = isTablet) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp)
-                .clickable { onExpandedChange(!expanded) },
+                .background(headerBg)
+                .then(
+                    if (isDesktop) {
+                        Modifier
+                            .hoverable(interactionSource)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                    } else {
+                        Modifier
+                    },
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                ) { onExpandedChange(!expanded) }
+                .padding(
+                    horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                    vertical = NuvioTokens.Space.s14,
+                ),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
             ) {
                 Text(
                     text = stringResource(
@@ -225,7 +261,7 @@ private fun HeroSourcesDropdown(
                         HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT,
                     ),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
@@ -233,13 +269,13 @@ private fun HeroSourcesDropdown(
                         .joinToString(separator = ", ") { it.displayTitle }
                         .ifBlank { noSourcesSelected },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                 )
             }
             Icon(
                 imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isDesktop && isHovered) tokens.colors.accent else tokens.colors.textMuted,
             )
         }
 
@@ -282,15 +318,19 @@ private fun HomescreenSummaryCard(
     totalCatalogCount: Int,
     selectedHeroSourceCount: Int,
 ) {
+    val tokens = MaterialTheme.nuvio
     SettingsGroup(isTablet = isTablet) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(
+                horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                vertical = NuvioTokens.Space.s16,
+            ),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
         ) {
             Text(
                 text = stringResource(Res.string.settings_homescreen_keep_home_focused),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = tokens.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
@@ -301,12 +341,12 @@ private fun HomescreenSummaryCard(
                     selectedHeroSourceCount,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textSecondary,
             )
             Text(
                 text = stringResource(Res.string.settings_homescreen_summary_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
             )
         }
     }
@@ -318,6 +358,7 @@ private fun HomescreenCatalogList(
     items: List<HomeCatalogSettingsItem>,
     onPinnedDragAttempt: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     var expandedKey by remember { mutableStateOf<String?>(null) }
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
@@ -348,7 +389,10 @@ private fun HomescreenCatalogList(
                 ) { isDragging ->
                     val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
 
-                    Surface(shadowElevation = elevation) {
+                    Surface(
+                        shadowElevation = elevation,
+                        color = if (isDragging) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
+                    ) {
                         Column {
                             if (index > 0) {
                                 SettingsGroupDivider(isTablet = isTablet)

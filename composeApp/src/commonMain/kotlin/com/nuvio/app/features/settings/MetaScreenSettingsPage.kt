@@ -1,11 +1,17 @@
 package com.nuvio.app.features.settings
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,26 +43,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nuvio.app.features.shuffle.EpisodeShuffleRepository
-import com.nuvio.app.core.ui.NuvioToastController
-import nuvio.composeapp.generated.resources.random_episode_title
-import nuvio.composeapp.generated.resources.layout_random_episode_sub
-import nuvio.composeapp.generated.resources.shuffle_save_failed
-import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.ui.Chip
 import com.nuvio.app.core.ui.NuvioActionLabel
+import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.features.details.MetaEpisodeCardStyle
 import com.nuvio.app.features.details.MetaScreenBackgroundMode
 import com.nuvio.app.features.details.MetaScreenSectionItem
@@ -64,11 +70,14 @@ import com.nuvio.app.features.details.MetaScreenSectionKey
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
 import com.nuvio.app.features.details.desktopHeroOwnedMetaSectionKeys
+import com.nuvio.app.features.shuffle.EpisodeShuffleRepository
 import com.nuvio.app.isDesktop
 import com.nuvio.app.supportsPosterNavigationMotion
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_reorder
 import nuvio.composeapp.generated.resources.action_reset
+import nuvio.composeapp.generated.resources.layout_random_episode_sub
+import nuvio.composeapp.generated.resources.random_episode_title
 import nuvio.composeapp.generated.resources.settings_homescreen_hidden
 import nuvio.composeapp.generated.resources.settings_homescreen_visible
 import nuvio.composeapp.generated.resources.settings_meta_actions
@@ -118,6 +127,7 @@ import nuvio.composeapp.generated.resources.settings_meta_tab_layout
 import nuvio.composeapp.generated.resources.settings_meta_tab_layout_description
 import nuvio.composeapp.generated.resources.settings_meta_trailers
 import nuvio.composeapp.generated.resources.settings_meta_trailers_description
+import nuvio.composeapp.generated.resources.shuffle_save_failed
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -241,6 +251,7 @@ private fun MetaSectionReorderableList(
     isTablet: Boolean,
     tabLayout: Boolean,
 ) {
+    val tokens = MaterialTheme.nuvio
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
     val reorderableLazyListState = rememberReorderableLazyListState(
@@ -271,7 +282,10 @@ private fun MetaSectionReorderableList(
             ReorderableItem(reorderableLazyListState, key = item.key.name) { isDragging ->
                 val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
 
-                Surface(shadowElevation = elevation) {
+                Surface(
+                    shadowElevation = elevation,
+                    color = if (isDragging) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
+                ) {
                     Column {
                         if (index > 0) {
                             SettingsGroupDivider(isTablet = isTablet)
@@ -303,8 +317,9 @@ private fun MetaSectionRow(
     onTabGroupChange: (Int?) -> Unit,
     dragHandleScope: ReorderableCollectionItemScope,
 ) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalPadding = if (isTablet) 18.dp else 16.dp
+    val tokens = MaterialTheme.nuvio
+    val horizontalPadding = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
+    val verticalPadding = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16
     val hapticFeedback = LocalHapticFeedback.current
 
     Column(
@@ -320,13 +335,13 @@ private fun MetaSectionRow(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                    .padding(end = NuvioTokens.Space.s12),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
             ) {
                 Text(
                     text = stringResource(item.key.titleRes),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -334,10 +349,10 @@ private fun MetaSectionRow(
                 Text(
                     text = stringResource(item.key.descriptionRes),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                 )
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -347,19 +362,19 @@ private fun MetaSectionRow(
                             stringResource(Res.string.settings_homescreen_hidden)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textMuted,
                     )
                     if (tabLayout && item.tabGroup != null) {
                         Box(
                             modifier = Modifier
-                                .size(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                                .size(NuvioTokens.Space.s4)
+                                .clip(RoundedCornerShape(NuvioTokens.Space.s2))
+                                .background(tokens.colors.textMuted.copy(alpha = 0.4f)),
                         )
                         Text(
                             text = stringResource(Res.string.settings_meta_tab_group_format, item.tabGroup ?: 0),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = tokens.colors.accent,
                             fontWeight = FontWeight.Medium,
                         )
                     }
@@ -369,29 +384,32 @@ private fun MetaSectionRow(
                 checked = item.enabled,
                 onCheckedChange = onEnabledChange,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                    checkedTrackColor = MaterialTheme.colorScheme.primary,
-                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
+                    checkedThumbColor = tokens.colors.onAccent,
+                    checkedTrackColor = tokens.colors.accent,
+                    uncheckedThumbColor = tokens.colors.textSecondary,
+                    uncheckedTrackColor = tokens.colors.surfaceElevated,
+                    uncheckedBorderColor = tokens.colors.borderDefault,
                 ),
             )
             IconButton(
                 modifier = with(dragHandleScope) {
-                    Modifier.draggableHandle(
-                        onDragStarted = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        },
-                        onDragStopped = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        },
-                    )
+                    Modifier
+                        .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                        .draggableHandle(
+                            onDragStarted = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            onDragStopped = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            },
+                        )
                 },
                 onClick = {},
             ) {
                 Icon(
                     Icons.Rounded.Menu,
                     contentDescription = stringResource(Res.string.action_reorder),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = tokens.colors.textMuted,
                 )
             }
         }
@@ -455,26 +473,30 @@ private fun MetaEpisodeCardStyleSelector(
     selectedStyle: MetaEpisodeCardStyle,
     onStyleSelected: (MetaEpisodeCardStyle) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = if (isTablet) 18.dp else 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(
+                horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                vertical = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16,
+            ),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
     ) {
         Text(
             text = stringResource(Res.string.settings_meta_episode_cards),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = stringResource(Res.string.settings_meta_episode_cards_description),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textMuted,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
         ) {
             MetaEpisodeCardStyle.entries.forEach { style ->
                 Box(modifier = Modifier.weight(1f)) {
@@ -497,23 +519,60 @@ private fun MetaEpisodeCardStyleOption(
     isTablet: Boolean,
     onClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val optionShape = RoundedCornerShape(NuvioTokens.Radius.lg + NuvioTokens.Space.s2)
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "episodeStyleBorder",
+    )
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.focusBackground
+            isDesktop && isHovered -> tokens.colors.surfaceElevated
+            else -> tokens.colors.background
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "episodeStyleBg",
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-        } else {
-            MaterialTheme.colorScheme.surface
-        },
-        shape = RoundedCornerShape(12.dp),
+            .clip(optionShape)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .nuvioFocusBorder(optionShape)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        color = containerColor,
+        shape = optionShape,
+        border = BorderStroke(if (selected) NuvioTokens.Border.medium else tokens.borders.thin, borderColor),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 16.dp),
+                .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s16),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
         ) {
             Box(
                 modifier = Modifier
@@ -526,7 +585,7 @@ private fun MetaEpisodeCardStyleOption(
                     Icon(
                         imageVector = Icons.Rounded.CheckCircle,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = tokens.colors.accent,
                         modifier = Modifier.align(Alignment.TopEnd).size(if (isTablet) 24.dp else 18.dp),
                     )
                 }
@@ -534,13 +593,13 @@ private fun MetaEpisodeCardStyleOption(
             Text(
                 text = stringResource(style.labelRes),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                color = if (selected) tokens.colors.textPrimary else tokens.colors.textSecondary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = stringResource(style.descriptionRes),
                 style = if (isTablet) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
             )
         }
     }
@@ -590,11 +649,13 @@ private val MetaScreenSectionKey.descriptionRes: StringResource
 private fun MetaEpisodeCardStylePreview(
     style: MetaEpisodeCardStyle,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 16.dp),
+            .clip(RoundedCornerShape(NuvioTokens.Radius.lg))
+            .background(tokens.colors.surfaceElevated)
+            .border(tokens.borders.thin, tokens.colors.borderSubtle, RoundedCornerShape(NuvioTokens.Radius.lg))
+            .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s16),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -604,33 +665,34 @@ private fun MetaEpisodeCardStylePreview(
                     modifier = Modifier
                         .width(128.dp)
                         .height(80.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)),
+                        .clip(RoundedCornerShape(NuvioTokens.Radius.md))
+                        .background(tokens.colors.surfaceCard)
+                        .border(tokens.borders.hairline, tokens.colors.borderDefault, RoundedCornerShape(NuvioTokens.Radius.md)),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(26.dp)
                             .align(Alignment.BottomCenter)
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.36f)),
+                            .background(tokens.colors.overlayScrim),
                     )
                     Box(
                         modifier = Modifier
-                            .width(42.dp)
-                            .height(7.dp)
                             .align(Alignment.TopStart)
                             .padding(start = 6.dp, top = 6.dp)
+                            .width(42.dp)
+                            .height(7.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.26f)),
+                            .background(tokens.colors.textPrimary.copy(alpha = 0.28f)),
                     )
                     Box(
                         modifier = Modifier
-                            .width(72.dp)
-                            .height(6.dp)
                             .align(Alignment.BottomStart)
                             .padding(start = 8.dp, bottom = 8.dp)
+                            .width(72.dp)
+                            .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)),
+                            .background(tokens.colors.textSecondary.copy(alpha = 0.24f)),
                     )
                 }
             }
@@ -640,14 +702,15 @@ private fun MetaEpisodeCardStylePreview(
                     modifier = Modifier
                         .width(132.dp)
                         .height(78.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)),
+                        .clip(RoundedCornerShape(NuvioTokens.Radius.md))
+                        .background(tokens.colors.surfaceCard)
+                        .border(tokens.borders.hairline, tokens.colors.borderDefault, RoundedCornerShape(NuvioTokens.Radius.md)),
                 ) {
                     Box(
                         modifier = Modifier
                             .width(48.dp)
                             .height(78.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+                            .background(tokens.colors.borderDefault.copy(alpha = 0.7f)),
                     )
                     Column(
                         modifier = Modifier
@@ -660,21 +723,21 @@ private fun MetaEpisodeCardStylePreview(
                                 .fillMaxWidth(0.82f)
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.20f)),
+                                .background(tokens.colors.textPrimary.copy(alpha = 0.24f)),
                         )
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.52f)
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)),
+                                .background(tokens.colors.textMuted.copy(alpha = 0.22f)),
                         )
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
+                                .background(tokens.colors.accent.copy(alpha = 0.7f)),
                         )
                     }
                 }
