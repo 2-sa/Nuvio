@@ -143,7 +143,7 @@ internal fun AddonsSettingsPageContent(
     val usePersonalMediaCopy = AppFeaturePolicy.personalMediaAddonCopyEnabled
 
     val overview = remember(uiState.addons) { uiState.addons.toOverview() }
-    val onAddClick = {
+    val onAddClick: () -> Unit = {
         val requestedUrl = addonUrl.trim()
         if (requestedUrl.isBlank()) {
             formMessage = enterAddonUrlMessage
