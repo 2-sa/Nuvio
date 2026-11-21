@@ -121,14 +121,14 @@ internal fun MainTabsDestination(
         val isSidebarHovered by sidebarHoverSource.collectIsHoveredAsState()
         var isProfileStackVisible by remember { mutableStateOf(false) }
 
-        val isSidebarExpanded = when (navBarStyleSetting) {
-            NavBarStyle.EXPANDED -> true
-            NavBarStyle.COMPACT -> isProfileStackVisible
-            else -> isSidebarHovered || isProfileStackVisible // ADAPTIVE
-        }
+        val isSidebarExpanded = desktopSidebarIsExpanded(
+            navBarStyle = navBarStyleSetting,
+            isHovered = isSidebarHovered,
+            profileStackVisible = isProfileStackVisible,
+        )
 
         val animatedSidebarWidth by animateDpAsState(
-            targetValue = if (isSidebarExpanded) DesktopSidebarExpandedWidth else DesktopSidebarCollapsedWidth,
+            targetValue = desktopSidebarWidthForState(isSidebarExpanded),
             animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
             label = "desktop_sidebar_width",
         )

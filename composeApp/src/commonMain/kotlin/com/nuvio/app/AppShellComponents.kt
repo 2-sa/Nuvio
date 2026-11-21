@@ -3,22 +3,23 @@ package com.nuvio.app
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -26,7 +27,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -40,7 +40,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
@@ -54,13 +53,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -71,9 +69,11 @@ import com.nuvio.app.core.ui.LocalNuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.nuvioTrackTopBarFocus
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.controller.ControllerFocusZone
 import com.nuvio.app.controller.controllerFocusable
 import com.nuvio.app.features.cloud.CloudLibraryContentType
@@ -91,7 +91,6 @@ import com.nuvio.app.features.player.PlayerBackRequest
 import com.nuvio.app.features.profiles.ActiveProfileMiniAvatar
 import com.nuvio.app.features.profiles.AvatarCatalogItem
 import com.nuvio.app.features.profiles.AvatarRepository
-import com.nuvio.app.features.profiles.MAX_PROFILES
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileBackgroundBackdrop
 import com.nuvio.app.features.profiles.ProfileRepository
@@ -122,16 +121,28 @@ import nuvio.composeapp.generated.resources.sidebar_search
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
-internal val DesktopSidebarCollapsedWidth = 68.dp
-internal val DesktopSidebarExpandedWidth = 192.dp
-private val DesktopSidebarExpandedContentWidth = 156.dp
-private val DesktopSidebarItemHeight = 56.dp
+internal val DesktopSidebarCollapsedWidth = 72.dp
+internal val DesktopSidebarExpandedWidth = 224.dp
+private val DesktopSidebarExpandedContentWidth = 192.dp
+private val DesktopSidebarItemHeight = 48.dp
 private val DesktopSidebarIconSlotSize = 38.dp
 private val DesktopSidebarIconSize = NuvioTokens.Icon.lg
-private val DesktopSidebarProfileStackRowHeight = 44.dp
-private val DesktopSidebarProfileStackRowGap = 4.dp
-private val DesktopSidebarProfileStackTopGap = 6.dp
-private val DesktopSidebarProfileStackNavGap = 12.dp
+
+internal fun desktopSidebarWidthForState(expanded: Boolean): Dp =
+    if (expanded) DesktopSidebarExpandedWidth else DesktopSidebarCollapsedWidth
+
+internal fun desktopSidebarIsExpanded(
+    navBarStyle: NavBarStyle,
+    isHovered: Boolean,
+    profileStackVisible: Boolean,
+): Boolean = when (navBarStyle) {
+    NavBarStyle.EXPANDED -> true
+    NavBarStyle.COMPACT -> profileStackVisible
+    NavBarStyle.ADAPTIVE, NavBarStyle.CLASSIC -> isHovered || profileStackVisible
+}
+
+internal fun desktopSidebarActiveIndicatorAlpha(selected: Boolean): Float =
+    if (selected) 1f else 0f
 
 @Composable
 internal fun rememberGuardedPopBackStack(
@@ -746,13 +757,13 @@ internal fun DesktopHoverSidebar(
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
     val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
     val activeProfile = profileState.activeProfile
-    val profiles = profileState.profiles
     val activeProfileName = activeProfile?.name ?: stringResource(Res.string.compose_nav_profile)
-    val profileTopPadding = statusBarPadding + 18.dp
+    val brandTopPadding = statusBarPadding + 18.dp
     fun selectTab(tab: AppScreenTab) {
         onProfileStackVisibleChange(false)
         onTabSelected(tab)
@@ -764,90 +775,90 @@ internal fun DesktopHoverSidebar(
             .fillMaxHeight()
             .hoverable(hoverSource)
             .zIndex(NuvioTokens.Z.navigation),
-        color = tokens.colors.background,
+        color = tokens.colors.surfaceElevated.copy(alpha = 0.96f),
         contentColor = tokens.colors.textPrimary,
     ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize(),
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to tokens.colors.accent.copy(alpha = 0.04f),
+                        0.38f to Color.Transparent,
+                        1.0f to Color.Transparent,
+                    ),
+                ),
         ) {
-            val profileStackRows = profiles.size + if (profiles.size < MAX_PROFILES) 1 else 0
-            val profileStackHeight = if (profileStackRows > 0) {
-                DesktopSidebarProfileStackRowHeight * profileStackRows +
-                    DesktopSidebarProfileStackRowGap * (profileStackRows - 1)
-            } else {
-                0.dp
-            }
-            val profileStackTop = profileTopPadding + DesktopSidebarItemHeight + DesktopSidebarProfileStackTopGap
-            val minNavTop = if (profileStackVisible) {
-                profileStackTop + profileStackHeight + DesktopSidebarProfileStackNavGap
-            } else {
-                0.dp
-            }
-            val navColumnHeight = DesktopSidebarItemHeight * AppScreenTab.entries.size
-            val centeredNavTop = ((maxHeight - navColumnHeight) / 2).coerceAtLeast(0.dp)
-            val availableNavOffset = (maxHeight - navColumnHeight - centeredNavTop).coerceAtLeast(0.dp)
-            val navColumnOffset = (minNavTop - centeredNavTop)
-                .coerceIn(0.dp, availableNavOffset)
-            val animatedNavColumnOffset by animateDpAsState(
-                targetValue = navColumnOffset,
-                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-                label = "desktop_sidebar_nav_offset",
-            )
-
-            val profileInteractionSource = remember { MutableInteractionSource() }
-            val isProfileHovered by profileInteractionSource.collectIsHoveredAsState()
-            val profileHoverBg by animateColorAsState(
-                targetValue = if (isDesktop && isProfileHovered) {
-                    tokens.colors.textPrimary.copy(alpha = 0.08f)
-                } else {
-                    Color.Transparent
-                },
-                label = "desktop_sidebar_profile_hover",
-            )
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = profileTopPadding)
-                    .fillMaxWidth()
-                    .height(DesktopSidebarItemHeight)
-                    .padding(horizontal = 6.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(profileHoverBg)
-                    .hoverable(profileInteractionSource)
-                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
-                    .clickable(
-                        interactionSource = profileInteractionSource,
-                        indication = null,
-                        onClick = { onProfileStackVisibleChange(!profileStackVisible) },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                DesktopSidebarProfileTrigger(
-                    profile = activeProfile,
-                    avatars = avatars,
-                    label = activeProfileName,
-                    expanded = sidebarExpanded,
-                )
-            }
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(tokens.colors.borderSubtle),
+            )
 
-            if (profileStackVisible) {
-                SidebarProfileSwitcherStack(
-                    onProfileSelected = onProfileSelected,
-                    onAddProfileRequested = onAddProfileRequested,
-                    onDismissRequest = { onProfileStackVisibleChange(false) },
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = profileStackTop)
-                        .width(DesktopSidebarExpandedContentWidth)
-                        .zIndex(NuvioTokens.Z.sheet),
-                )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = brandTopPadding, start = 10.dp, end = 10.dp)
+                    .fillMaxWidth()
+                    .height(40.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                AnimatedVisibility(
+                    visible = !sidebarExpanded,
+                    enter = fadeIn(animationSpec = tween(160)),
+                    exit = fadeOut(animationSpec = tween(100)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 7.dp)
+                            .size(DesktopSidebarIconSlotSize),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val emblemShape = RoundedCornerShape(10.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(emblemShape)
+                                .background(tokens.colors.focusBackground, emblemShape)
+                                .border(
+                                    width = 1.dp,
+                                    color = tokens.colors.accent.copy(alpha = 0.35f),
+                                    shape = emblemShape,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "N",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    brush = palette.accentBrush(),
+                                    fontWeight = FontWeight.ExtraBold,
+                                ),
+                            )
+                        }
+                    }
+                }
+                AnimatedVisibility(
+                    visible = sidebarExpanded,
+                    enter = fadeIn(animationSpec = tween(180, delayMillis = 40)),
+                    exit = fadeOut(animationSpec = tween(100)),
+                ) {
+                    AppBrandWordmark(
+                        contentDescription = stringResource(Res.string.app_brand_name),
+                        modifier = Modifier
+                            .padding(start = 10.dp)
+                            .height(24.dp),
+                    )
+                }
             }
 
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .offset(y = animatedNavColumnOffset)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 DesktopSidebarItem(
@@ -907,6 +918,83 @@ internal fun DesktopHoverSidebar(
                     )
                 }
             }
+
+            if (profileStackVisible) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = tokens.colors.surfacePopover.copy(alpha = 0.96f),
+                    border = BorderStroke(1.dp, tokens.colors.borderDefault),
+                    shadowElevation = tokens.elevation.overlay,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 18.dp + DesktopSidebarItemHeight + 8.dp)
+                        .width(DesktopSidebarExpandedContentWidth)
+                        .zIndex(NuvioTokens.Z.sheet),
+                ) {
+                    SidebarProfileSwitcherStack(
+                        onProfileSelected = onProfileSelected,
+                        onAddProfileRequested = onAddProfileRequested,
+                        onDismissRequest = { onProfileStackVisibleChange(false) },
+                        modifier = Modifier.padding(6.dp),
+                    )
+                }
+            }
+
+            val profileShape = RoundedCornerShape(14.dp)
+            val profileInteractionSource = remember { MutableInteractionSource() }
+            val isProfileHovered by profileInteractionSource.collectIsHoveredAsState()
+            val isProfilePillVisible = sidebarExpanded || (isDesktop && isProfileHovered) || profileStackVisible
+            val profileBg by animateColorAsState(
+                targetValue = if (isProfilePillVisible) {
+                    tokens.colors.surfaceCard.copy(alpha = 0.72f)
+                } else {
+                    Color.Transparent
+                },
+                animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+                label = "desktop_sidebar_profile_bg",
+            )
+            val profileBorderColor by animateColorAsState(
+                targetValue = if (isProfilePillVisible) {
+                    tokens.colors.borderSubtle
+                } else {
+                    Color.Transparent
+                },
+                animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+                label = "desktop_sidebar_profile_border",
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 10.dp)
+                    .padding(bottom = 18.dp)
+                    .fillMaxWidth()
+                    .height(DesktopSidebarItemHeight)
+                    .clip(profileShape)
+                    .background(profileBg, profileShape)
+                    .then(
+                        if (profileBorderColor.alpha > 0.01f) {
+                            Modifier.border(width = 1.dp, color = profileBorderColor, shape = profileShape)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .nuvioFocusBorder(profileShape)
+                    .hoverable(profileInteractionSource)
+                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                    .clickable(
+                        interactionSource = profileInteractionSource,
+                        indication = null,
+                        onClick = { onProfileStackVisibleChange(!profileStackVisible) },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                DesktopSidebarProfileTrigger(
+                    profile = activeProfile,
+                    avatars = avatars,
+                    label = activeProfileName,
+                    expanded = sidebarExpanded,
+                )
+            }
         }
     }
 }
@@ -923,12 +1011,12 @@ private fun DesktopSidebarProfileTrigger(
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Color.Transparent,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 9.dp),
+                .padding(horizontal = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -981,17 +1069,35 @@ private fun DesktopSidebarItem(
     icon: @Composable (Color) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val contentColor = if (selected) tokens.colors.textPrimary else tokens.colors.textMuted
-    val iconColor = if (selected) tokens.colors.onAccent else contentColor
+    val accentBrush = MaterialTheme.themePalette.accentBrush()
+    val itemShape = RoundedCornerShape(14.dp)
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val hoverBgColor by animateColorAsState(
-        targetValue = if (isDesktop && isHovered && !selected) {
-            tokens.colors.textPrimary.copy(alpha = 0.08f)
-        } else {
-            Color.Transparent
+    val hovered = isDesktop && isHovered
+
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.focusBackground
+            hovered -> tokens.colors.overlayHover
+            else -> Color.Transparent
         },
-        label = "desktop_sidebar_item_hover",
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        label = "desktop_sidebar_item_bg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) tokens.colors.accent.copy(alpha = 0.35f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        label = "desktop_sidebar_item_border",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected || hovered) tokens.colors.textPrimary else tokens.colors.textMuted,
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        label = "desktop_sidebar_item_fg",
+    )
+    val indicatorAlpha by animateFloatAsState(
+        targetValue = desktopSidebarActiveIndicatorAlpha(selected),
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        label = "desktop_sidebar_indicator_alpha",
     )
 
     Surface(
@@ -1005,57 +1111,68 @@ private fun DesktopSidebarItem(
                 id = id,
                 zone = ControllerFocusZone.Navigation,
                 isDefaultFocus = selected,
-                shape = RoundedCornerShape(16.dp),
-                cornerRadius = 16.dp,
+                shape = itemShape,
+                cornerRadius = 14.dp,
                 scaleOnFocus = 1.03f,
                 selectLabel = label,
                 onSelect = onClick,
             )
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        color = hoverBgColor,
-        shape = RoundedCornerShape(16.dp),
+            .nuvioFocusBorder(itemShape),
+        color = containerColor,
+        border = if (borderColor.alpha > 0.01f) BorderStroke(1.dp, borderColor) else null,
+        shape = itemShape,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(DesktopSidebarIconSlotSize),
-                color = if (selected) tokens.colors.accent else Color.Transparent,
-                shape = RoundedCornerShape(14.dp),
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (indicatorAlpha > 0.01f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 3.dp)
+                        .width(3.dp)
+                        .height(22.dp)
+                        .alpha(indicatorAlpha)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(accentBrush),
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.size(DesktopSidebarIconSlotSize),
                     contentAlignment = Alignment.Center,
                 ) {
-                    icon(iconColor)
+                    icon(contentColor)
                 }
-            }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(animationSpec = tween(160)) + expandHorizontally(
-                    expandFrom = Alignment.Start,
-                    animationSpec = tween(200, easing = FastOutSlowInEasing),
-                ),
-                exit = shrinkHorizontally(
-                    shrinkTowards = Alignment.Start,
-                    animationSpec = tween(200, easing = FastOutSlowInEasing),
-                ) + fadeOut(
-                    animationSpec = tween(80, delayMillis = 120),
-                ),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = contentColor,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip,
-                    )
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = fadeIn(animationSpec = tween(160)) + expandHorizontally(
+                        expandFrom = Alignment.Start,
+                        animationSpec = tween(200, easing = FastOutSlowInEasing),
+                    ),
+                    exit = shrinkHorizontally(
+                        shrinkTowards = Alignment.Start,
+                        animationSpec = tween(200, easing = FastOutSlowInEasing),
+                    ) + fadeOut(
+                        animationSpec = tween(80, delayMillis = 120),
+                    ),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                            ),
+                            color = contentColor,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip,
+                        )
+                    }
                 }
             }
         }

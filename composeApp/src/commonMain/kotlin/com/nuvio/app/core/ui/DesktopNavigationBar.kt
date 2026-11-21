@@ -5,6 +5,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -48,6 +50,7 @@ internal fun DesktopNavigationBar(
     @Suppress("UNUSED_PARAMETER") glowEnabled: Boolean = true,
 ) {
     if (items.isEmpty()) return
+    val tokens = MaterialTheme.nuvio
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isHomeSelected = items.first().selected
@@ -62,9 +65,18 @@ internal fun DesktopNavigationBar(
         label = "desktop_nav_labels",
     )
     val surfaceColor by animateColorAsState(
-        targetValue = if (isFrosted) Color(0xFF1C1C1E).copy(alpha = 0.30f) else Color(0xFF0F0F11).copy(alpha = 0.20f),
+        targetValue = if (isFrosted) {
+            tokens.colors.surfaceElevated.copy(alpha = 0.84f)
+        } else {
+            tokens.colors.surfaceElevated.copy(alpha = 0.56f)
+        },
         animationSpec = tween(140, easing = FastOutSlowInEasing),
         label = "desktop_nav_surface",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isFrosted) tokens.colors.borderDefault else tokens.colors.borderSubtle,
+        animationSpec = tween(140, easing = FastOutSlowInEasing),
+        label = "desktop_nav_border",
     )
     val sheenAlpha by animateFloatAsState(
         targetValue = if (isFrosted) 1f else 0f,
@@ -94,9 +106,10 @@ internal fun DesktopNavigationBar(
                 .hoverable(interactionSource)
                 .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
         ) {
+            val pillShape = RoundedCornerShape(50)
             Box(
                 modifier = Modifier.matchParentSize()
-                    .clip(RoundedCornerShape(50))
+                    .clip(pillShape)
                     .then(
                         if (isFrosted && hazeState != null) {
                             Modifier.hazeEffect(state = hazeState) { blurRadius = 14.dp }
@@ -113,6 +126,11 @@ internal fun DesktopNavigationBar(
                                 Color.Transparent,
                             ),
                         ),
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = borderColor,
+                        shape = pillShape,
                     ),
             )
         }
