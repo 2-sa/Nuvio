@@ -1792,7 +1792,7 @@ private fun PlayerScreenRuntime.buildPlayerControlSubtitleSelection(): PlayerCon
                 )
 
                 is SubtitleSelectionOption.Addon -> {
-                    val title = languageLabelForCode(option.subtitle.language)
+                    val title = option.subtitle.title ?: languageLabelForCode(option.subtitle.language)
                     PlayerControlSubtitleOptionItem(
                         id = option.id,
                         languageKey = language.key,
@@ -1800,7 +1800,7 @@ private fun PlayerScreenRuntime.buildPlayerControlSubtitleSelection(): PlayerCon
                         index = visibleAddonSubtitles.indexOf(option.subtitle).coerceAtLeast(0),
                         sourceLabel = option.subtitle.addonName ?: addonLabel,
                         title = title,
-                        metadata = option.subtitle.display.takeIf {
+                        metadata = (option.subtitle.label ?: option.subtitle.display).takeIf {
                             it.isNotBlank() && it != title
                         }.orEmpty(),
                         isSelected = option.id == selectedOptionId,
