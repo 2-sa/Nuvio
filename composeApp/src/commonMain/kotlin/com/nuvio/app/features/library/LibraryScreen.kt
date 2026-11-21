@@ -1,11 +1,17 @@
 package com.nuvio.app.features.library
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,16 +19,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -32,18 +45,16 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ViewAgenda
-import com.nuvio.app.core.ui.DisintegratingContainer
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.gestures.stopScroll
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,33 +63,48 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
+import com.nuvio.app.core.poster.CustomPosterScreen
+import com.nuvio.app.core.poster.CustomPosterUrlRepository
+import com.nuvio.app.core.poster.withCustomPosterUrl
+import com.nuvio.app.core.ui.DisintegratingContainer
 import com.nuvio.app.core.ui.DisintegrationRequest
+import com.nuvio.app.core.ui.FullscreenActionButton
+import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.NuvioDropdownChip
 import com.nuvio.app.core.ui.NuvioDropdownOption
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioShelfSection
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.ScopedDisintegrationTracker
+import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.SkeletonBlock
+import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+import com.nuvio.app.core.ui.nuvioFocusBorder
+import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.posterGridColumnCountForViewport
-import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
-import com.nuvio.app.isDesktop
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.shimmer
-import com.nuvio.app.core.ui.LocalVerticalBarPadding
-import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryItemType
@@ -88,16 +114,17 @@ import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
-import com.nuvio.app.features.servers.ServerRepository
 import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
+import com.nuvio.app.features.home.components.PosterGridRow
+import com.nuvio.app.features.home.components.PosterGridSkeletonRow
+import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.servers.ServerRepository
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
-import com.nuvio.app.core.poster.CustomPosterScreen
-import com.nuvio.app.core.poster.CustomPosterUrlRepository
-import com.nuvio.app.core.poster.withCustomPosterUrl
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -317,13 +344,38 @@ fun LibraryScreen(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val tokens = MaterialTheme.nuvio
         val posterCardStyle = rememberPosterCardStyleUiState()
+        val pageHorizontalPadding = if (isDesktop) {
+            desktopPageHorizontalPaddingForWidth(maxWidth.value)
+        } else {
+            16.dp
+        }
+        val useInlineDesktopToolbar = isDesktop && maxWidth >= 820.dp
         val gridColumns = remember(maxWidth, maxHeight, posterCardStyle.widthDp, isDesktop) {
             if (isDesktop) {
                 posterGridColumnCountForViewport(maxWidth, maxHeight, posterCardStyle.widthDp)
             } else {
                 posterGridColumnCountForWidth(maxWidth)
             }
+        }
+        val activeTitle = if (sourceMode != LibraryViewMode.Saved) {
+            stringResource(Res.string.library_title)
+        } else {
+            when (uiState.sourceMode) {
+                LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
+                LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
+                LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
+                LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_title)
+            }
+        }
+        val activeItemCount = when (sourceMode) {
+            LibraryViewMode.Saved -> when (displaySettings.layoutMode) {
+                LibraryLayoutMode.HORIZONTAL -> uiState.sections.sumOf { it.items.size }
+                LibraryLayoutMode.VERTICAL -> verticalProjection.entries.size
+            }
+            LibraryViewMode.Cloud -> cloudUiState.items.size
+            LibraryViewMode.Servers -> serverShelves?.sumOf { it.section?.items?.size ?: 0 } ?: 0
         }
 
         NuvioScreen(
@@ -341,75 +393,93 @@ fun LibraryScreen(
                     Box(
                         modifier = Modifier
                             .matchParentSize()
-                            .background(MaterialTheme.colorScheme.background)
+                            .background(tokens.colors.background)
                             .nuvioConsumePointerEvents(),
                     )
-                    androidx.compose.foundation.layout.Column(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(LocalVerticalBarPadding.current),
                     ) {
-                        NuvioScreenHeader(
-                            title = if (sourceMode != LibraryViewMode.Saved) {
-                                stringResource(Res.string.library_title)
-                            } else {
-                                when (uiState.sourceMode) {
-                                    LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
-                                    LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
-                                    LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
-                                    LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_title)
-                                }
-                            },
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            topPadding = topChromePadding,
-                            actions = {
-                                if (sourceMode == LibraryViewMode.Saved) {
-                                    LibraryListManagementButton()
-                                    val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
-                                        LibraryLayoutMode.VERTICAL
-                                    } else {
-                                        LibraryLayoutMode.HORIZONTAL
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            LibraryDisplaySettingsRepository.setLayoutMode(targetLayout)
-                                        },
-                                    ) {
-                                        Crossfade(
-                                            targetState = targetLayout,
-                                            animationSpec = tween(durationMillis = 140),
-                                            label = "libraryLayoutAction",
-                                        ) { animatedTargetLayout ->
-                                            Icon(
-                                                imageVector = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
-                                                    Icons.Rounded.GridView
-                                                } else {
-                                                    Icons.Rounded.ViewAgenda
-                                                },
-                                                contentDescription = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
-                                                    stringResource(Res.string.library_layout_show_vertical)
-                                                } else {
-                                                    stringResource(Res.string.library_layout_show_horizontal)
-                                                },
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
+                        if (isDesktop) {
+                            DesktopLibraryToolbar(
+                                title = activeTitle,
+                                itemCount = activeItemCount,
+                                sourceMode = sourceMode,
+                                showServers = hasServers,
+                                layoutMode = displaySettings.layoutMode,
+                                inlineSourceSwitch = useInlineDesktopToolbar,
+                                topPadding = topChromePadding,
+                                horizontalPadding = pageHorizontalPadding,
+                                onModeSelected = { mode -> sourceModeName = mode.name },
+                                onToggleLayout = { targetLayout ->
+                                    LibraryDisplaySettingsRepository.setLayoutMode(targetLayout)
+                                },
+                                onDownloadsClick = onDownloadsClick,
+                            )
+                        } else {
+                            NuvioScreenHeader(
+                                title = activeTitle,
+                                backgroundColor = tokens.colors.background,
+                                modifier = Modifier.padding(horizontal = pageHorizontalPadding),
+                                topPadding = topChromePadding,
+                                actions = {
+                                    if (sourceMode == LibraryViewMode.Saved) {
+                                        LibraryListManagementButton()
+                                        val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
+                                            LibraryLayoutMode.VERTICAL
+                                        } else {
+                                            LibraryLayoutMode.HORIZONTAL
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                LibraryDisplaySettingsRepository.setLayoutMode(targetLayout)
+                                            },
+                                        ) {
+                                            Crossfade(
+                                                targetState = targetLayout,
+                                                animationSpec = tween(durationMillis = 140),
+                                                label = "libraryLayoutAction",
+                                            ) { animatedTargetLayout ->
+                                                Icon(
+                                                    imageVector = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
+                                                        Icons.Rounded.GridView
+                                                    } else {
+                                                        Icons.Rounded.ViewAgenda
+                                                    },
+                                                    contentDescription = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
+                                                        stringResource(Res.string.library_layout_show_vertical)
+                                                    } else {
+                                                        stringResource(Res.string.library_layout_show_horizontal)
+                                                    },
+                                                    tint = tokens.colors.textSecondary,
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                                if (onDownloadsClick != null) {
-                                    LibraryDownloadsButton(onClick = onDownloadsClick)
-                                }
-                            },
-                        )
-                        LibrarySourceSwitch(
-                            selectedMode = sourceMode,
-                            showServers = hasServers,
-                            onModeSelected = { mode ->
-                                sourceModeName = mode.name
-                            },
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
+                                    if (onDownloadsClick != null) {
+                                        LibraryDownloadsButton(onClick = onDownloadsClick)
+                                    }
+                                },
+                            )
+                            LibrarySourceSwitch(
+                                selectedMode = sourceMode,
+                                showServers = hasServers,
+                                onModeSelected = { mode ->
+                                    sourceModeName = mode.name
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = pageHorizontalPadding),
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                        if (isDesktop) {
+                            HorizontalDivider(
+                                thickness = NuvioTokens.Border.thin,
+                                color = tokens.colors.borderSubtle,
+                            )
+                        }
                     }
                 }
             }
@@ -421,6 +491,7 @@ fun LibraryScreen(
                     selectedType = selectedType,
                     selectedCloudItemKey = selectedCloudItemKey,
                     searchQuery = cloudSearchQuery,
+                    horizontalPadding = pageHorizontalPadding,
                     onSearchQueryChange = {
                         cloudSearchQuery = it
                         selectedCloudItemKey = null
@@ -460,11 +531,14 @@ fun LibraryScreen(
                 when {
                     !uiState.isLoaded || (uiState.isLoading && uiState.sections.isEmpty()) -> {
                         if (displaySettings.layoutMode == LibraryLayoutMode.VERTICAL) {
-                            libraryVerticalSkeletonItems(gridColumns)
+                            libraryVerticalGridSkeletonItems(
+                                columns = gridColumns,
+                                horizontalPadding = pageHorizontalPadding,
+                            )
                         } else {
                             items(3) {
                                 HomeSkeletonRow(
-                                    horizontalPadding = 16.dp,
+                                    horizontalPadding = pageHorizontalPadding,
                                 )
                             }
                         }
@@ -475,12 +549,12 @@ fun LibraryScreen(
                             if (networkStatusUiState.isOfflineLike) {
                                 NuvioNetworkOfflineCard(
                                     condition = networkStatusUiState.condition,
-                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    modifier = Modifier.padding(horizontal = pageHorizontalPadding),
                                     onRetry = retryLibraryLoad,
                                 )
                             } else {
                                 HomeEmptyStateCard(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    modifier = Modifier.padding(horizontal = pageHorizontalPadding),
                                     title = when (uiState.sourceMode) {
                                         LibrarySourceMode.LOCAL -> stringResource(Res.string.library_load_failed)
                                         LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_load_failed)
@@ -498,7 +572,7 @@ fun LibraryScreen(
                     uiState.sections.isEmpty() -> {
                         item {
                             HomeEmptyStateCard(
-                                modifier = Modifier.padding(horizontal = 16.dp),
+                                modifier = Modifier.padding(horizontal = pageHorizontalPadding),
                                 title = when (uiState.sourceMode) {
                                     LibrarySourceMode.LOCAL -> stringResource(Res.string.library_empty_title)
                                     LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_empty_title)
@@ -533,7 +607,7 @@ fun LibraryScreen(
                                 onWatchedFilterSelected = { filter -> libraryWatchedFilterName = filter.name },
                                 onSortSelected = LibraryDisplaySettingsRepository::setSortOption,
                                 modifier = libraryContentTransitionModifier()
-                                    .padding(horizontal = 16.dp),
+                                    .padding(horizontal = pageHorizontalPadding),
                             )
                         }
                         when (displaySettings.layoutMode) {
@@ -543,14 +617,16 @@ fun LibraryScreen(
                                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                 sortOption = effectiveSortOption,
                                 posterPattern = effectivePosterPattern,
+                                horizontalPadding = pageHorizontalPadding,
                                 onPosterClick = onPosterClick,
                                 onSectionViewAllClick = onSectionViewAllClick,
                                 onPosterLongClick = onPosterLongClick,
                                 onDisintegrated = disintegration::onExited,
                             )
-                            LibraryLayoutMode.VERTICAL -> libraryVerticalContent(
+                            LibraryLayoutMode.VERTICAL -> libraryVerticalGridItems(
                                 projection = verticalProjection,
                                 columns = gridColumns,
+                                horizontalPadding = pageHorizontalPadding,
                                 watchedKeys = watchedUiState.watchedKeys,
                                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                 posterPattern = effectivePosterPattern,
@@ -565,12 +641,158 @@ fun LibraryScreen(
     }
 }
 
+@Composable
+private fun DesktopLibraryToolbar(
+    title: String,
+    itemCount: Int,
+    sourceMode: LibraryViewMode,
+    showServers: Boolean,
+    layoutMode: LibraryLayoutMode,
+    inlineSourceSwitch: Boolean,
+    topPadding: Dp?,
+    horizontalPadding: Dp,
+    onModeSelected: (LibraryViewMode) -> Unit,
+    onToggleLayout: (LibraryLayoutMode) -> Unit,
+    onDownloadsClick: (() -> Unit)?,
+) {
+    val tokens = MaterialTheme.nuvio
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val resolvedTopPadding = topPadding ?: statusBarTop
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = horizontalPadding,
+                end = horizontalPadding,
+                top = resolvedTopPadding,
+                bottom = NuvioTokens.Space.s12,
+            ),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.displayLarge,
+                    color = tokens.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (itemCount > 0) {
+                    Surface(
+                        shape = tokens.shapes.chip,
+                        color = tokens.colors.surfaceElevated,
+                        border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.collections_trakt_list_items_count, itemCount),
+                            modifier = Modifier.padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s4),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = tokens.colors.textSecondary,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (inlineSourceSwitch) {
+                    LibrarySourceSwitch(
+                        selectedMode = sourceMode,
+                        showServers = showServers,
+                        onModeSelected = onModeSelected,
+                    )
+                    Spacer(modifier = Modifier.width(NuvioTokens.Space.s4))
+                }
+                if (sourceMode == LibraryViewMode.Saved) {
+                    LibraryListManagementButton()
+                    val targetLayout = if (layoutMode == LibraryLayoutMode.HORIZONTAL) {
+                        LibraryLayoutMode.VERTICAL
+                    } else {
+                        LibraryLayoutMode.HORIZONTAL
+                    }
+                    val layoutInteraction = remember { MutableInteractionSource() }
+                    val isLayoutHovered by layoutInteraction.collectIsHoveredAsState()
+                    val layoutDesc = if (targetLayout == LibraryLayoutMode.VERTICAL) {
+                        stringResource(Res.string.library_layout_show_vertical)
+                    } else {
+                        stringResource(Res.string.library_layout_show_horizontal)
+                    }
+                    Surface(
+                        onClick = { onToggleLayout(targetLayout) },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .nuvioFocusBorder(CircleShape)
+                            .pointerHoverIcon(PointerIcon.Hand),
+                        shape = CircleShape,
+                        color = if (isLayoutHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+                        border = BorderStroke(
+                            width = NuvioTokens.Border.thin,
+                            color = if (isLayoutHovered) tokens.colors.borderStrong else tokens.colors.borderDefault,
+                        ),
+                        interactionSource = layoutInteraction,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Crossfade(
+                                targetState = targetLayout,
+                                animationSpec = tween(durationMillis = 140),
+                                label = "libraryLayoutActionDesktop",
+                            ) { animatedTargetLayout ->
+                                Icon(
+                                    imageVector = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
+                                        Icons.Rounded.GridView
+                                    } else {
+                                        Icons.Rounded.ViewAgenda
+                                    },
+                                    contentDescription = layoutDesc,
+                                    tint = if (isLayoutHovered) tokens.colors.textPrimary else tokens.colors.textSecondary,
+                                    modifier = Modifier.size(NuvioTokens.Icon.md),
+                                )
+                            }
+                        }
+                    }
+                }
+                if (onDownloadsClick != null) {
+                    LibraryDownloadsButton(onClick = onDownloadsClick)
+                }
+                FullscreenActionButton(
+                    buttonSize = 40.dp,
+                    iconSize = 22.dp,
+                    contentColor = tokens.colors.textPrimary,
+                )
+            }
+        }
+
+        if (!inlineSourceSwitch) {
+            LibrarySourceSwitch(
+                selectedMode = sourceMode,
+                showServers = showServers,
+                onModeSelected = onModeSelected,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
 private fun LazyListScope.cloudLibraryContent(
     uiState: CloudLibraryUiState,
     selectedProviderId: String?,
     selectedType: CloudLibraryItemType?,
     selectedCloudItemKey: String?,
     searchQuery: String,
+    horizontalPadding: Dp,
     onSearchQueryChange: (String) -> Unit,
     onProviderSelected: (String?) -> Unit,
     onTypeSelected: (CloudLibraryItemType?) -> Unit,
@@ -582,13 +804,13 @@ private fun LazyListScope.cloudLibraryContent(
 ) {
     when {
         !uiState.isLoaded -> {
-            cloudLibrarySkeletonItems()
+            cloudLibrarySkeletonItems(horizontalPadding = horizontalPadding)
         }
 
         !uiState.isEnabled -> {
             item {
                 HomeEmptyStateCard(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
                     title = stringResource(Res.string.cloud_library_disabled_title),
                     message = stringResource(Res.string.cloud_library_disabled_message),
                     actionLabel = stringResource(Res.string.cloud_library_disabled_action),
@@ -600,7 +822,7 @@ private fun LazyListScope.cloudLibraryContent(
         !uiState.hasConnectedProvider -> {
             item {
                 HomeEmptyStateCard(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
                     title = stringResource(Res.string.cloud_library_connect_title),
                     message = stringResource(Res.string.cloud_library_connect_message),
                     actionLabel = stringResource(Res.string.cloud_library_connect_action),
@@ -639,6 +861,7 @@ private fun LazyListScope.cloudLibraryContent(
                         item = selectedItem,
                         onBack = onBackToItems,
                         onFileSelected = { file -> onFileSelected(selectedItem, file) },
+                        modifier = Modifier.padding(horizontal = horizontalPadding),
                     )
                 }
             } else {
@@ -651,7 +874,7 @@ private fun LazyListScope.cloudLibraryContent(
                         onProviderSelected = onProviderSelected,
                         onTypeSelected = onTypeSelected,
                         onRefresh = onRefresh,
-                        modifier = Modifier.padding(horizontal = 16.dp),
+                        modifier = Modifier.padding(horizontal = horizontalPadding),
                     )
                 }
 
@@ -659,7 +882,7 @@ private fun LazyListScope.cloudLibraryContent(
                     CloudLibrarySearchField(
                         query = searchQuery,
                         onQueryChange = onSearchQueryChange,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 4.dp),
                     )
                 }
 
@@ -672,7 +895,7 @@ private fun LazyListScope.cloudLibraryContent(
                 failedProviderStates.forEach { providerState ->
                     item(key = "cloud-error-${providerState.providerId}") {
                         HomeEmptyStateCard(
-                            modifier = Modifier.padding(horizontal = 16.dp),
+                            modifier = Modifier.padding(horizontal = horizontalPadding),
                             title = stringResource(Res.string.cloud_library_load_failed, providerState.providerName),
                             message = providerState.errorMessage.orEmpty(),
                             actionLabel = stringResource(Res.string.action_retry),
@@ -682,11 +905,11 @@ private fun LazyListScope.cloudLibraryContent(
                 }
 
                 if (uiState.isRefreshing && filteredItems.isEmpty()) {
-                    cloudLibrarySkeletonItems()
+                    cloudLibrarySkeletonItems(horizontalPadding = horizontalPadding)
                 } else if (filteredItems.isEmpty() && failedProviderStates.isEmpty()) {
                     item {
                         HomeEmptyStateCard(
-                            modifier = Modifier.padding(horizontal = 16.dp),
+                            modifier = Modifier.padding(horizontal = horizontalPadding),
                             title = stringResource(
                                 if (hasActiveFilter) {
                                     Res.string.cloud_library_no_matches_title
@@ -713,6 +936,7 @@ private fun LazyListScope.cloudLibraryContent(
                         CloudLibraryRow(
                             item = item,
                             onClick = { onItemSelected(item) },
+                            modifier = Modifier.padding(horizontal = horizontalPadding),
                         )
                     }
                 }
@@ -727,40 +951,112 @@ private fun CloudLibrarySearchField(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = modifier.fillMaxWidth(),
-        singleLine = true,
-        shape = RoundedCornerShape(12.dp),
-        placeholder = { Text(stringResource(Res.string.cloud_library_search_label)) },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Rounded.Search,
-                contentDescription = null,
-            )
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(14.dp)
+    var isFocused by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isFocused -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderDefault
         },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = stringResource(Res.string.compose_search_clear),
-                    )
-                }
-            }
-        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "cloud_search_border",
     )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = if (isDesktop) 50.dp else 46.dp)
+            .clip(shape)
+            .background(if (isFocused) tokens.colors.surfaceCard else tokens.colors.surfaceElevated)
+            .border(NuvioTokens.Border.thin, borderColor, shape)
+            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
+            .padding(horizontal = NuvioTokens.Space.s14),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Search,
+            contentDescription = null,
+            tint = if (isFocused) tokens.colors.accent else tokens.colors.textMuted,
+            modifier = Modifier.size(NuvioTokens.Icon.md),
+        )
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (query.isEmpty()) {
+                Text(
+                    text = stringResource(Res.string.cloud_library_search_label),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = tokens.colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { isFocused = it.isFocused },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = tokens.colors.textPrimary,
+                    textDirection = TextDirection.Content,
+                ),
+                cursorBrush = SolidColor(tokens.colors.accent),
+            )
+        }
+        if (query.isNotEmpty()) {
+            val clearInteraction = remember { MutableInteractionSource() }
+            val isClearHovered by clearInteraction.collectIsHoveredAsState()
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(if (isDesktop && isClearHovered) tokens.colors.surfaceElevated else tokens.colors.overlayHover)
+                    .then(
+                        if (isDesktop) {
+                            Modifier
+                                .hoverable(clearInteraction)
+                                .pointerHoverIcon(PointerIcon.Hand)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .clickable(
+                        interactionSource = clearInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = { onQueryChange("") },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(Res.string.compose_search_clear),
+                    tint = if (isDesktop && isClearHovered) tokens.colors.textPrimary else tokens.colors.textMuted,
+                    modifier = Modifier.size(NuvioTokens.Icon.sm),
+                )
+            }
+        }
+    }
 }
 
-private fun LazyListScope.cloudLibrarySkeletonItems() {
+private fun LazyListScope.cloudLibrarySkeletonItems(horizontalPadding: Dp) {
     item(key = "cloud-library-skeleton-toolbar") {
         CloudLibrarySkeletonToolbar(
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = horizontalPadding),
         )
     }
     items(3) {
-        CloudLibrarySkeletonRow()
+        CloudLibrarySkeletonRow(
+            modifier = Modifier.padding(horizontal = horizontalPadding),
+        )
     }
 }
 
@@ -772,8 +1068,9 @@ private fun LibrarySourceSwitch(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         LibraryChip(
             label = stringResource(Res.string.library_source_saved),
@@ -806,6 +1103,7 @@ private fun CloudLibraryToolbar(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
     val providerOptions = buildList {
         add(NuvioDropdownOption(key = "", label = stringResource(Res.string.cloud_library_provider_all)))
         addAll(
@@ -840,8 +1138,7 @@ private fun CloudLibraryToolbar(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -875,12 +1172,30 @@ private fun CloudLibraryToolbar(
                     },
                 )
             }
-            IconButton(onClick = onRefresh) {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = stringResource(Res.string.cloud_library_refresh),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            val refreshInteraction = remember { MutableInteractionSource() }
+            val isRefreshHovered by refreshInteraction.collectIsHoveredAsState()
+            Surface(
+                onClick = onRefresh,
+                modifier = Modifier
+                    .size(38.dp)
+                    .nuvioFocusBorder(CircleShape)
+                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+                shape = CircleShape,
+                color = if (isDesktop && isRefreshHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+                border = BorderStroke(
+                    width = NuvioTokens.Border.thin,
+                    color = if (isDesktop && isRefreshHovered) tokens.colors.borderStrong else tokens.colors.borderDefault,
+                ),
+                interactionSource = refreshInteraction,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = stringResource(Res.string.cloud_library_refresh),
+                        tint = if (isDesktop && isRefreshHovered) tokens.colors.textPrimary else tokens.colors.textSecondary,
+                        modifier = Modifier.size(NuvioTokens.Icon.sm + NuvioTokens.Space.s2),
+                    )
+                }
             }
         }
     }
@@ -894,27 +1209,66 @@ private fun LibraryChip(
     error: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    Surface(
+    val tokens = MaterialTheme.nuvio
+    val pillShape = RoundedCornerShape(NuvioTokens.Radius.full)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.focusBackground
+            isDesktop && isHovered -> tokens.colors.surfaceCard
+            else -> tokens.colors.surfaceElevated
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "library_chip_bg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            error -> tokens.colors.danger
+            selected -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderDefault
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "library_chip_border",
+    )
+
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        color = if (selected) colorScheme.primaryContainer else colorScheme.surfaceContainerLow,
-        border = if (selected) BorderStroke(1.dp, colorScheme.primary.copy(alpha = 0.45f)) else null,
+            .nuvioFocusBorder(pillShape)
+            .clip(pillShape)
+            .background(containerColor)
+            .border(NuvioTokens.Border.thin, borderColor, pillShape)
+            .semantics { this.selected = selected }
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .padding(horizontal = NuvioTokens.Space.s14, vertical = NuvioTokens.Space.s8),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            modifier = Modifier
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .shimmer(loading),
-            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.shimmer(loading),
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            ),
             color = when {
-                error -> colorScheme.error
-                selected -> colorScheme.onPrimaryContainer
-                else -> colorScheme.onSurfaceVariant
+                error -> tokens.colors.danger
+                selected || (isDesktop && isHovered) -> tokens.colors.textPrimary
+                else -> tokens.colors.textSecondary
             },
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -927,34 +1281,65 @@ private fun CloudLibraryRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
     val playableCount = item.playableFiles.size
+    val enabled = playableCount > 0
+    val cardShape = RoundedCornerShape(14.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && enabled && isHovered) {
+            tokens.colors.borderStrong
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "cloud_row_border",
+    )
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clickable(enabled = playableCount > 0, onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+            .padding(vertical = 4.dp)
+            .then(
+                if (isDesktop && enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clip(cardShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick,
+            ),
+        shape = cardShape,
+        color = if (isDesktop && enabled && isHovered) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
+        border = BorderStroke(NuvioTokens.Border.thin, borderColor),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = NuvioTokens.Space.s16, vertical = NuvioTokens.Space.s12),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s2),
                 ) {
                     Text(
                         text = item.name,
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -962,23 +1347,33 @@ private fun CloudLibraryRow(
                     Text(
                         text = cloudLibrarySubtitle(item),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = cloudLibraryStatusLine(item),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (playableCount > 0) {
-                    IconButton(onClick = onClick) {
+                if (enabled) {
+                    Spacer(modifier = Modifier.width(NuvioTokens.Space.s10))
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(tokens.colors.surfaceElevated)
+                            .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Icon(
                             imageVector = Icons.Rounded.PlayArrow,
                             contentDescription = stringResource(Res.string.action_play),
+                            tint = tokens.colors.accent,
+                            modifier = Modifier.size(NuvioTokens.Icon.md),
                         )
                     }
                 }
@@ -986,9 +1381,11 @@ private fun CloudLibraryRow(
             item.progressFraction?.takeIf { it in 0f..0.999f }?.let { progress ->
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(NuvioTokens.Radius.full)),
+                    color = tokens.colors.accent,
+                    trackColor = tokens.colors.surfaceElevated,
                 )
             }
         }
@@ -1002,35 +1399,50 @@ private fun CloudLibraryFilePicker(
     onFileSelected: (CloudLibraryFile) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(16.dp)
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+            .padding(vertical = 4.dp),
+        shape = cardShape,
+        color = tokens.colors.surfaceCard,
+        border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = NuvioTokens.Space.s16, vertical = NuvioTokens.Space.s14),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = stringResource(Res.string.action_back),
-                    )
+                Surface(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+                    shape = CircleShape,
+                    color = tokens.colors.surfaceElevated,
+                    border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderDefault),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(Res.string.action_back),
+                            tint = tokens.colors.textPrimary,
+                            modifier = Modifier.size(NuvioTokens.Icon.md),
+                        )
+                    }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.name,
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1038,7 +1450,7 @@ private fun CloudLibraryFilePicker(
                     Text(
                         text = stringResource(Res.string.cloud_library_file_picker_title),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
             }
@@ -1051,12 +1463,12 @@ private fun CloudLibraryFilePicker(
                     Text(
                         text = stringResource(Res.string.cloud_library_no_files_title),
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                     )
                     Text(
                         text = stringResource(Res.string.cloud_library_no_files_message),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
             } else {
@@ -1077,23 +1489,46 @@ private fun CloudLibraryFileRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val rowShape = RoundedCornerShape(12.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.58f),
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clip(rowShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        shape = rowShape,
+        color = if (isDesktop && isHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+        border = BorderStroke(
+            width = NuvioTokens.Border.thin,
+            color = if (isDesktop && isHovered) tokens.colors.borderStrong else tokens.colors.borderSubtle,
+        ),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = NuvioTokens.Space.s14, vertical = NuvioTokens.Space.s12),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
             ) {
                 Icon(
                     modifier = Modifier
@@ -1101,13 +1536,13 @@ private fun CloudLibraryFileRow(
                         .size(18.dp),
                     imageVector = Icons.AutoMirrored.Filled.InsertDriveFile,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = tokens.colors.accent,
                 )
                 Text(
                     modifier = Modifier.weight(1f),
                     text = file.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -1119,14 +1554,14 @@ private fun CloudLibraryFileRow(
                 Text(
                     text = file.sizeBytes?.let { size -> formatCloudBytes(size) }.orEmpty(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Icon(
                     imageVector = Icons.Rounded.PlayArrow,
                     contentDescription = stringResource(Res.string.cloud_library_play_file),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = tokens.colors.accent,
                 )
             }
         }
@@ -1208,17 +1643,20 @@ private fun CloudLibrarySkeletonToolbar(
 private fun CloudLibrarySkeletonRow(
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(14.dp)
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+            .padding(vertical = 4.dp),
+        shape = cardShape,
+        color = tokens.colors.surfaceCard,
+        border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = NuvioTokens.Space.s16, vertical = NuvioTokens.Space.s12),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
@@ -1246,7 +1684,7 @@ private fun CloudLibrarySkeletonRow(
                         cornerRadius = 6.dp,
                     )
                 }
-                SkeletonBlock(width = 48.dp, height = 48.dp, cornerRadius = 24.dp)
+                SkeletonBlock(width = 36.dp, height = 36.dp, cornerRadius = 18.dp)
             }
         }
     }
@@ -1258,12 +1696,77 @@ private enum class LibraryViewMode {
     Servers,
 }
 
+private fun LazyListScope.libraryVerticalGridItems(
+    projection: LibraryVerticalProjection,
+    columns: Int,
+    horizontalPadding: Dp,
+    watchedKeys: Set<String>,
+    fullyWatchedSeriesKeys: Set<String>,
+    posterPattern: String,
+    onPosterClick: ((LibraryItem) -> Unit)?,
+    onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)?,
+) {
+    items(
+        items = projection.entries.chunked(columns),
+        key = { rowEntries ->
+            val firstEntry = rowEntries.first()
+            "library-vertical:${firstEntry.item.type}:${firstEntry.item.id}"
+        },
+    ) { rowEntries ->
+        val resolvedItems = remember(rowEntries, posterPattern) {
+            rowEntries.map { entry ->
+                entry.item.toMetaPreview().let {
+                    if (posterPattern.isNotBlank()) it.withCustomPosterUrl(posterPattern) else it
+                }
+            }
+        }
+        PosterGridRow(
+            items = resolvedItems,
+            columns = columns,
+            modifier = libraryContentTransitionModifier()
+                .padding(horizontal = horizontalPadding),
+            watchedKeys = watchedKeys,
+            fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+            onPosterClick = onPosterClick?.let { callback ->
+                { preview ->
+                    rowEntries.firstOrNull { it.item.id == preview.id && it.item.type == preview.type }
+                        ?.item
+                        ?.let(callback)
+                }
+            },
+            onPosterLongClick = onPosterLongClick?.let { callback ->
+                { preview ->
+                    rowEntries.firstOrNull { it.item.id == preview.id && it.item.type == preview.type }
+                        ?.let { entry -> callback(entry.item, entry.section) }
+                }
+            },
+        )
+    }
+}
+
+private fun LazyListScope.libraryVerticalGridSkeletonItems(
+    columns: Int,
+    horizontalPadding: Dp,
+) {
+    items(
+        count = 2,
+        key = { index -> "library-vertical-skeleton:$index" },
+    ) {
+        PosterGridSkeletonRow(
+            columns = columns,
+            modifier = libraryContentTransitionModifier()
+                .padding(horizontal = horizontalPadding),
+        )
+    }
+}
+
 private fun LazyListScope.librarySections(
     displaySections: List<LibraryDisplaySection>,
     watchedKeys: Set<String>,
     fullyWatchedSeriesKeys: Set<String>,
     sortOption: LibrarySortOption,
     posterPattern: String,
+    horizontalPadding: Dp,
     onPosterClick: ((LibraryItem) -> Unit)?,
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)?,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)?,
@@ -1277,8 +1780,8 @@ private fun LazyListScope.librarySections(
             title = localizedLibrarySectionTitle(section.type, section.displayTitle),
             entries = section.previewEntries,
             modifier = libraryContentTransitionModifier(),
-            headerHorizontalPadding = 16.dp,
-            rowContentPadding = PaddingValues(horizontal = 16.dp),
+            headerHorizontalPadding = horizontalPadding,
+            rowContentPadding = PaddingValues(horizontal = horizontalPadding),
             onViewAllClick = section.source
                 ?.takeIf { it.items.size > LIBRARY_SECTION_PREVIEW_LIMIT }
                 ?.let { source -> onSectionViewAllClick?.let { { it(source, sortOption) } } },

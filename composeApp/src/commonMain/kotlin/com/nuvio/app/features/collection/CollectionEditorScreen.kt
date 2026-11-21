@@ -1,8 +1,15 @@
 package com.nuvio.app.features.collection
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,8 +20,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -34,16 +41,15 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,23 +59,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.animation.core.animateDpAsState
-import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
-import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioSectionLabel
 import com.nuvio.app.core.ui.NuvioSurfaceCard
-import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PlatformBackHandler
+import com.nuvio.app.core.ui.accentBrush
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
+import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.trakt.TraktPublicListSearchResult
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -116,6 +133,7 @@ fun CollectionEditorScreen(
     initializeRepository: Boolean = true,
     onNavigateToPage: ((page: CollectionEditorPage, title: String) -> Unit)? = null,
 ) {
+    val tokens = MaterialTheme.nuvio
     val state by CollectionEditorRepository.uiState.collectAsState()
     val bottomInset = nuvioSafeBottomPadding()
 
@@ -244,153 +262,98 @@ fun CollectionEditorScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             stickyHeader {
-                NuvioScreenHeader(
-                    title = if (state.isNew) {
-                        stringResource(Res.string.collections_new)
-                    } else {
-                        stringResource(Res.string.collections_editor_edit_collection)
-                    },
-                    onBack = onBack,
-                )
-            }
-
-            item {
-                NuvioInputField(
-                    value = state.title,
-                    onValueChange = { CollectionEditorRepository.setTitle(it) },
-                    placeholder = stringResource(Res.string.collections_editor_placeholder_name),
-                )
-            }
-
-            item {
-                NuvioInputField(
-                    value = state.backdropImageUrl,
-                    onValueChange = { CollectionEditorRepository.setBackdropImageUrl(it) },
-                    placeholder = stringResource(Res.string.collections_editor_placeholder_backdrop),
-                )
-            }
-
-            item {
-                NuvioSurfaceCard {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { CollectionEditorRepository.setPinToTop(!state.pinToTop) },
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                            Text(
-                                text = stringResource(Res.string.collections_editor_pin_above),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = stringResource(Res.string.collections_editor_pin_above_desc),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
-                            checked = state.pinToTop,
-                            onCheckedChange = { CollectionEditorRepository.setPinToTop(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
-                            ),
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    NuvioScreenHeader(
+                        title = if (state.isNew) {
+                            stringResource(Res.string.collections_new)
+                        } else {
+                            stringResource(Res.string.collections_editor_edit_collection)
+                        },
+                        onBack = onBack,
+                    )
+                    if (isDesktop) {
+                        HorizontalDivider(
+                            thickness = NuvioTokens.Border.thin,
+                            color = tokens.colors.borderSubtle,
                         )
                     }
                 }
             }
 
+            item {
+                NuvioSurfaceCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12)) {
+                        CollectionEditorTextField(
+                            value = state.title,
+                            onValueChange = { CollectionEditorRepository.setTitle(it) },
+                            placeholder = stringResource(Res.string.collections_editor_placeholder_name),
+                        )
+                        CollectionEditorTextField(
+                            value = state.backdropImageUrl,
+                            onValueChange = { CollectionEditorRepository.setBackdropImageUrl(it) },
+                            placeholder = stringResource(Res.string.collections_editor_placeholder_backdrop),
+                        )
+                    }
+                }
+            }
 
+            item {
+                NuvioSurfaceCard {
+                    FolderEditorToggleRow(
+                        title = stringResource(Res.string.collections_editor_pin_above),
+                        subtitle = stringResource(Res.string.collections_editor_pin_above_desc),
+                        checked = state.pinToTop,
+                        onCheckedChange = { CollectionEditorRepository.setPinToTop(it) },
+                    )
+                }
+            }
 
             // View Mode
-        item {
+            item {
                 NuvioSurfaceCard {
                     Text(
                         text = stringResource(Res.string.collections_editor_view_mode),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(NuvioTokens.Space.s10))
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
                     ) {
                         FolderViewMode.entries
                             .filter { it != FolderViewMode.FOLLOW_LAYOUT }
                             .forEach { mode ->
-                            FilterChip(
-                                selected = state.viewMode == mode,
-                                onClick = { CollectionEditorRepository.setViewMode(mode) },
-                                label = {
-                                    Text(
-                                        when (mode) {
-                                            FolderViewMode.TABBED_GRID -> stringResource(Res.string.collections_editor_view_mode_tabs)
-                                            FolderViewMode.ROWS -> stringResource(Res.string.collections_editor_view_mode_rows)
-                                            FolderViewMode.FOLLOW_LAYOUT -> stringResource(Res.string.collections_editor_view_mode_rows)
-                                        }
-                                    )
-                                },
-                                leadingIcon = if (state.viewMode == mode) {
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
-                                } else null,
-                            )
-                        }
+                                CollectionOptionChip(
+                                    label = when (mode) {
+                                        FolderViewMode.TABBED_GRID -> stringResource(Res.string.collections_editor_view_mode_tabs)
+                                        FolderViewMode.ROWS -> stringResource(Res.string.collections_editor_view_mode_rows)
+                                        FolderViewMode.FOLLOW_LAYOUT -> stringResource(Res.string.collections_editor_view_mode_rows)
+                                    },
+                                    selected = state.viewMode == mode,
+                                    showCheckIcon = true,
+                                    onClick = { CollectionEditorRepository.setViewMode(mode) },
+                                )
+                            }
                     }
                 }
             }
 
             // Show All Tab
-        item {
+            item {
                 NuvioSurfaceCard {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { CollectionEditorRepository.setShowAllTab(!state.showAllTab) },
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                            Text(
-                                text = stringResource(Res.string.collections_editor_show_all_tab),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = stringResource(Res.string.collections_editor_show_all_tab_desc),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
-                            checked = state.showAllTab,
-                            onCheckedChange = { CollectionEditorRepository.setShowAllTab(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
-                            ),
-                        )
-                    }
+                    FolderEditorToggleRow(
+                        title = stringResource(Res.string.collections_editor_show_all_tab),
+                        subtitle = stringResource(Res.string.collections_editor_show_all_tab_desc),
+                        checked = state.showAllTab,
+                        onCheckedChange = { CollectionEditorRepository.setShowAllTab(it) },
+                    )
                 }
             }
 
             // Folders Section Header
-        item {
+            item {
                 val newFolderTitle = stringResource(Res.string.collections_editor_new_folder)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -398,91 +361,76 @@ fun CollectionEditorScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     NuvioSectionLabel(text = stringResource(Res.string.collections_editor_folders))
-                    TextButton(
+                    CollectionActionPill(
+                        icon = Icons.Rounded.Add,
+                        label = stringResource(Res.string.collections_editor_add_folder),
+                        tint = tokens.colors.textPrimary,
+                        borderColor = tokens.colors.borderDefault,
                         onClick = {
                             CollectionEditorRepository.addFolder(newFolderTitle)
                             onNavigateToPage?.invoke(CollectionEditorPage.FolderEditor, newFolderTitle)
                         },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(Res.string.collections_editor_add_folder))
-                    }
+                    )
                 }
             }
 
             // Folder Items
-        if (state.folders.isNotEmpty()) {
-            item {
-                val editFolderTitle = stringResource(Res.string.collections_editor_edit_folder)
-                FolderReorderableList(
-                    folders = state.folders,
-                    onEdit = {
-                        CollectionEditorRepository.editFolder(it)
-                        onNavigateToPage?.invoke(CollectionEditorPage.FolderEditor, editFolderTitle)
-                    },
-                    onDelete = { CollectionEditorRepository.removeFolder(it) },
-                )
-            }
-        }
-
-        if (state.folders.isEmpty()) {
-            item {
-                NuvioSurfaceCard(
-                    modifier = Modifier.padding(top = 8.dp),
-                ) {
-                    Text(
-                        text = stringResource(Res.string.collections_editor_folder_empty_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(Res.string.collections_editor_folder_empty_subtitle),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (state.folders.isNotEmpty()) {
+                item {
+                    val editFolderTitle = stringResource(Res.string.collections_editor_edit_folder)
+                    FolderReorderableList(
+                        folders = state.folders,
+                        onEdit = {
+                            CollectionEditorRepository.editFolder(it)
+                            onNavigateToPage?.invoke(CollectionEditorPage.FolderEditor, editFolderTitle)
+                        },
+                        onDelete = { CollectionEditorRepository.removeFolder(it) },
                     )
                 }
             }
-        }
+
+            if (state.folders.isEmpty()) {
+                item {
+                    NuvioSurfaceCard(
+                        modifier = Modifier.padding(top = 8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.collections_editor_folder_empty_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = tokens.colors.textPrimary,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(Res.string.collections_editor_folder_empty_subtitle),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = tokens.colors.textSecondary,
+                        )
+                    }
+                }
+            }
 
             item {
                 Spacer(modifier = Modifier.height(96.dp + bottomInset))
             }
         }
 
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            color = MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
-            tonalElevation = 6.dp,
-            shadowElevation = 10.dp,
+        CollectionStickyBottomBar(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            bottomInset = bottomInset,
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .padding(bottom = bottomInset),
-            ) {
-                NuvioPrimaryButton(
-                    text = if (state.isNew) {
-                        stringResource(Res.string.collections_editor_create_collection)
-                    } else {
-                        stringResource(Res.string.collections_editor_save_changes)
-                    },
-                    enabled = state.title.isNotBlank(),
-                    onClick = {
-                        if (CollectionEditorRepository.save()) {
-                            onBack()
-                        }
-                    },
-                )
-            }
+            CollectionAccentGradientButton(
+                text = if (state.isNew) {
+                    stringResource(Res.string.collections_editor_create_collection)
+                } else {
+                    stringResource(Res.string.collections_editor_save_changes)
+                },
+                enabled = state.title.isNotBlank(),
+                onClick = {
+                    if (CollectionEditorRepository.save()) {
+                        onBack()
+                    }
+                },
+            )
         }
     }
 }
@@ -507,24 +455,19 @@ private fun FolderReorderableList(
             .fillMaxWidth()
             .heightIn(max = 720.dp),
         state = lazyListState,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
     ) {
         itemsIndexed(folders, key = { _, folder -> folder.id }) { _, folder ->
             ReorderableItem(reorderableLazyListState, key = folder.id) { isDragging ->
-                val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
-
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = MaterialTheme.shapes.extraLarge,
+                val elevation by animateDpAsState(if (isDragging) 6.dp else 0.dp)
+                FolderListItem(
+                    folder = folder,
+                    isDragging = isDragging,
                     shadowElevation = elevation,
-                ) {
-                    FolderListItem(
-                        folder = folder,
-                        onEdit = { onEdit(folder.id) },
-                        onDelete = { onDelete(folder.id) },
-                        dragHandleScope = this@ReorderableItem,
-                    )
-                }
+                    onEdit = { onEdit(folder.id) },
+                    onDelete = { onDelete(folder.id) },
+                    dragHandleScope = this@ReorderableItem,
+                )
             }
         }
     }
@@ -533,91 +476,141 @@ private fun FolderReorderableList(
 @Composable
 private fun FolderListItem(
     folder: CollectionFolder,
+    isDragging: Boolean,
+    shadowElevation: Dp,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     dragHandleScope: ReorderableCollectionItemScope,
 ) {
+    val tokens = MaterialTheme.nuvio
     val hapticFeedback = LocalHapticFeedback.current
+    val cardShape = RoundedCornerShape(16.dp)
+    val cardInteraction = remember { MutableInteractionSource() }
+    val isHovered by cardInteraction.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isDragging -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "folder_card_border",
+    )
 
-    NuvioSurfaceCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (isDesktop) Modifier.hoverable(cardInteraction) else Modifier),
+        shape = cardShape,
+        color = if (isDragging) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
+        border = BorderStroke(NuvioTokens.Border.thin, borderColor),
+        shadowElevation = shadowElevation,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(tokens.spacing.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
         ) {
-            // Folder cover preview
-            if (folder.coverEmoji != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (folder.coverEmoji != null) {
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = tokens.colors.focusBackground,
+                        border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderDefault),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = folder.coverEmoji, style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    val summary = stringResource(
+                        Res.string.collections_editor_source_count,
+                        folder.resolvedSources.size,
+                        posterShapeLabel(folder.posterShape),
+                    )
+                    Text(
+                        text = folder.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = tokens.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = tokens.colors.textSecondary,
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val dragInteraction = remember { MutableInteractionSource() }
+                val isDragHovered by dragInteraction.collectIsHoveredAsState()
                 Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    modifier = with(dragHandleScope) {
+                        Modifier
+                            .draggableHandle(
+                                onDragStarted = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDragStopped = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                },
+                            )
+                            .then(
+                                if (isDesktop) {
+                                    Modifier
+                                        .hoverable(dragInteraction)
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                } else {
+                                    Modifier
+                                },
+                            )
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isDesktop && isDragHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+                    border = BorderStroke(
+                        width = NuvioTokens.Border.thin,
+                        color = if (isDesktop && isDragHovered) tokens.colors.borderStrong else tokens.colors.borderDefault,
+                    ),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(text = folder.coverEmoji, style = MaterialTheme.typography.titleLarge)
+                    Box(
+                        modifier = Modifier.padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s6),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Menu,
+                            contentDescription = stringResource(Res.string.action_reorder),
+                            modifier = Modifier.size(18.dp),
+                            tint = if (isDesktop && isDragHovered) tokens.colors.textPrimary else tokens.colors.textMuted,
+                        )
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                val summary = stringResource(
-                    Res.string.collections_editor_source_count,
-                    folder.resolvedSources.size,
-                    posterShapeLabel(folder.posterShape),
+                Spacer(modifier = Modifier.weight(1f))
+                CollectionActionPill(
+                    icon = Icons.Rounded.Edit,
+                    label = stringResource(Res.string.action_edit),
+                    tint = tokens.colors.textPrimary,
+                    borderColor = tokens.colors.borderDefault,
+                    onClick = onEdit,
                 )
-                Text(
-                    text = folder.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                modifier = with(dragHandleScope) {
-                    Modifier.draggableHandle(
-                        onDragStarted = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        },
-                        onDragStopped = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        },
-                    ).size(36.dp)
-                },
-                onClick = {},
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Menu,
-                    contentDescription = stringResource(Res.string.action_reorder),
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    imageVector = Icons.Rounded.Edit,
-                    contentDescription = stringResource(Res.string.action_edit),
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    imageVector = Icons.Rounded.Delete,
+                CollectionActionPill(
+                    icon = Icons.Rounded.Delete,
+                    label = null,
                     contentDescription = stringResource(Res.string.action_delete),
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = tokens.colors.danger,
+                    borderColor = tokens.colors.danger.copy(alpha = 0.40f),
+                    onClick = onDelete,
                 )
             }
         }
@@ -632,6 +625,7 @@ private fun FolderEditorPage(
     onNavigateToPage: ((page: CollectionEditorPage, title: String) -> Unit)?,
     onSave: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val folder = state.editingFolder ?: return
     val bottomInset = nuvioSafeBottomPadding()
     val catalogPickerTitle = stringResource(Res.string.collections_editor_select_catalogs)
@@ -646,14 +640,22 @@ private fun FolderEditorPage(
     Box(modifier = Modifier.fillMaxSize()) {
         NuvioScreen(modifier = Modifier.fillMaxSize()) {
             stickyHeader {
-                NuvioScreenHeader(
-                    title = if (state.folders.any { it.id == folder.id }) {
-                        stringResource(Res.string.collections_editor_edit_folder)
-                    } else {
-                        stringResource(Res.string.collections_editor_new_folder)
-                    },
-                    onBack = onBack,
-                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    NuvioScreenHeader(
+                        title = if (state.folders.any { it.id == folder.id }) {
+                            stringResource(Res.string.collections_editor_edit_folder)
+                        } else {
+                            stringResource(Res.string.collections_editor_new_folder)
+                        },
+                        onBack = onBack,
+                    )
+                    if (isDesktop) {
+                        HorizontalDivider(
+                            thickness = NuvioTokens.Border.thin,
+                            color = tokens.colors.borderSubtle,
+                        )
+                    }
+                }
             }
 
             item {
@@ -661,7 +663,7 @@ private fun FolderEditorPage(
                     Text(
                         text = stringResource(Res.string.collections_editor_folder_editor_help),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
             }
@@ -669,7 +671,7 @@ private fun FolderEditorPage(
             item {
                 FolderEditorSection(title = stringResource(Res.string.collections_editor_section_basics)) {
                     NuvioSurfaceCard {
-                        NuvioInputField(
+                        CollectionEditorTextField(
                             value = folder.title,
                             onValueChange = { CollectionEditorRepository.updateFolderTitle(it) },
                             placeholder = stringResource(Res.string.collections_editor_placeholder_folder),
@@ -687,56 +689,56 @@ private fun FolderEditorPage(
                                     text = stringResource(Res.string.collections_editor_cover),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = tokens.colors.textPrimary,
                                 )
                                 FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    FilterChip(
+                                    CollectionOptionChip(
+                                        label = stringResource(Res.string.collections_editor_cover_none),
                                         selected = folder.coverEmoji == null && folder.coverImageUrl == null,
                                         onClick = { CollectionEditorRepository.clearFolderCover() },
-                                        label = { Text(stringResource(Res.string.collections_editor_cover_none)) },
                                     )
-                                    FilterChip(
+                                    CollectionOptionChip(
+                                        label = stringResource(Res.string.collections_editor_cover_emoji),
                                         selected = folder.coverEmoji != null,
                                         onClick = {
                                             if (folder.coverEmoji == null) {
                                                 CollectionEditorRepository.updateFolderCoverEmoji("📁")
                                             }
                                         },
-                                        label = { Text(stringResource(Res.string.collections_editor_cover_emoji)) },
                                     )
-                                    FilterChip(
+                                    CollectionOptionChip(
+                                        label = stringResource(Res.string.collections_editor_cover_image_url),
                                         selected = folder.coverImageUrl != null,
                                         onClick = {
                                             if (folder.coverImageUrl == null) {
                                                 CollectionEditorRepository.updateFolderCoverImage("")
                                             }
                                         },
-                                        label = { Text(stringResource(Res.string.collections_editor_cover_image_url)) },
                                     )
                                 }
                             }
 
                             if (folder.coverEmoji != null) {
-                                NuvioInputField(
+                                CollectionEditorTextField(
                                     value = folder.coverEmoji,
                                     onValueChange = { CollectionEditorRepository.updateFolderCoverEmoji(it) },
                                     placeholder = stringResource(Res.string.collections_editor_cover_emoji),
-                                    modifier = Modifier.width(100.dp),
+                                    modifier = Modifier.width(120.dp),
                                 )
                             }
 
                             if (folder.coverImageUrl != null) {
-                                NuvioInputField(
+                                CollectionEditorTextField(
                                     value = folder.coverImageUrl,
                                     onValueChange = { CollectionEditorRepository.updateFolderCoverImage(it) },
                                     placeholder = stringResource(Res.string.collections_editor_cover_image_url),
                                 )
                             }
 
-                            NuvioInputField(
+                            CollectionEditorTextField(
                                 value = folder.focusGifUrl.orEmpty(),
                                 onValueChange = { CollectionEditorRepository.updateFolderFocusGifUrl(it) },
                                 placeholder = stringResource(Res.string.collections_editor_placeholder_gif),
@@ -751,26 +753,18 @@ private fun FolderEditorPage(
                                     text = stringResource(Res.string.collections_editor_tile_shape),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = tokens.colors.textPrimary,
                                 )
                                 FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     PosterShape.entries.forEach { shape ->
-                                        FilterChip(
+                                        CollectionOptionChip(
+                                            label = posterShapeLabel(shape),
                                             selected = folder.posterShape == shape,
+                                            showCheckIcon = true,
                                             onClick = { CollectionEditorRepository.updateFolderTileShape(shape) },
-                                            label = { Text(posterShapeLabel(shape)) },
-                                            leadingIcon = if (folder.posterShape == shape) {
-                                                {
-                                                    Icon(
-                                                        imageVector = Icons.Rounded.Check,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(18.dp),
-                                                    )
-                                                }
-                                            } else null,
                                         )
                                     }
                                 }
@@ -799,10 +793,14 @@ private fun FolderEditorPage(
                     title = stringResource(Res.string.collections_editor_section_catalog_sources),
                     actions = {
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+                            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
                         ) {
-                            TextButton(
+                            CollectionActionPill(
+                                icon = Icons.Rounded.Add,
+                                label = stringResource(Res.string.source_tmdb),
+                                tint = tokens.colors.textPrimary,
+                                borderColor = tokens.colors.borderDefault,
                                 onClick = {
                                     CollectionEditorRepository.showTmdbSourcePicker()
                                     onNavigateToPage?.invoke(
@@ -810,16 +808,12 @@ private fun FolderEditorPage(
                                         tmdbSourcePickerTitle,
                                     )
                                 },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(stringResource(Res.string.source_tmdb))
-                            }
-                            TextButton(
+                            )
+                            CollectionActionPill(
+                                icon = Icons.Rounded.Add,
+                                label = stringResource(Res.string.collections_editor_add_trakt_source),
+                                tint = tokens.colors.textPrimary,
+                                borderColor = tokens.colors.borderDefault,
                                 onClick = {
                                     CollectionEditorRepository.showTraktSourcePicker()
                                     onNavigateToPage?.invoke(
@@ -827,16 +821,12 @@ private fun FolderEditorPage(
                                         traktSourcePickerTitle,
                                     )
                                 },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(stringResource(Res.string.collections_editor_add_trakt_source))
-                            }
-                            TextButton(
+                            )
+                            CollectionActionPill(
+                                icon = Icons.Rounded.Add,
+                                label = stringResource(Res.string.collections_editor_add_catalog),
+                                tint = tokens.colors.textPrimary,
+                                borderColor = tokens.colors.borderDefault,
                                 onClick = {
                                     CollectionEditorRepository.showCatalogPicker()
                                     onNavigateToPage?.invoke(
@@ -844,15 +834,7 @@ private fun FolderEditorPage(
                                         catalogPickerTitle,
                                     )
                                 },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(stringResource(Res.string.collections_editor_add_catalog))
-                            }
+                            )
                         }
                     },
                 ) {
@@ -864,12 +846,12 @@ private fun FolderEditorPage(
                                     text = stringResource(Res.string.collections_editor_catalog_sources_empty_title),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = tokens.colors.textPrimary,
                                 )
                                 Text(
                                     text = stringResource(Res.string.collections_editor_catalog_sources_empty_subtitle),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = tokens.colors.textSecondary,
                                 )
                             }
                         }
@@ -913,26 +895,15 @@ private fun FolderEditorPage(
             }
         }
 
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            color = MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
-            tonalElevation = 6.dp,
-            shadowElevation = 10.dp,
+        CollectionStickyBottomBar(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            bottomInset = bottomInset,
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .padding(bottom = bottomInset),
-            ) {
-                NuvioPrimaryButton(
-                    text = stringResource(Res.string.collections_editor_save),
-                    enabled = folder.title.isNotBlank(),
-                    onClick = onSave,
-                )
-            }
+            CollectionAccentGradientButton(
+                text = stringResource(Res.string.collections_editor_save),
+                enabled = folder.title.isNotBlank(),
+                onClick = onSave,
+            )
         }
     }
 }
@@ -944,16 +915,25 @@ private fun CatalogPickerScreen(
     onToggle: (AvailableCatalog) -> Unit,
     onBack: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     PlatformBackHandler(enabled = true) {
         onBack()
     }
 
     NuvioScreen(modifier = Modifier.fillMaxSize()) {
         stickyHeader {
-            NuvioScreenHeader(
-                title = stringResource(Res.string.collections_editor_select_catalogs),
-                onBack = onBack,
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                NuvioScreenHeader(
+                    title = stringResource(Res.string.collections_editor_select_catalogs),
+                    onBack = onBack,
+                )
+                if (isDesktop) {
+                    HorizontalDivider(
+                        thickness = NuvioTokens.Border.thin,
+                        color = tokens.colors.borderSubtle,
+                    )
+                }
+            }
         }
 
         item {
@@ -962,13 +942,13 @@ private fun CatalogPickerScreen(
                     Text(
                         text = stringResource(Res.string.collections_editor_select_catalogs_description),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                     Text(
                         text = stringResource(Res.string.collections_editor_selected_count, selectedSources.size),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = tokens.colors.accent,
                     )
                 }
             }
@@ -1007,7 +987,7 @@ private fun CatalogPickerScreen(
                             onClick = { onToggle(catalog) },
                         )
                         if (index != catalogs.lastIndex) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                            Spacer(modifier = Modifier.height(NuvioTokens.Space.s4))
                         }
                     }
                 }
@@ -1026,6 +1006,7 @@ private fun TmdbSourcePickerScreen(
     state: CollectionEditorUiState,
     onBack: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val bottomInset = nuvioSafeBottomPadding()
     val sourceType = when (state.tmdbBuilderMode) {
         TmdbBuilderMode.PRESETS -> TmdbCollectionSourceType.DISCOVER
@@ -1056,10 +1037,18 @@ private fun TmdbSourcePickerScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         NuvioScreen(modifier = Modifier.fillMaxSize()) {
             stickyHeader {
-                NuvioScreenHeader(
-                    title = stringResource(Res.string.collections_editor_tmdb_sources),
-                    onBack = onBack,
-                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    NuvioScreenHeader(
+                        title = stringResource(Res.string.collections_editor_tmdb_sources),
+                        onBack = onBack,
+                    )
+                    if (isDesktop) {
+                        HorizontalDivider(
+                            thickness = NuvioTokens.Border.thin,
+                            color = tokens.colors.borderSubtle,
+                        )
+                    }
+                }
             }
 
             item {
@@ -1068,19 +1057,11 @@ private fun TmdbSourcePickerScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     TmdbBuilderMode.entries.forEach { mode ->
-                        FilterChip(
+                        CollectionOptionChip(
+                            label = tmdbBuilderModeLabel(mode),
                             selected = state.tmdbBuilderMode == mode,
+                            showCheckIcon = true,
                             onClick = { CollectionEditorRepository.setTmdbBuilderMode(mode) },
-                            label = { Text(tmdbBuilderModeLabel(mode)) },
-                            leadingIcon = if (state.tmdbBuilderMode == mode) {
-                                {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                }
-                            } else null,
                         )
                     }
                 }
@@ -1091,7 +1072,7 @@ private fun TmdbSourcePickerScreen(
                     Text(
                         text = tmdbModeHelpText(state.tmdbBuilderMode),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
             }
@@ -1119,7 +1100,7 @@ private fun TmdbSourcePickerScreen(
                             Text(
                                 text = state.tmdbSearchError,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
+                                color = tokens.colors.danger,
                             )
                         }
                     }
@@ -1190,32 +1171,32 @@ private fun TmdbSourcePickerScreen(
                     PickerPanel(
                         title = stringResource(Res.string.collections_editor_tmdb_type),
                     ) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                FilterChip(
-                                    selected = state.tmdbMediaType == TmdbCollectionMediaType.MOVIE && !state.tmdbMediaBoth,
-                                    onClick = {
-                                        CollectionEditorRepository.setTmdbMediaBoth(false)
-                                        CollectionEditorRepository.setTmdbMediaType(TmdbCollectionMediaType.MOVIE)
-                                    },
-                                    label = { Text(stringResource(Res.string.collections_editor_tmdb_movies)) },
-                                )
-                                FilterChip(
-                                    selected = state.tmdbMediaType == TmdbCollectionMediaType.TV && !state.tmdbMediaBoth,
-                                    onClick = {
-                                        CollectionEditorRepository.setTmdbMediaBoth(false)
-                                        CollectionEditorRepository.setTmdbMediaType(TmdbCollectionMediaType.TV)
-                                    },
-                                    label = { Text(stringResource(Res.string.collections_editor_tmdb_series)) },
-                                )
-                                FilterChip(
-                                    selected = state.tmdbMediaBoth,
-                                    onClick = { CollectionEditorRepository.setTmdbMediaBoth(true) },
-                                    label = { Text(stringResource(Res.string.collections_editor_tmdb_both)) },
-                                )
-                            }
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            CollectionOptionChip(
+                                label = stringResource(Res.string.collections_editor_tmdb_movies),
+                                selected = state.tmdbMediaType == TmdbCollectionMediaType.MOVIE && !state.tmdbMediaBoth,
+                                onClick = {
+                                    CollectionEditorRepository.setTmdbMediaBoth(false)
+                                    CollectionEditorRepository.setTmdbMediaType(TmdbCollectionMediaType.MOVIE)
+                                },
+                            )
+                            CollectionOptionChip(
+                                label = stringResource(Res.string.collections_editor_tmdb_series),
+                                selected = state.tmdbMediaType == TmdbCollectionMediaType.TV && !state.tmdbMediaBoth,
+                                onClick = {
+                                    CollectionEditorRepository.setTmdbMediaBoth(false)
+                                    CollectionEditorRepository.setTmdbMediaType(TmdbCollectionMediaType.TV)
+                                },
+                            )
+                            CollectionOptionChip(
+                                label = stringResource(Res.string.collections_editor_tmdb_both),
+                                selected = state.tmdbMediaBoth,
+                                onClick = { CollectionEditorRepository.setTmdbMediaBoth(true) },
+                            )
+                        }
                     }
                 }
             }
@@ -1225,28 +1206,28 @@ private fun TmdbSourcePickerScreen(
                     PickerPanel(
                         title = stringResource(Res.string.collections_editor_tmdb_sort),
                     ) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                val sorts = listOf(
-                                    TmdbCollectionSort.POPULAR_DESC,
-                                    TmdbCollectionSort.VOTE_AVERAGE_DESC,
-                                    TmdbCollectionSort.VOTE_COUNT_DESC,
-                                    if (state.tmdbMediaType == TmdbCollectionMediaType.TV && !state.tmdbMediaBoth) {
-                                        TmdbCollectionSort.FIRST_AIR_DATE_DESC
-                                    } else {
-                                        TmdbCollectionSort.RELEASE_DATE_DESC
-                                    },
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            val sorts = listOf(
+                                TmdbCollectionSort.POPULAR_DESC,
+                                TmdbCollectionSort.VOTE_AVERAGE_DESC,
+                                TmdbCollectionSort.VOTE_COUNT_DESC,
+                                if (state.tmdbMediaType == TmdbCollectionMediaType.TV && !state.tmdbMediaBoth) {
+                                    TmdbCollectionSort.FIRST_AIR_DATE_DESC
+                                } else {
+                                    TmdbCollectionSort.RELEASE_DATE_DESC
+                                },
+                            )
+                            sorts.forEach { sort ->
+                                CollectionOptionChip(
+                                    label = tmdbSortLabel(sort),
+                                    selected = state.tmdbSortBy == sort.value,
+                                    onClick = { CollectionEditorRepository.setTmdbSortBy(sort.value) },
                                 )
-                                sorts.forEach { sort ->
-                                    FilterChip(
-                                        selected = state.tmdbSortBy == sort.value,
-                                        onClick = { CollectionEditorRepository.setTmdbSortBy(sort.value) },
-                                        label = { Text(tmdbSortLabel(sort)) },
-                                    )
-                                }
                             }
+                        }
                     }
                 }
             }
@@ -1587,22 +1568,17 @@ private fun TmdbSourcePickerScreen(
         }
 
         if (state.tmdbBuilderMode != TmdbBuilderMode.PRESETS) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth(),
-                color = MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
-                tonalElevation = 6.dp,
-                shadowElevation = 10.dp,
+            CollectionStickyBottomBar(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                bottomInset = bottomInset,
             ) {
-                PickerActionBar(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .padding(bottom = bottomInset),
-                ) {
+                PickerActionBar(modifier = Modifier.fillMaxWidth()) {
                     if (sourceType == TmdbCollectionSourceType.COMPANY || sourceType == TmdbCollectionSourceType.COLLECTION) {
-                        TextButton(
+                        CollectionActionPill(
+                            icon = Icons.Rounded.Search,
+                            label = stringResource(Res.string.collections_editor_tmdb_search),
+                            tint = tokens.colors.textPrimary,
+                            borderColor = tokens.colors.borderDefault,
                             onClick = {
                                 if (sourceType == TmdbCollectionSourceType.COMPANY) {
                                     CollectionEditorRepository.searchTmdbCompanies()
@@ -1610,17 +1586,9 @@ private fun TmdbSourcePickerScreen(
                                     CollectionEditorRepository.searchTmdbCollections()
                                 }
                             },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Search,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(Res.string.collections_editor_tmdb_search))
-                        }
+                        )
                     }
-                    NuvioPrimaryButton(
+                    CollectionAccentGradientButton(
                         text = stringResource(Res.string.collections_editor_add_source),
                         modifier = Modifier.weight(1f),
                         enabled = !requiresId || state.tmdbInput.isNotBlank(),
@@ -1638,6 +1606,7 @@ private fun TraktSourcePickerScreen(
     state: CollectionEditorUiState,
     onBack: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val bottomInset = nuvioSafeBottomPadding()
     val searchResultsTitle = stringResource(Res.string.collections_editor_trakt_search_results)
     val trendingTitle = stringResource(Res.string.collections_editor_trakt_trending)
@@ -1650,14 +1619,22 @@ private fun TraktSourcePickerScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         NuvioScreen(modifier = Modifier.fillMaxSize()) {
             stickyHeader {
-                NuvioScreenHeader(
-                    title = if (state.editingTraktSourceIndex != null) {
-                        stringResource(Res.string.collections_editor_edit_trakt_source)
-                    } else {
-                        stringResource(Res.string.collections_editor_trakt_sources)
-                    },
-                    onBack = onBack,
-                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    NuvioScreenHeader(
+                        title = if (state.editingTraktSourceIndex != null) {
+                            stringResource(Res.string.collections_editor_edit_trakt_source)
+                        } else {
+                            stringResource(Res.string.collections_editor_trakt_sources)
+                        },
+                        onBack = onBack,
+                    )
+                    if (isDesktop) {
+                        HorizontalDivider(
+                            thickness = NuvioTokens.Border.thin,
+                            color = tokens.colors.borderSubtle,
+                        )
+                    }
+                }
             }
 
             item {
@@ -1681,7 +1658,7 @@ private fun TraktSourcePickerScreen(
                             Text(
                                 text = state.traktSearchError,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
+                                color = tokens.colors.danger,
                             )
                         }
                     }
@@ -1694,26 +1671,26 @@ private fun TraktSourcePickerScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        FilterChip(
+                        CollectionOptionChip(
+                            label = stringResource(Res.string.collections_editor_tmdb_movies),
                             selected = state.traktMediaType == TmdbCollectionMediaType.MOVIE && !state.traktMediaBoth,
                             onClick = {
                                 CollectionEditorRepository.setTraktMediaBoth(false)
                                 CollectionEditorRepository.setTraktMediaType(TmdbCollectionMediaType.MOVIE)
                             },
-                            label = { Text(stringResource(Res.string.collections_editor_tmdb_movies)) },
                         )
-                        FilterChip(
+                        CollectionOptionChip(
+                            label = stringResource(Res.string.collections_editor_tmdb_series),
                             selected = state.traktMediaType == TmdbCollectionMediaType.TV && !state.traktMediaBoth,
                             onClick = {
                                 CollectionEditorRepository.setTraktMediaBoth(false)
                                 CollectionEditorRepository.setTraktMediaType(TmdbCollectionMediaType.TV)
                             },
-                            label = { Text(stringResource(Res.string.collections_editor_tmdb_series)) },
                         )
-                        FilterChip(
+                        CollectionOptionChip(
+                            label = stringResource(Res.string.collections_editor_tmdb_both),
                             selected = state.traktMediaBoth,
                             onClick = { CollectionEditorRepository.setTraktMediaBoth(true) },
-                            label = { Text(stringResource(Res.string.collections_editor_tmdb_both)) },
                         )
                     }
                 }
@@ -1726,10 +1703,10 @@ private fun TraktSourcePickerScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         traktSortOptions().forEach { (value, label) ->
-                            FilterChip(
+                            CollectionOptionChip(
+                                label = label,
                                 selected = state.traktSortBy == value,
                                 onClick = { CollectionEditorRepository.setTraktSortBy(value) },
-                                label = { Text(label) },
                             )
                         }
                     }
@@ -1739,21 +1716,21 @@ private fun TraktSourcePickerScreen(
                             text = stringResource(Res.string.collections_editor_trakt_direction),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = tokens.colors.textSecondary,
                         )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            FilterChip(
+                            CollectionOptionChip(
+                                label = stringResource(Res.string.collections_editor_trakt_ascending),
                                 selected = state.traktSortHow == TraktSortHow.ASC.value,
                                 onClick = { CollectionEditorRepository.setTraktSortHow(TraktSortHow.ASC.value) },
-                                label = { Text(stringResource(Res.string.collections_editor_trakt_ascending)) },
                             )
-                            FilterChip(
+                            CollectionOptionChip(
+                                label = stringResource(Res.string.collections_editor_trakt_descending),
                                 selected = state.traktSortHow == TraktSortHow.DESC.value,
                                 onClick = { CollectionEditorRepository.setTraktSortHow(TraktSortHow.DESC.value) },
-                                label = { Text(stringResource(Res.string.collections_editor_trakt_descending)) },
                             )
                         }
                     }
@@ -1778,30 +1755,19 @@ private fun TraktSourcePickerScreen(
             }
         }
 
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            color = MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
-            tonalElevation = 6.dp,
-            shadowElevation = 10.dp,
+        CollectionStickyBottomBar(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            bottomInset = bottomInset,
         ) {
-            PickerActionBar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .padding(bottom = bottomInset),
-            ) {
-                TextButton(onClick = { CollectionEditorRepository.searchTraktLists() }) {
-                    Icon(
-                        imageVector = Icons.Rounded.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(stringResource(Res.string.collections_editor_tmdb_search))
-                }
-                NuvioPrimaryButton(
+            PickerActionBar(modifier = Modifier.fillMaxWidth()) {
+                CollectionActionPill(
+                    icon = Icons.Rounded.Search,
+                    label = stringResource(Res.string.collections_editor_tmdb_search),
+                    tint = tokens.colors.textPrimary,
+                    borderColor = tokens.colors.borderDefault,
+                    onClick = { CollectionEditorRepository.searchTraktLists() },
+                )
+                CollectionAccentGradientButton(
                     text = if (state.editingTraktSourceIndex != null) {
                         stringResource(Res.string.collections_editor_save)
                     } else {
@@ -1840,6 +1806,7 @@ private fun PickerPanel(
     subtitle: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     NuvioSurfaceCard {
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1849,13 +1816,13 @@ private fun PickerPanel(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
             }
@@ -1871,18 +1838,40 @@ private fun PickerOptionRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val rowShape = RoundedCornerShape(12.dp)
-    val bgColor = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val bgColor = when {
+        selected -> tokens.colors.focusBackground
+        isDesktop && isHovered -> tokens.colors.surfaceCard
+        else -> tokens.colors.surfaceElevated
+    }
+    val borderColor = when {
+        selected -> tokens.colors.accent
+        isDesktop && isHovered -> tokens.colors.borderStrong
+        else -> tokens.colors.borderSubtle
     }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(rowShape)
             .background(bgColor)
-            .clickable(onClick = onClick)
+            .border(NuvioTokens.Border.thin, borderColor, rowShape)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -1895,7 +1884,7 @@ private fun PickerOptionRow(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = tokens.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1903,7 +1892,7 @@ private fun PickerOptionRow(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1913,7 +1902,7 @@ private fun PickerOptionRow(
             Icon(
                 imageVector = Icons.Rounded.Check,
                 contentDescription = stringResource(Res.string.cd_selected),
-                tint = MaterialTheme.colorScheme.primary,
+                tint = tokens.colors.accent,
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -1949,14 +1938,15 @@ private fun TmdbLabeledField(
     placeholder: String,
     helper: String,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
         )
-        NuvioInputField(
+        CollectionEditorTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = placeholder,
@@ -1965,7 +1955,7 @@ private fun TmdbLabeledField(
             Text(
                 text = helper,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
             )
         }
     }
@@ -1994,22 +1984,23 @@ private fun TmdbQuickChips(
     chips: List<Pair<String, String>>,
     onSelect: (String) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textSecondary,
         )
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             chips.forEach { (chipLabel, value) ->
-                FilterChip(
+                CollectionOptionChip(
+                    label = chipLabel,
                     selected = false,
                     onClick = { onSelect(value) },
-                    label = { Text(chipLabel) },
                 )
             }
         }
@@ -2069,12 +2060,13 @@ private fun GenrePickerSheet(
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     NuvioModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = tokens.colors.surfaceSheet,
     ) {
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
@@ -2086,12 +2078,12 @@ private fun GenrePickerSheet(
                         text = stringResource(Res.string.collections_editor_genre_filter),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                     )
                     Text(
                         text = title,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
             }
@@ -2140,7 +2132,6 @@ private fun FolderEditorSection(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FolderEditorToggleRow(
     title: String,
@@ -2148,9 +2139,11 @@ private fun FolderEditorToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
             .clickable { onCheckedChange(!checked) },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -2165,22 +2158,23 @@ private fun FolderEditorToggleRow(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = tokens.colors.textPrimary,
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textSecondary,
             )
         }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
+                checkedThumbColor = tokens.colors.onAccent,
+                checkedTrackColor = tokens.colors.accent,
+                uncheckedThumbColor = tokens.colors.textMuted,
+                uncheckedTrackColor = tokens.colors.surfaceElevated,
+                uncheckedBorderColor = tokens.colors.borderDefault,
             ),
         )
     }
@@ -2191,6 +2185,7 @@ private fun FolderTmdbSourceCard(
     source: CollectionSource,
     onRemove: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     NuvioSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2199,33 +2194,30 @@ private fun FolderTmdbSourceCard(
                         text = source.title?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.source_tmdb),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = stringResource(Res.string.source_tmdb),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
-                IconButton(
+                CollectionActionPill(
+                    icon = Icons.Rounded.Close,
+                    label = null,
+                    contentDescription = stringResource(Res.string.action_remove),
+                    tint = tokens.colors.danger,
+                    borderColor = tokens.colors.danger.copy(alpha = 0.40f),
                     onClick = onRemove,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = stringResource(Res.string.action_remove),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                }
+                )
             }
 
             Text(
                 text = tmdbSourceSubtitle(source),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
             )
         }
     }
@@ -2237,58 +2229,54 @@ private fun FolderTraktSourceCard(
     onEdit: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     NuvioSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+            ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = source.title?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.source_trakt),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = stringResource(Res.string.source_trakt),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
-                IconButton(
+                CollectionActionPill(
+                    icon = Icons.Rounded.Edit,
+                    label = stringResource(Res.string.action_edit),
+                    tint = tokens.colors.textPrimary,
+                    borderColor = tokens.colors.borderDefault,
                     onClick = onEdit,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = stringResource(Res.string.action_edit),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                IconButton(
+                )
+                CollectionActionPill(
+                    icon = Icons.Rounded.Close,
+                    label = null,
+                    contentDescription = stringResource(Res.string.action_remove),
+                    tint = tokens.colors.danger,
+                    borderColor = tokens.colors.danger.copy(alpha = 0.40f),
                     onClick = onRemove,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = stringResource(Res.string.action_remove),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                }
+                )
             }
 
             Text(
                 text = traktSourceSubtitle(source),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
             )
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FolderCatalogSourceCard(
     source: CollectionCatalogSource,
@@ -2296,6 +2284,7 @@ private fun FolderCatalogSourceCard(
     onRemove: () -> Unit,
     onOpenGenrePicker: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val typeLabel = source.type.replaceFirstChar {
         if (it.isLowerCase()) it.titlecase() else it.toString()
     }
@@ -2318,42 +2307,45 @@ private fun FolderCatalogSourceCard(
                         text = matchingCatalog?.catalogName ?: source.catalogId,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = matchingCatalog?.addonName ?: source.addonId,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                IconButton(
+                CollectionActionPill(
+                    icon = Icons.Rounded.Close,
+                    label = null,
+                    contentDescription = stringResource(Res.string.action_remove),
+                    tint = tokens.colors.danger,
+                    borderColor = tokens.colors.danger.copy(alpha = 0.40f),
                     onClick = onRemove,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = stringResource(Res.string.action_remove),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                }
+                )
             }
 
             Text(
                 text = metaLine,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
             )
 
             if (genreOptions.isNotEmpty()) {
+                val genreShape = RoundedCornerShape(10.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(onClick = onOpenGenrePicker),
+                        .clip(genreShape)
+                        .background(tokens.colors.surfaceElevated)
+                        .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, genreShape)
+                        .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                        .clickable(onClick = onOpenGenrePicker)
+                        .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s10),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -2363,22 +2355,279 @@ private fun FolderCatalogSourceCard(
                     ) {
                         Text(
                             text = stringResource(Res.string.collections_editor_genre_filter),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = tokens.colors.textMuted,
                         )
                         Text(
                             text = selectedGenreLabel,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                            color = tokens.colors.textPrimary,
                         )
                     }
-                    TextButton(onClick = onOpenGenrePicker) {
-                        Text(stringResource(Res.string.collections_editor_choose_genre))
-                    }
+                    Text(
+                        text = stringResource(Res.string.collections_editor_choose_genre),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = tokens.colors.accent,
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CollectionEditorTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        placeholder = {
+            Text(
+                text = placeholder,
+                color = tokens.colors.textMuted,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        },
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = tokens.colors.textPrimary),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = tokens.colors.accent,
+            unfocusedBorderColor = tokens.colors.borderDefault,
+            focusedContainerColor = tokens.colors.surfaceElevated,
+            unfocusedContainerColor = tokens.colors.surfaceElevated,
+            cursorColor = tokens.colors.accent,
+        ),
+    )
+}
+
+@Composable
+private fun CollectionOptionChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    showCheckIcon: Boolean = false,
+) {
+    val tokens = MaterialTheme.nuvio
+    val pillShape = RoundedCornerShape(NuvioTokens.Radius.full)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.focusBackground
+            isDesktop && isHovered -> tokens.colors.surfaceCard
+            else -> tokens.colors.surfaceElevated
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "collection_chip_bg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderDefault
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "collection_chip_border",
+    )
+
+    Row(
+        modifier = Modifier
+            .nuvioFocusBorder(pillShape)
+            .clip(pillShape)
+            .background(containerColor)
+            .border(NuvioTokens.Border.thin, borderColor, pillShape)
+            .semantics { this.selected = selected }
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s8),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (selected && showCheckIcon) {
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                tint = tokens.colors.accent,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            ),
+            color = if (selected || (isDesktop && isHovered)) tokens.colors.textPrimary else tokens.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun CollectionActionPill(
+    icon: ImageVector,
+    label: String?,
+    tint: Color,
+    borderColor: Color,
+    onClick: () -> Unit,
+    contentDescription: String? = null,
+) {
+    val tokens = MaterialTheme.nuvio
+    val pillShape = RoundedCornerShape(10.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .nuvioFocusBorder(pillShape)
+            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+        shape = pillShape,
+        color = if (isDesktop && isHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+        border = BorderStroke(
+            width = NuvioTokens.Border.thin,
+            color = if (isDesktop && isHovered) tokens.colors.borderStrong else borderColor,
+        ),
+        interactionSource = interactionSource,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = if (label != null) NuvioTokens.Space.s12 else NuvioTokens.Space.s10,
+                vertical = NuvioTokens.Space.s6,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(16.dp),
+                tint = tint,
+            )
+            if (label != null) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = tint,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollectionStickyBottomBar(
+    bottomInset: Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = tokens.colors.background.copy(alpha = 0.96f),
+        tonalElevation = 6.dp,
+        shadowElevation = 10.dp,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            HorizontalDivider(
+                thickness = NuvioTokens.Border.thin,
+                color = tokens.colors.borderSubtle,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(bottom = bottomInset),
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollectionAccentGradientButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
+    val buttonShape = RoundedCornerShape(14.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    val backgroundModifier = if (enabled) {
+        Modifier
+            .background(palette.accentBrush())
+            .then(
+                if (isDesktop && isHovered) {
+                    Modifier.background(Color.White.copy(alpha = NuvioTokens.Opacity.hover))
+                } else {
+                    Modifier
+                },
+            )
+    } else {
+        Modifier
+            .background(tokens.colors.surfaceElevated)
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, buttonShape)
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .nuvioFocusBorder(buttonShape)
+            .clip(buttonShape)
+            .then(backgroundModifier)
+            .then(
+                if (isDesktop && enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (enabled) tokens.colors.onAccent else tokens.colors.textDisabled,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -2570,24 +2819,41 @@ private fun GenrePickerOptionRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val bgColor = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    val tokens = MaterialTheme.nuvio
+    val rowShape = RoundedCornerShape(12.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val bgColor = when {
+        selected -> tokens.colors.focusBackground
+        isDesktop && isHovered -> tokens.colors.surfaceCard
+        else -> tokens.colors.surfaceElevated
     }
-    val borderColor = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    val borderColor = when {
+        selected -> tokens.colors.accent
+        isDesktop && isHovered -> tokens.colors.borderStrong
+        else -> tokens.colors.borderSubtle
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(rowShape)
             .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
+            .border(NuvioTokens.Border.thin, borderColor, rowShape)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
             .padding(horizontal = 14.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -2596,13 +2862,13 @@ private fun GenrePickerOptionRow(
             text = title,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
         )
         if (selected) {
             Icon(
                 imageVector = Icons.Rounded.Check,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = tokens.colors.accent,
                 modifier = Modifier.size(20.dp),
             )
         }

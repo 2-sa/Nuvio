@@ -1,59 +1,88 @@
 package com.nuvio.app.features.search
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.stopScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
-import com.nuvio.app.core.ui.NuvioInputField
-import com.nuvio.app.core.ui.NuvioTokens
-import com.nuvio.app.core.ui.NuvioScreen
+import com.nuvio.app.core.ui.Chip
+import com.nuvio.app.core.ui.NuvioDropdownChip
+import com.nuvio.app.core.ui.NuvioDropdownOption
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
+import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.NuvioSectionLabel
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.ScreenActivityEffect
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+import com.nuvio.app.core.ui.nuvioFocusBorder
+import com.nuvio.app.core.ui.posterGridColumnCountForCatalogWidth
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
-import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.firstEnabledManifestError
 import com.nuvio.app.features.addons.hasPendingEnabledManifests
@@ -62,12 +91,13 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.buildAddonCatalogRefreshSignature
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
-import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
 import com.nuvio.app.features.home.components.HomeSkeletonRow
-import com.nuvio.app.core.ui.posterGridColumnCountForCatalogWidth
+import com.nuvio.app.features.home.components.PosterGridRow
+import com.nuvio.app.features.home.components.PosterGridSkeletonRow
+import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
 import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
-import com.nuvio.app.isDesktop
 import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -77,8 +107,6 @@ import kotlinx.coroutines.flow.map
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
 import nuvio.composeapp.generated.resources.compose_nav_search
-import nuvio.composeapp.generated.resources.home_empty_no_sources_title
-import nuvio.composeapp.generated.resources.search_empty_no_sources_message
 import nuvio.composeapp.generated.resources.compose_search_clear
 import nuvio.composeapp.generated.resources.compose_search_discover_title
 import nuvio.composeapp.generated.resources.compose_search_empty_failed_message
@@ -90,6 +118,26 @@ import nuvio.composeapp.generated.resources.compose_search_empty_no_search_catal
 import nuvio.composeapp.generated.resources.compose_search_placeholder
 import nuvio.composeapp.generated.resources.compose_search_recent_searches
 import nuvio.composeapp.generated.resources.compose_search_remove_recent_search
+import nuvio.composeapp.generated.resources.discover_all_genres
+import nuvio.composeapp.generated.resources.discover_catalog
+import nuvio.composeapp.generated.resources.discover_catalog_context
+import nuvio.composeapp.generated.resources.discover_empty_load_failed_message
+import nuvio.composeapp.generated.resources.discover_empty_load_failed_title
+import nuvio.composeapp.generated.resources.discover_empty_no_catalogs_message
+import nuvio.composeapp.generated.resources.discover_empty_no_catalogs_title
+import nuvio.composeapp.generated.resources.discover_empty_no_results_message
+import nuvio.composeapp.generated.resources.discover_empty_no_results_title
+import nuvio.composeapp.generated.resources.discover_select_catalog
+import nuvio.composeapp.generated.resources.discover_select_genre
+import nuvio.composeapp.generated.resources.discover_select_type
+import nuvio.composeapp.generated.resources.discover_type
+import nuvio.composeapp.generated.resources.home_empty_no_sources_title
+import nuvio.composeapp.generated.resources.media_anime
+import nuvio.composeapp.generated.resources.media_channels
+import nuvio.composeapp.generated.resources.media_movies
+import nuvio.composeapp.generated.resources.media_series
+import nuvio.composeapp.generated.resources.media_tv
+import nuvio.composeapp.generated.resources.search_empty_no_sources_message
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -239,6 +287,7 @@ fun SearchScreen(
     BoxWithConstraints(
         modifier = modifier.fillMaxSize(),
     ) {
+        val tokens = MaterialTheme.nuvio
         val posterCardStyle = rememberPosterCardStyleUiState()
         val discoverColumns = remember(maxWidth, maxHeight, posterCardStyle.widthDp, isDesktop) {
             if (isDesktop) {
@@ -253,6 +302,7 @@ fun SearchScreen(
         val homeSectionPadding = remember(maxWidth) {
             homeSectionHorizontalPaddingForWidth(maxWidth.value)
         }
+        val contentPadding = if (isDesktop) homeSectionPadding else 16.dp
         val headerTitle = when {
             query.isNotBlank() -> stringResource(Res.string.compose_nav_search)
             discoverInFocus -> stringResource(Res.string.compose_search_discover_title)
@@ -265,74 +315,71 @@ fun SearchScreen(
             listState = listState,
             modifier = Modifier.fillMaxSize(),
         ) {
-        stickyHeader {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .nuvioConsumePointerEvents(),
-                )
-                androidx.compose.foundation.layout.Column(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    NuvioScreenHeader(
-                        title = headerTitle,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        topPadding = topChromePadding,
+            stickyHeader {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(tokens.colors.background)
+                            .nuvioConsumePointerEvents(),
                     )
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
-                    androidx.compose.foundation.layout.Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        NuvioInputField(
-                            value = query,
-                            onValueChange = {
-                                focusRequester.captureFocus()
-                                query = it
-                            },
-                            placeholder = stringResource(Res.string.compose_search_placeholder),
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
-                            shape = RoundedCornerShape(NuvioTokens.Radius.xl),
-                            modifier = Modifier
-                                .focusRequester(focusRequester)
-                                .onFocusChanged {
-                                    isSearchFocused = it.isFocused
-                                    if (query.isNotBlank()) focusRequester.captureFocus()
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        NuvioScreenHeader(
+                            title = headerTitle,
+                            backgroundColor = tokens.colors.background,
+                            modifier = Modifier.padding(horizontal = contentPadding),
+                            topPadding = topChromePadding,
+                        )
+                        Spacer(modifier = Modifier.height(NuvioTokens.Space.s8))
+                        Box(modifier = Modifier.padding(horizontal = contentPadding)) {
+                            ObsidianSearchBar(
+                                value = query,
+                                onValueChange = {
+                                    focusRequester.captureFocus()
+                                    query = it
                                 },
-                            trailingContent = if (query.isNotBlank()) {
-                                {
-                                    IconButton(onClick = { query = "" }) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Close,
-                                            contentDescription = stringResource(Res.string.compose_search_clear),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                            } else {
-                                null
-                            },
+                                onClear = { query = "" },
+                                placeholder = stringResource(Res.string.compose_search_placeholder),
+                                clearContentDescription = stringResource(Res.string.compose_search_clear),
+                                isFocused = isSearchFocused,
+                                modifier = Modifier
+                                    .focusRequester(focusRequester)
+                                    .onFocusChanged {
+                                        isSearchFocused = it.isFocused
+                                        if (query.isNotBlank()) focusRequester.captureFocus()
+                                    },
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(NuvioTokens.Space.s12))
+                        if (isDesktop) {
+                            HorizontalDivider(
+                                thickness = NuvioTokens.Border.thin,
+                                color = tokens.colors.borderSubtle,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (query.isBlank()) {
+                if (isSearchFocused && recentSearches.isNotEmpty()) {
+                    focusRequester.captureFocus()
+                    item(key = "recent_searches") {
+                        SearchRecentSection(
+                            recentSearches = recentSearches,
+                            onSearchPress = { recentQuery -> query = recentQuery },
+                            onRemoveSearch = SearchHistoryRepository::removeSearch,
+                            modifier = Modifier.padding(horizontal = contentPadding),
                         )
                     }
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(14.dp))
                 }
-            }
-        }
-
-        if (query.isBlank()) {
-            if (isSearchFocused && recentSearches.isNotEmpty()) {
-                focusRequester.captureFocus()
-                item(key = "recent_searches") {
-                    SearchRecentSection(
-                        recentSearches = recentSearches,
-                        onSearchPress = { recentQuery -> query = recentQuery },
-                        onRemoveSearch = SearchHistoryRepository::removeSearch,
-                    )
-                }
-            }
-                discoverContent(
+                searchDiscoverContent(
                     state = discoverUiState,
                     isSourceLoading = addonManifestsLoading,
                     columns = discoverColumns,
+                    horizontalPadding = contentPadding,
                     networkCondition = networkStatusUiState.condition,
                     onTypeSelected = SearchRepository::selectDiscoverType,
                     onCatalogSelected = SearchRepository::selectDiscoverCatalog,
@@ -360,7 +407,7 @@ fun SearchScreen(
                     isWaitingForSearch -> {
                         items(2) {
                             HomeSkeletonRow(
-                                horizontalPadding = homeSectionPadding,
+                                horizontalPadding = contentPadding,
                             )
                         }
                     }
@@ -368,7 +415,7 @@ fun SearchScreen(
                     (uiState.isLoading || addonManifestsLoading) && uiState.sections.isEmpty() -> {
                         items(2) {
                             HomeSkeletonRow(
-                                horizontalPadding = homeSectionPadding,
+                                horizontalPadding = contentPadding,
                             )
                         }
                     }
@@ -393,7 +440,7 @@ fun SearchScreen(
                                         }
                                     }
                                 },
-                                modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                modifier = Modifier.padding(horizontal = contentPadding),
                             )
                         }
                     }
@@ -406,7 +453,8 @@ fun SearchScreen(
                             val section = keyedSection.value
                             HomeCatalogRowSection(
                                 section = section,
-                                modifier = Modifier.padding(bottom = 12.dp),
+                                modifier = Modifier.padding(bottom = NuvioTokens.Space.s12),
+                                sectionPadding = contentPadding,
                                 watchedKeys = watchedUiState.watchedKeys,
                                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                 onPosterClick = onPosterClick,
@@ -416,7 +464,7 @@ fun SearchScreen(
                         if (uiState.isLoading) {
                             item(key = "search_loading_more") {
                                 HomeSkeletonRow(
-                                    horizontalPadding = homeSectionPadding,
+                                    horizontalPadding = contentPadding,
                                 )
                             }
                         }
@@ -425,6 +473,379 @@ fun SearchScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ObsidianSearchBar(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onClear: () -> Unit,
+    placeholder: String,
+    clearContentDescription: String,
+    isFocused: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val barShape = RoundedCornerShape(14.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isFocused -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderDefault
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "search_bar_border",
+    )
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            isFocused -> tokens.colors.surfaceCard
+            isDesktop && isHovered -> tokens.colors.surfaceCard.copy(alpha = 0.85f)
+            else -> tokens.colors.surfaceElevated
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "search_bar_bg",
+    )
+    val searchIconTint by animateColorAsState(
+        targetValue = if (isFocused) tokens.colors.accent else tokens.colors.textMuted,
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "search_icon_tint",
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = if (isDesktop) 52.dp else 48.dp)
+            .clip(barShape)
+            .background(containerColor)
+            .border(NuvioTokens.Border.thin, borderColor, barShape)
+            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
+            .padding(horizontal = NuvioTokens.Space.s14),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Search,
+            contentDescription = null,
+            tint = searchIconTint,
+            modifier = Modifier.size(NuvioTokens.Icon.md),
+        )
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (value.isEmpty()) {
+                Text(
+                    text = placeholder,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = tokens.colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = tokens.colors.textPrimary,
+                    textDirection = TextDirection.Content,
+                ),
+                cursorBrush = SolidColor(tokens.colors.accent),
+            )
+        }
+        if (value.isNotEmpty()) {
+            val clearInteraction = remember { MutableInteractionSource() }
+            val isClearHovered by clearInteraction.collectIsHoveredAsState()
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .nuvioFocusBorder(CircleShape)
+                    .clip(CircleShape)
+                    .background(
+                        if (isDesktop && isClearHovered) {
+                            tokens.colors.surfaceElevated
+                        } else {
+                            tokens.colors.overlayHover
+                        },
+                    )
+                    .border(
+                        width = NuvioTokens.Border.thin,
+                        color = if (isDesktop && isClearHovered) tokens.colors.borderStrong else tokens.colors.borderSubtle,
+                        shape = CircleShape,
+                    )
+                    .then(
+                        if (isDesktop) {
+                            Modifier
+                                .hoverable(clearInteraction)
+                                .pointerHoverIcon(PointerIcon.Hand)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .clickable(
+                        interactionSource = clearInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = clearContentDescription,
+                        onClick = onClear,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = clearContentDescription,
+                    tint = if (isDesktop && isClearHovered) tokens.colors.textPrimary else tokens.colors.textSecondary,
+                    modifier = Modifier.size(NuvioTokens.Icon.sm),
+                )
+            }
+        }
+    }
+}
+
+private fun LazyListScope.searchDiscoverContent(
+    state: DiscoverUiState,
+    isSourceLoading: Boolean,
+    columns: Int,
+    horizontalPadding: Dp,
+    networkCondition: NetworkCondition,
+    onTypeSelected: (String) -> Unit,
+    onCatalogSelected: (String) -> Unit,
+    onGenreSelected: (String?) -> Unit,
+    onRetry: (() -> Unit)? = null,
+    watchedKeys: Set<String> = emptySet(),
+    fullyWatchedSeriesKeys: Set<String> = emptySet(),
+    onPosterClick: ((MetaPreview) -> Unit)? = null,
+    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
+) {
+    item(key = "discover_header") {
+        val tokens = MaterialTheme.nuvio
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = horizontalPadding),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_search_discover_title),
+                style = MaterialTheme.typography.headlineLarge,
+                color = tokens.colors.textPrimary,
+            )
+            state.selectedCatalog?.let { selectedCatalog ->
+                Surface(
+                    shape = tokens.shapes.chip,
+                    color = tokens.colors.surfaceElevated,
+                    border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
+                ) {
+                    Text(
+                        text = stringResource(
+                            Res.string.discover_catalog_context,
+                            selectedCatalog.addonName,
+                            selectedCatalog.type.displayMediaTypeLabel(),
+                        ),
+                        modifier = Modifier.padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s4),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = tokens.colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+
+    item(key = "discover_filters") {
+        SearchDiscoverFilterStrip(
+            state = state,
+            onTypeSelected = onTypeSelected,
+            onCatalogSelected = onCatalogSelected,
+            onGenreSelected = onGenreSelected,
+            modifier = Modifier.padding(horizontal = horizontalPadding),
+        )
+    }
+
+    when {
+        (state.isLoading || isSourceLoading) && state.items.isEmpty() -> {
+            items(2) {
+                PosterGridSkeletonRow(
+                    columns = columns,
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
+                )
+            }
+        }
+
+        state.items.isEmpty() -> {
+            item(key = "discover_empty") {
+                SearchDiscoverEmptyStateCard(
+                    reason = state.emptyStateReason,
+                    errorMessage = state.errorMessage,
+                    networkCondition = networkCondition,
+                    onRetry = onRetry,
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
+                )
+            }
+        }
+
+        else -> {
+            items(count = (state.items.size + columns - 1) / columns) { rowIndex ->
+                val firstIndex = rowIndex * columns
+                PosterGridRow(
+                    items = state.items.subList(firstIndex, minOf(firstIndex + columns, state.items.size)),
+                    columns = columns,
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
+                    watchedKeys = watchedKeys,
+                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                    onPosterClick = onPosterClick,
+                    onPosterLongClick = onPosterLongClick,
+                )
+            }
+            if (state.isLoading) {
+                item(key = "discover_loading_footer") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = horizontalPadding, vertical = NuvioTokens.Space.s8),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        NuvioLoadingIndicator(modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchDiscoverFilterStrip(
+    state: DiscoverUiState,
+    onTypeSelected: (String) -> Unit,
+    onCatalogSelected: (String) -> Unit,
+    onGenreSelected: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (state.typeOptions.size > 1) {
+            state.typeOptions.forEach { typeOption ->
+                Chip(
+                    label = typeOption.displayMediaTypeLabel(),
+                    selected = state.selectedType == typeOption,
+                    onClick = { onTypeSelected(typeOption) },
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .width(NuvioTokens.Border.thin)
+                    .height(22.dp)
+                    .background(tokens.colors.borderSubtle),
+            )
+        } else {
+            NuvioDropdownChip(
+                title = stringResource(Res.string.discover_select_type),
+                label = state.selectedType?.displayMediaTypeLabel() ?: stringResource(Res.string.discover_type),
+                selectedKey = state.selectedType,
+                options = state.typeOptions.map { NuvioDropdownOption(key = it, label = it.displayMediaTypeLabel()) },
+                enabled = state.typeOptions.isNotEmpty(),
+                onSelected = { onTypeSelected(it.key) },
+            )
+        }
+
+        NuvioDropdownChip(
+            title = stringResource(Res.string.discover_select_catalog),
+            label = state.selectedCatalog?.catalogName ?: stringResource(Res.string.discover_catalog),
+            selectedKey = state.selectedCatalogKey,
+            options = state.catalogOptions.map { option ->
+                NuvioDropdownOption(key = option.key, label = option.catalogName)
+            },
+            enabled = state.catalogOptions.isNotEmpty(),
+            onSelected = { onCatalogSelected(it.key) },
+        )
+
+        val selectedCatalog = state.selectedCatalog
+        val genreOptions = buildList {
+            if (selectedCatalog?.genreRequired != true) {
+                add(NuvioDropdownOption(key = "", label = stringResource(Res.string.discover_all_genres)))
+            }
+            addAll(state.genreOptions.map { genre -> NuvioDropdownOption(key = genre, label = genre) })
+        }
+        NuvioDropdownChip(
+            title = stringResource(Res.string.discover_select_genre),
+            label = state.selectedGenre ?: stringResource(Res.string.discover_all_genres),
+            selectedKey = state.selectedGenre ?: "",
+            options = genreOptions,
+            enabled = genreOptions.size > 1 || selectedCatalog?.genreRequired == true,
+            onSelected = { option ->
+                onGenreSelected(option.key.ifBlank { null })
+            },
+        )
+    }
+}
+
+@Composable
+private fun SearchDiscoverEmptyStateCard(
+    reason: DiscoverEmptyStateReason?,
+    errorMessage: String?,
+    networkCondition: NetworkCondition,
+    onRetry: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    if (
+        reason == DiscoverEmptyStateReason.RequestFailed &&
+        (networkCondition == NetworkCondition.NoInternet || networkCondition == NetworkCondition.ServersUnreachable)
+    ) {
+        NuvioNetworkOfflineCard(
+            condition = networkCondition,
+            modifier = modifier,
+            onRetry = onRetry,
+        )
+        return
+    }
+
+    val title: String
+    val message: String
+
+    when (reason) {
+        DiscoverEmptyStateReason.NoActiveAddons -> {
+            title = stringResource(Res.string.home_empty_no_sources_title)
+            message = stringResource(Res.string.search_empty_no_sources_message)
+        }
+
+        DiscoverEmptyStateReason.NoDiscoverCatalogs -> {
+            title = stringResource(Res.string.discover_empty_no_catalogs_title)
+            message = stringResource(Res.string.discover_empty_no_catalogs_message)
+        }
+
+        DiscoverEmptyStateReason.RequestFailed -> {
+            title = stringResource(Res.string.discover_empty_load_failed_title)
+            message = errorMessage ?: stringResource(Res.string.discover_empty_load_failed_message)
+        }
+
+        DiscoverEmptyStateReason.NoResults, null -> {
+            title = stringResource(Res.string.discover_empty_no_results_title)
+            message = stringResource(Res.string.discover_empty_no_results_message)
+        }
+    }
+
+    HomeEmptyStateCard(
+        modifier = modifier,
+        title = title,
+        message = message,
+        actionLabel = if (reason == DiscoverEmptyStateReason.RequestFailed) {
+            stringResource(Res.string.action_retry)
+        } else {
+            null
+        },
+        onActionClick = if (reason == DiscoverEmptyStateReason.RequestFailed) onRetry else null,
+    )
 }
 
 @Composable
@@ -492,26 +913,42 @@ private fun SearchRecentSection(
     onRemoveSearch: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(14.dp)
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
     ) {
-        Text(
+        NuvioSectionLabel(
             text = stringResource(Res.string.compose_search_recent_searches),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        recentSearches.forEach { recentQuery ->
-            SearchRecentRow(
-                query = recentQuery,
-                onSearchPress = { onSearchPress(recentQuery) },
-                onRemovePress = { onRemoveSearch(recentQuery) },
-            )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = cardShape,
+            color = tokens.colors.surfaceCard,
+            border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = NuvioTokens.Space.s4),
+            ) {
+                recentSearches.forEachIndexed { index, recentQuery ->
+                    SearchRecentRow(
+                        query = recentQuery,
+                        onSearchPress = { onSearchPress(recentQuery) },
+                        onRemovePress = { onRemoveSearch(recentQuery) },
+                    )
+                    if (index != recentSearches.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = NuvioTokens.Space.s12),
+                            thickness = NuvioTokens.Border.thin,
+                            color = tokens.colors.borderSubtle,
+                        )
+                    }
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(6.dp))
     }
 }
 
@@ -522,33 +959,87 @@ internal fun SearchRecentRow(
     onRemovePress: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val rowShape = RoundedCornerShape(10.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val removeInteraction = remember { MutableInteractionSource() }
+    val isRemoveHovered by removeInteraction.collectIsHoveredAsState()
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onSearchPress)
-            .padding(vertical = 2.dp)
-            .background(
-                color = MaterialTheme.colorScheme.background,
-                shape = RoundedCornerShape(16.dp),
+            .padding(horizontal = NuvioTokens.Space.s4)
+            .clip(rowShape)
+            .background(if (isDesktop && isHovered) tokens.colors.overlayHover else tokens.colors.surfaceCard.copy(alpha = 0f))
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
             )
-            .padding(start = 2.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .clickable(onClick = onSearchPress)
+            .padding(start = NuvioTokens.Space.s10, end = NuvioTokens.Space.s8, top = NuvioTokens.Space.s8, bottom = NuvioTokens.Space.s8),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Icon(
+            imageVector = Icons.Rounded.History,
+            contentDescription = null,
+            tint = tokens.colors.textMuted,
+            modifier = Modifier.size(NuvioTokens.Icon.sm + NuvioTokens.Space.s2),
+        )
         Text(
             text = query,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
-            color = MaterialTheme.colorScheme.onBackground,
+            color = tokens.colors.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        IconButton(onClick = onRemovePress) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(if (isDesktop && isRemoveHovered) tokens.colors.surfaceElevated else tokens.colors.overlayHover.copy(alpha = 0f))
+                .then(
+                    if (isDesktop) {
+                        Modifier
+                            .hoverable(removeInteraction)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                    } else {
+                        Modifier
+                    },
+                )
+                .clickable(
+                    interactionSource = removeInteraction,
+                    indication = null,
+                    role = Role.Button,
+                    onClickLabel = stringResource(Res.string.compose_search_remove_recent_search),
+                    onClick = onRemovePress,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 imageVector = Icons.Rounded.Close,
                 contentDescription = stringResource(Res.string.compose_search_remove_recent_search),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isDesktop && isRemoveHovered) tokens.colors.textPrimary else tokens.colors.textMuted,
+                modifier = Modifier.size(NuvioTokens.Icon.sm),
             )
         }
     }
 }
+
+@Composable
+private fun String.displayMediaTypeLabel(): String =
+    when (lowercase()) {
+        "movie" -> stringResource(Res.string.media_movies)
+        "series" -> stringResource(Res.string.media_series)
+        "anime" -> stringResource(Res.string.media_anime)
+        "channel" -> stringResource(Res.string.media_channels)
+        "tv" -> stringResource(Res.string.media_tv)
+        else -> replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    }

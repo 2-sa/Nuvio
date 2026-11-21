@@ -1,11 +1,21 @@
 package com.nuvio.app.features.collection
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -16,18 +26,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalRippleConfiguration
-import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,42 +56,52 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
-import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
+import androidx.compose.ui.unit.dp
 import com.nuvio.app.controller.ControllerFocusZone
 import com.nuvio.app.controller.RegisterControllerVerticalScroll
 import com.nuvio.app.controller.controllerFocusable
+import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
+import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.catalogPosterBaseWidthDp
 import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.posterGridColumnCountForViewport
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
-import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.canOpenCatalog
-import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomePosterHoverPreview
 import com.nuvio.app.features.home.components.homeCatalogPreviewLimitForWidth
 import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
+import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.isDesktop
@@ -99,6 +123,7 @@ fun FolderDetailScreen(
     onCatalogClick: (HomeCatalogSection) -> Unit,
     onPosterClick: (MetaPreview) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val uiState by FolderDetailRepository.uiState.collectAsState()
     val watchedUiState by remember {
         WatchedRepository.ensureLoaded()
@@ -124,7 +149,7 @@ fun FolderDetailScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(tokens.colors.background),
     ) {
         if (coverImageUrl != null) {
             AsyncImage(
@@ -145,9 +170,9 @@ fun FolderDetailScreen(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to MaterialTheme.colorScheme.background.copy(alpha = 0.50f),
-                            0.42f to MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
-                            1f to MaterialTheme.colorScheme.background.copy(alpha = 0.88f),
+                            0f to tokens.colors.background.copy(alpha = 0.55f),
+                            0.42f to tokens.colors.background.copy(alpha = 0.78f),
+                            1f to tokens.colors.background.copy(alpha = 0.94f),
                         ),
                     ),
             )
@@ -160,24 +185,24 @@ fun FolderDetailScreen(
                     NuvioScreenHeader(
                         title = folder?.title ?: uiState.collectionTitle,
                         modifier = Modifier.padding(horizontal = desktopPagePadding),
-                        backgroundColor = Color.Transparent,
+                        backgroundColor = if (coverImageUrl != null) Color.Transparent else tokens.colors.background,
                         includeStatusBarPadding = false,
-                        topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 32.dp,
+                        topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 28.dp,
                         onBack = onBack,
                     )
+                    if (coverImageUrl == null) {
+                        HorizontalDivider(
+                            thickness = NuvioTokens.Border.thin,
+                            color = tokens.colors.borderSubtle,
+                        )
+                    }
                 }
 
                 if (folder == null && !uiState.isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.collections_folder_not_found),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    FolderStateCard(
+                        message = stringResource(Res.string.collections_folder_not_found),
+                        isError = false,
+                    )
                     return@Column
                 }
 
@@ -220,6 +245,7 @@ private fun MobileFolderDetailContent(
     onCatalogClick: (HomeCatalogSection) -> Unit,
     onPosterClick: (MetaPreview) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val folder = uiState.folder
     val density = LocalDensity.current
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -263,7 +289,7 @@ private fun MobileFolderDetailContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(tokens.colors.background),
     ) {
         if (coverImageUrl != null && heroHeight > 0.dp) {
             FolderCoverImage(
@@ -277,6 +303,7 @@ private fun MobileFolderDetailContent(
             NuvioScreenHeader(
                 title = folder?.title ?: uiState.collectionTitle,
                 modifier = Modifier.padding(horizontal = 16.dp),
+                backgroundColor = tokens.colors.background,
                 includeStatusBarPadding = coverImageUrl == null,
                 topPadding = if (coverImageUrl != null) statusBarTop * heroCollapseFraction else null,
                 onBack = onBack,
@@ -284,16 +311,10 @@ private fun MobileFolderDetailContent(
         }
 
         if (folder == null && !uiState.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(Res.string.collections_folder_not_found),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            FolderStateCard(
+                message = stringResource(Res.string.collections_folder_not_found),
+                isError = false,
+            )
             return@Column
         }
 
@@ -343,6 +364,7 @@ private fun TabbedGridContent(
     onTabSelected: (Int) -> Unit,
     onPosterClick: (MetaPreview) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val gridState = rememberLazyGridState()
 
     // Lets the controller spatial engine scroll this grid when focus reaches the bottom edge.
@@ -363,21 +385,25 @@ private fun TabbedGridContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         if (uiState.tabs.size > 1) {
-            CompositionLocalProvider(LocalRippleConfiguration provides null) {
-                ScrollableTabRow(
-                    selectedTabIndex = uiState.selectedTabIndex,
-                    modifier = Modifier.fillMaxWidth(),
-                    edgePadding = pageHorizontalPadding,
-                    containerColor = if (isDesktop) Color.Transparent else MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.onBackground,
-                    divider = {},
+            if (isDesktop) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = pageHorizontalPadding, vertical = NuvioTokens.Space.s10),
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     uiState.tabs.forEachIndexed { index, tab ->
-                        Tab(
+                        val label = if (tab.isAllTab) {
+                            stringResource(Res.string.collections_tab_all)
+                        } else {
+                            tab.label
+                        }
+                        DesktopFolderTabPill(
+                            label = label,
                             selected = index == uiState.selectedTabIndex,
                             onClick = { onTabSelected(index) },
-                            // Category tabs are part of the spatial grid: Up from the top poster row
-                            // reaches them, Down returns to the posters and A selects a category.
                             modifier = Modifier.controllerFocusable(
                                 id = "folder_tab_$index",
                                 zone = ControllerFocusZone.Content,
@@ -385,18 +411,45 @@ private fun TabbedGridContent(
                                 selectLabel = "Select",
                                 onSelect = { onTabSelected(index) },
                             ),
-                            text = {
-                                Text(
-                                    text = if (tab.isAllTab) {
-                                        stringResource(Res.string.collections_tab_all)
-                                    } else {
-                                        tab.label
-                                    },
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
                         )
+                    }
+                }
+            } else {
+                CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                    ScrollableTabRow(
+                        selectedTabIndex = uiState.selectedTabIndex,
+                        modifier = Modifier.fillMaxWidth(),
+                        edgePadding = pageHorizontalPadding,
+                        containerColor = tokens.colors.background,
+                        contentColor = tokens.colors.textPrimary,
+                        divider = {},
+                    ) {
+                        uiState.tabs.forEachIndexed { index, tab ->
+                            Tab(
+                                selected = index == uiState.selectedTabIndex,
+                                onClick = { onTabSelected(index) },
+                                // Category tabs are part of the spatial grid: Up from the top poster row
+                                // reaches them, Down returns to the posters and A selects a category.
+                                modifier = Modifier.controllerFocusable(
+                                    id = "folder_tab_$index",
+                                    zone = ControllerFocusZone.Content,
+                                    groupKey = "folder_tabs",
+                                    selectLabel = "Select",
+                                    onSelect = { onTabSelected(index) },
+                                ),
+                                text = {
+                                    Text(
+                                        text = if (tab.isAllTab) {
+                                            stringResource(Res.string.collections_tab_all)
+                                        } else {
+                                            tab.label
+                                        },
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -425,8 +478,14 @@ private fun TabbedGridContent(
 
             when {
                 selectedTab.isLoading && selectedTab.items.isEmpty() -> LoadingIndicator()
-                selectedTab.error != null && selectedTab.items.isEmpty() -> ErrorMessage(selectedTab.error)
-                selectedTab.items.isEmpty() -> EmptyMessage()
+                selectedTab.error != null && selectedTab.items.isEmpty() -> FolderStateCard(
+                    message = selectedTab.error,
+                    isError = true,
+                )
+                selectedTab.items.isEmpty() -> FolderStateCard(
+                    message = stringResource(Res.string.collections_folder_empty_items),
+                    isError = false,
+                )
                 else -> {
                     Box(modifier = Modifier.fillMaxSize()) {
                         LazyVerticalGrid(
@@ -439,7 +498,7 @@ private fun TabbedGridContent(
                                 top = if (isDesktop) 8.dp else 4.dp,
                                 bottom = nuvioSafeBottomPadding(18.dp),
                             ),
-                            horizontalArrangement = Arrangement.spacedBy(if (isDesktop) 12.dp else 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(if (isDesktop) 14.dp else 10.dp),
                             verticalArrangement = Arrangement.spacedBy(if (isDesktop) 18.dp else 14.dp),
                         ) {
                             items(
@@ -492,6 +551,66 @@ private fun TabbedGridContent(
 }
 
 @Composable
+private fun DesktopFolderTabPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val pillShape = RoundedCornerShape(NuvioTokens.Radius.full)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.focusBackground
+            isHovered -> tokens.colors.surfaceCard
+            else -> tokens.colors.surfaceElevated
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "folder_tab_bg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.accent
+            isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderDefault
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "folder_tab_border",
+    )
+
+    Box(
+        modifier = modifier
+            .nuvioFocusBorder(pillShape)
+            .clip(pillShape)
+            .background(containerColor)
+            .border(NuvioTokens.Border.thin, borderColor, pillShape)
+            .semantics { this.selected = selected }
+            .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .padding(horizontal = NuvioTokens.Space.s14, vertical = NuvioTokens.Space.s8),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            ),
+            color = if (selected || isHovered) tokens.colors.textPrimary else tokens.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun RowsContent(
     uiState: FolderDetailUiState,
     watchedKeys: Set<String>,
@@ -511,7 +630,10 @@ private fun RowsContent(
     }
 
     if (sections.isEmpty() && !uiState.isLoading) {
-        EmptyMessage()
+        FolderStateCard(
+            message = stringResource(Res.string.collections_folder_empty_items),
+            isError = false,
+        )
         return
     }
 
@@ -607,38 +729,35 @@ private fun LoadingIndicator() {
 }
 
 @Composable
-private fun ErrorMessage(error: String) {
+private fun FolderStateCard(
+    message: String,
+    isError: Boolean,
+) {
+    val tokens = MaterialTheme.nuvio
     Box(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(NuvioTokens.Space.s24),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = error,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error,
-            textAlign = TextAlign.Center,
-        )
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 460.dp),
+            shape = RoundedCornerShape(NuvioTokens.Radius.xl),
+            color = tokens.colors.surfaceCard,
+            border = BorderStroke(
+                width = NuvioTokens.Border.thin,
+                color = if (isError) tokens.colors.danger.copy(alpha = 0.45f) else tokens.colors.borderSubtle,
+            ),
+        ) {
+            Text(
+                text = message,
+                modifier = Modifier.padding(tokens.spacing.cardPadding),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (isError) tokens.colors.danger else tokens.colors.textSecondary,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
-
-@Composable
-private fun EmptyMessage() {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = stringResource(Res.string.collections_folder_empty_items),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-private fun PosterShape.toNuvioPosterShape(): NuvioPosterShape =
-    when (this) {
-        PosterShape.Poster -> NuvioPosterShape.Poster
-        PosterShape.Square -> NuvioPosterShape.Square
-        PosterShape.Landscape -> NuvioPosterShape.Landscape
-    }

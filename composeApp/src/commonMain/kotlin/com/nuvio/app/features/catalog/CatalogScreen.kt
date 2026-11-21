@@ -1,13 +1,16 @@
 package com.nuvio.app.features.catalog
 
-import com.nuvio.app.core.ui.rememberAnimatedArtworkAnimation
-import com.nuvio.app.controller.RegisterControllerVerticalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
@@ -20,20 +23,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.nuvio.app.core.ui.NuvioBackButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -41,50 +45,65 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import com.nuvio.app.controller.RegisterControllerVerticalScroll
+import com.nuvio.app.core.format.formatReleaseDateForDisplay
+import com.nuvio.app.core.i18n.localizedMediaTypeLabel
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
-import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
+import com.nuvio.app.core.poster.CustomPosterFallbackInterceptor
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
-import com.nuvio.app.core.format.formatReleaseDateForDisplay
-import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
+import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
+import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
+import com.nuvio.app.core.ui.SkeletonPoster
 import com.nuvio.app.core.ui.catalogPosterBaseWidthDp
 import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
-import com.nuvio.app.core.ui.landscapePosterWidth
-import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.desktopPosterHoverScale
+import com.nuvio.app.core.ui.landscapePosterWidth
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioCardDepth
-import com.nuvio.app.core.ui.posterCardClickable
-import com.nuvio.app.core.ui.posterGridColumnCountForViewport
-import com.nuvio.app.core.ui.NuvioLoadingIndicator
-import com.nuvio.app.core.ui.SkeletonPoster
+import com.nuvio.app.core.ui.nuvioConsumePointerEvents
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.posterCardClickable
+import com.nuvio.app.core.ui.posterGridColumnCountForViewport
+import com.nuvio.app.core.ui.rememberAnimatedArtworkAnimation
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.core.ui.skeleton
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
-import com.nuvio.app.isDesktop
-import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
-import com.nuvio.app.features.home.components.HomePosterHoverPreview
 import com.nuvio.app.features.home.components.HomePosterCard
+import com.nuvio.app.features.home.components.HomePosterHoverPreview
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
+import com.nuvio.app.isDesktop
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import nuvio.composeapp.generated.resources.*
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_retry
+import nuvio.composeapp.generated.resources.catalog_empty_message
+import nuvio.composeapp.generated.resources.catalog_empty_title
+import nuvio.composeapp.generated.resources.catalog_load_failed_title
+import nuvio.composeapp.generated.resources.collections_trakt_list_items_count
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -178,10 +197,12 @@ fun CatalogScreen(
         }
     }
 
+    val tokens = MaterialTheme.nuvio
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(tokens.colors.background),
     ) {
         val pageHorizontalPadding = if (isDesktop) {
             desktopPageHorizontalPaddingForWidth(maxWidth.value)
@@ -215,11 +236,11 @@ fun CatalogScreen(
                 modifier = Modifier.fillMaxSize().then(scrollViewportModifier),
                 contentPadding = PaddingValues(
                     start = pageHorizontalPadding,
-                    top = with(androidx.compose.ui.platform.LocalDensity.current) { headerHeightPx.toDp() } + 12.dp,
+                    top = with(LocalDensity.current) { headerHeightPx.toDp() } + 16.dp,
                     end = pageHorizontalPadding,
                     bottom = nuvioSafeBottomPadding(28.dp),
                 ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (isDesktop) 14.dp else 12.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 if (uiState.items.isEmpty() && uiState.isLoading) {
@@ -303,6 +324,8 @@ fun CatalogScreen(
             CatalogHeader(
                 title = title,
                 subtitle = subtitle,
+                target = target,
+                itemCount = uiState.items.size,
                 pageHorizontalPadding = pageHorizontalPadding,
                 modifier = Modifier.onSizeChanged { headerHeightPx = it.height },
                 onBack = onBack,
@@ -311,10 +334,13 @@ fun CatalogScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CatalogHeader(
     title: String,
     subtitle: String,
+    target: CatalogTarget,
+    itemCount: Int,
     pageHorizontalPadding: Dp,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -329,40 +355,119 @@ private fun CatalogHeader(
         return
     }
 
+    val tokens = MaterialTheme.nuvio
+    val activeGenre = (target as? CatalogTarget.Addon)?.genre?.takeIf { it.isNotBlank() }
+    val contentTypeLabel = target.contentType.takeIf { it.isNotBlank() }?.let { localizedMediaTypeLabel(it) }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .then(if (isDesktop) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
-            .padding(horizontal = pageHorizontalPadding)
-            .padding(top = if (isDesktop) 32.dp else 52.dp, bottom = 12.dp),
+            .background(tokens.colors.background)
+            .nuvioConsumePointerEvents(),
     ) {
-        NuvioBackButton(
-            onClick = onBack,
-            modifier = Modifier.size(if (isDesktop) 48.dp else 40.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            iconSize = 24.dp,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (isDesktop) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
+                .padding(horizontal = pageHorizontalPadding)
+                .padding(top = if (isDesktop) 24.dp else 52.dp, bottom = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+            ) {
+                NuvioBackButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(if (isDesktop) 42.dp else 40.dp),
+                    containerColor = tokens.colors.surfaceElevated,
+                    showContainerOnDesktop = true,
+                    contentColor = tokens.colors.textPrimary,
+                    buttonSize = if (isDesktop) 42.dp else 40.dp,
+                    iconSize = 20.dp,
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.displaySmall,
+                        color = tokens.colors.textPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
+                            color = tokens.colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            if (contentTypeLabel != null || activeGenre != null || itemCount > 0) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                ) {
+                    if (contentTypeLabel != null) {
+                        CatalogHeaderPill(
+                            text = contentTypeLabel,
+                            highlighted = false,
+                        )
+                    }
+                    if (activeGenre != null) {
+                        CatalogHeaderPill(
+                            text = activeGenre,
+                            highlighted = true,
+                        )
+                    }
+                    if (itemCount > 0) {
+                        CatalogHeaderPill(
+                            text = stringResource(Res.string.collections_trakt_list_items_count, itemCount),
+                            highlighted = false,
+                        )
+                    }
+                }
+            }
+        }
+        HorizontalDivider(
+            thickness = NuvioTokens.Border.thin,
+            color = tokens.colors.borderSubtle,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun CatalogHeaderPill(
+    text: String,
+    highlighted: Boolean,
+) {
+    val tokens = MaterialTheme.nuvio
+    Surface(
+        shape = tokens.shapes.chip,
+        color = if (highlighted) tokens.colors.focusBackground else tokens.colors.surfaceElevated,
+        border = BorderStroke(
+            width = NuvioTokens.Border.thin,
+            color = if (highlighted) tokens.colors.accent else tokens.colors.borderDefault,
+        ),
+    ) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.displaySmall,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
+            text = text,
+            modifier = Modifier.padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s4),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (highlighted) tokens.colors.textPrimary else tokens.colors.textSecondary,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (subtitle.isNotBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
@@ -375,6 +480,7 @@ private fun CatalogPosterTile(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val tokens = MaterialTheme.nuvio
     HomePosterHoverPreview(
         item = item,
         isWatched = isWatched,
@@ -388,14 +494,16 @@ private fun CatalogPosterTile(
                 .then(it),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val shape = RoundedCornerShape(cornerRadiusDp.dp)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(item.posterShape.catalogAspectRatio())
-                    .clip(RoundedCornerShape(cornerRadiusDp.dp))
-                    .background(MaterialTheme.colorScheme.surface)
+                    .clip(shape)
+                    .background(tokens.colors.surfaceCard)
+                    .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, shape)
                     .nuvioCardDepth(
-                        shape = RoundedCornerShape(cornerRadiusDp.dp),
+                        shape = shape,
                         surface = NuvioCardDepthSurface.Posters,
                     )
                     .posterCardClickable(
@@ -407,14 +515,14 @@ private fun CatalogPosterTile(
                     ),
             ) {
                 if (item.poster != null) {
-                    val platformContext = coil3.compose.LocalPlatformContext.current
+                    val platformContext = LocalPlatformContext.current
                     val hasFallback = !item.rawPosterUrl.isNullOrBlank() && item.rawPosterUrl != item.poster
                     val imageModel = remember(item.poster, item.rawPosterUrl, platformContext) {
                         if (hasFallback) {
-                            coil3.request.ImageRequest.Builder(platformContext)
+                            ImageRequest.Builder(platformContext)
                                 .data(item.poster)
                                 .memoryCacheKeyExtras(
-                                    mapOf(com.nuvio.app.core.poster.CustomPosterFallbackInterceptor.FALLBACK_URL_KEY to item.rawPosterUrl!!)
+                                    mapOf(CustomPosterFallbackInterceptor.FALLBACK_URL_KEY to item.rawPosterUrl!!),
                                 )
                                 .build()
                         } else {
@@ -435,7 +543,7 @@ private fun CatalogPosterTile(
                 Text(
                     text = item.name,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = tokens.colors.textPrimary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -444,7 +552,7 @@ private fun CatalogPosterTile(
                     Text(
                         text = detail,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -457,21 +565,20 @@ private fun CatalogPosterTile(
 }
 
 @Composable
-private fun CatalogSkeletonTile(cornerRadiusDp: Int) {
-    CatalogSkeletonTile(cornerRadiusDp = cornerRadiusDp, aspectRatio = 0.68f)
-}
-
-@Composable
 private fun CatalogSkeletonTile(
     cornerRadiusDp: Int,
     aspectRatio: Float,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(cornerRadiusDp.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(aspectRatio)
-            .clip(RoundedCornerShape(cornerRadiusDp.dp))
-            .background(MaterialTheme.colorScheme.surface),
+            .clip(shape)
+            .background(tokens.colors.surfaceCard, shape)
+            .skeleton(shape)
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, shape),
     )
 }
 
