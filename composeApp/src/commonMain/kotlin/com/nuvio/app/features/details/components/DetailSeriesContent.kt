@@ -3,6 +3,7 @@ package com.nuvio.app.features.details.components
 import com.nuvio.app.core.ui.rememberAnimatedArtworkAnimation
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -16,6 +17,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +42,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -79,17 +86,19 @@ import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
-import com.nuvio.app.core.ui.NuvioProgressBar
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterZoomAnchor
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
-import com.nuvio.app.core.ui.backdropControlColor
+import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.captureSecondaryClickRootOffset
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.secondaryClick
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.isDesktop
 import com.nuvio.app.features.details.EpisodeRatingsVisibility
@@ -481,17 +490,34 @@ private fun SeasonViewModeToggle(
     sizing: SeriesContentSizing,
     onClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val isPosters = mode == SeasonViewMode.Posters
+    val shape = RoundedCornerShape(NuvioTokens.Radius.md)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val containerColor = if (isDesktop && isHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated
+    val borderColor = if (isDesktop && isHovered) tokens.colors.borderStrong else tokens.colors.borderDefault
+    val textColor = if (isDesktop && isHovered) tokens.colors.textPrimary else tokens.colors.textSecondary
+
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .nuvioFocusBorder(shape)
+            .clip(shape)
+            .background(containerColor)
             .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(8.dp),
+                width = NuvioTokens.Border.thin,
+                color = borderColor,
+                shape = shape,
             )
-            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
@@ -506,7 +532,7 @@ private fun SeasonViewModeToggle(
                 fontSize = sizing.seasonToggleTextSize,
                 fontWeight = FontWeight.SemiBold,
             ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = textColor,
         )
     }
 }
@@ -548,8 +574,29 @@ private fun SeasonTextChipScrollRow(
         horizontalArrangement = Arrangement.spacedBy(sizing.seasonChipGap),
     ) {
         items(seasons, key = { season -> season }) { season ->
+            val tokens = MaterialTheme.nuvio
             val isSelected = season == currentSeason
             val chipShape = RoundedCornerShape(sizing.seasonChipRadius)
+            val interactionSource = remember { MutableInteractionSource() }
+            val isHovered by interactionSource.collectIsHoveredAsState()
+            val chipBackground by animateColorAsState(
+                targetValue = when {
+                    isSelected -> tokens.colors.focusBackground
+                    isDesktop && isHovered -> tokens.colors.surfaceCard
+                    else -> tokens.colors.surfaceElevated
+                },
+                animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+                label = "season_chip_bg",
+            )
+            val chipBorder by animateColorAsState(
+                targetValue = when {
+                    isSelected -> tokens.colors.accent
+                    isDesktop && isHovered -> tokens.colors.borderStrong
+                    else -> tokens.colors.borderDefault
+                },
+                animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+                label = "season_chip_border",
+            )
             var chipBounds by remember(season) { mutableStateOf<Rect?>(null) }
             val onSecondaryClick = onLongPress?.let { handler ->
                 {
@@ -579,15 +626,22 @@ private fun SeasonTextChipScrollRow(
                         )
                     }
                     .clip(chipShape)
-                    .background(
-                        if (isSelected) {
-                            backdropControlColor(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                        } else {
-                            Color.Transparent
-                        },
+                    .background(chipBackground)
+                    .border(
+                        width = NuvioTokens.Border.thin,
+                        color = chipBorder,
+                        shape = chipShape,
                     )
                     .nuvioFocusBorder(chipShape)
-                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                    .then(
+                        if (isDesktop) {
+                            Modifier
+                                .hoverable(interactionSource)
+                                .pointerHoverIcon(PointerIcon.Hand)
+                        } else {
+                            Modifier
+                        },
+                    )
                     .captureSecondaryClickRootOffset(enabled = onSecondaryClick != null)
                     .combinedClickable(
                         onClick = {
@@ -609,10 +663,10 @@ private fun SeasonTextChipScrollRow(
                         fontSize = sizing.seasonChipTextSize,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                     ),
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.onBackground
+                    color = if (isSelected || (isDesktop && isHovered)) {
+                        tokens.colors.textPrimary
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        tokens.colors.textSecondary
                     },
                 )
             }
@@ -695,10 +749,25 @@ private fun SeasonPosterButton(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val posterShape = RoundedCornerShape(sizing.seasonPosterRadius)
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isSelected -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "season_poster_border",
+    )
+
     Column(
         modifier = Modifier
             .width(sizing.seasonPosterWidth)
-            .nuvioFocusBorder(RoundedCornerShape(sizing.seasonPosterRadius))
+            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
+            .nuvioFocusBorder(posterShape)
             .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -706,16 +775,12 @@ private fun SeasonPosterButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(sizing.seasonPosterHeight)
-                .clip(RoundedCornerShape(sizing.seasonPosterRadius))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .clip(posterShape)
+                .background(tokens.colors.surfaceCard)
                 .border(
-                    width = if (isSelected) 2.dp else 1.dp,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        Color.White.copy(alpha = 0.1f)
-                    },
-                    shape = RoundedCornerShape(sizing.seasonPosterRadius),
+                    width = if (isSelected) 2.dp else NuvioTokens.Border.thin,
+                    color = borderColor,
+                    shape = posterShape,
                 ),
         ) {
             if (imageUrl != null) {
@@ -729,14 +794,14 @@ private fun SeasonPosterButton(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surface),
+                        .background(tokens.colors.surfaceElevated),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = label,
                         modifier = Modifier.padding(horizontal = 12.dp),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -750,10 +815,10 @@ private fun SeasonPosterButton(
                 fontSize = sizing.seasonChipTextSize,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
             ),
-            color = if (isSelected) {
-                MaterialTheme.colorScheme.onBackground
+            color = if (isSelected || (isDesktop && isHovered)) {
+                tokens.colors.textPrimary
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+                tokens.colors.textSecondary
             },
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -860,7 +925,20 @@ private fun EpisodeHorizontalCard(
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
 ) {
-    val cardShape = RoundedCornerShape(metrics.cornerRadius)
+    val tokens = MaterialTheme.nuvio
+    val cornerRadius = if (isDesktop) 14.dp else metrics.cornerRadius
+    val cardShape = RoundedCornerShape(cornerRadius)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.65f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "episode_horizontal_card_border",
+    )
     val ratingLabel = remember(imdbRating, episodeRatingsVisibility, isWatched) {
         imdbRating?.takeIf { it > 0.0 && episodeRatingsVisibility.showRating(isWatched) }
             ?.let(::formatEpisodeRating)
@@ -882,18 +960,24 @@ private fun EpisodeHorizontalCard(
             .width(metrics.cardWidth)
             .height(metrics.cardHeight)
             .clip(cardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .background(tokens.colors.surfaceCard)
             .nuvioCardDepth(
                 shape = cardShape,
                 surface = NuvioCardDepthSurface.EpisodeCards,
-                fallbackBorderAlpha = 0.12f,
+                fallbackBorderAlpha = 0f,
+            )
+            .border(
+                width = NuvioTokens.Border.thin,
+                color = borderColor,
+                shape = cardShape,
             )
             .nuvioFocusBorder(cardShape)
+            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
             .posterCardClickable(
                 onClick = onClick,
                 onLongClick = onLongPress,
                 zoomImageUrl = imageUrl,
-                zoomCornerRadius = metrics.cornerRadius,
+                zoomCornerRadius = cornerRadius,
             ),
     ) {
         val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
@@ -915,11 +999,11 @@ private fun EpisodeHorizontalCard(
                 .background(
                     Brush.verticalGradient(
                         0f to Color.Transparent,
-                        0.42f to Color.Transparent,
-                        0.56f to Color.Black.copy(alpha = 0.20f),
-                        0.70f to Color.Black.copy(alpha = 0.45f),
-                        0.84f to Color.Black.copy(alpha = 0.68f),
-                        1f to Color.Black.copy(alpha = 0.92f),
+                        0.40f to Color.Transparent,
+                        0.56f to tokens.colors.background.copy(alpha = 0.28f),
+                        0.72f to tokens.colors.background.copy(alpha = 0.62f),
+                        0.86f to tokens.colors.background.copy(alpha = 0.84f),
+                        1f to tokens.colors.background.copy(alpha = 0.96f),
                     ),
                 ),
         )
@@ -956,7 +1040,6 @@ private fun EpisodeHorizontalCard(
                 radius = metrics.badgeRadius,
                 horizontalPadding = metrics.badgeHorizontalPadding,
                 verticalPadding = metrics.badgeVerticalPadding,
-                backgroundAlpha = 0.42f,
             )
 
             Text(
@@ -966,7 +1049,7 @@ private fun EpisodeHorizontalCard(
                     fontWeight = FontWeight.ExtraBold,
                     lineHeight = metrics.titleLineHeight,
                 ),
-                color = Color.White,
+                color = tokens.colors.textPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -978,7 +1061,7 @@ private fun EpisodeHorizontalCard(
                         fontSize = metrics.bodyTextSize,
                         lineHeight = metrics.bodyLineHeight,
                     ),
-                    color = Color.White.copy(alpha = 0.86f),
+                    color = tokens.colors.textSecondary.copy(alpha = 0.90f),
                     maxLines = metrics.overviewMaxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -994,7 +1077,7 @@ private fun EpisodeHorizontalCard(
                         Text(
                             text = runtime,
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = metrics.metaTextSize),
-                            color = Color.White.copy(alpha = 0.78f),
+                            color = tokens.colors.textMuted,
                             maxLines = 1,
                         )
                     }
@@ -1011,7 +1094,7 @@ private fun EpisodeHorizontalCard(
                         Text(
                             text = date,
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = metrics.metaTextSize),
-                            color = Color.White.copy(alpha = 0.78f),
+                            color = tokens.colors.textMuted,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.End,
@@ -1022,8 +1105,9 @@ private fun EpisodeHorizontalCard(
         }
 
         visibleProgressEntry?.let { entry ->
-            NuvioProgressBar(
+            EpisodeGradientProgressBar(
                 progress = entry.progressFraction,
+                height = progressBarHeight,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
@@ -1032,9 +1116,6 @@ private fun EpisodeHorizontalCard(
                         end = metrics.contentPadding,
                         bottom = progressBarBottomSpacing,
                     ),
-                height = progressBarHeight,
-                trackColor = Color.White.copy(alpha = 0.22f),
-                fillColor = MaterialTheme.colorScheme.primary,
             )
         }
     }
@@ -1175,24 +1256,53 @@ private fun EpisodeCodeBadge(
     radius: Dp,
     horizontalPadding: Dp,
     verticalPadding: Dp,
-    backgroundAlpha: Float,
+    backgroundAlpha: Float = 0.84f,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(radius)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(radius))
-            .background(Color.Black.copy(alpha = backgroundAlpha))
+            .clip(shape)
+            .background(tokens.colors.surfaceElevated.copy(alpha = backgroundAlpha))
+            .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, shape)
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium.copy(
                 fontSize = textSize,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 letterSpacing = 0.sp,
             ),
-            color = Color.White.copy(alpha = 0.9f),
+            color = tokens.colors.textPrimary,
             maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun EpisodeGradientProgressBar(
+    progress: Float,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
+    val clampedProgress = progress.coerceIn(0f, 1f)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(tokens.shapes.chip)
+            .background(tokens.colors.textPrimary.copy(alpha = 0.18f)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(clampedProgress)
+                .fillMaxHeight()
+                .clip(tokens.shapes.chip)
+                .background(palette.accentBrush()),
         )
     }
 }
@@ -1204,7 +1314,14 @@ private fun ImdbEpisodeRatingBadge(
     logoHeight: Dp,
     textSize: androidx.compose.ui.unit.TextUnit,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val badgeShape = RoundedCornerShape(NuvioTokens.Radius.sm)
     Row(
+        modifier = Modifier
+            .clip(badgeShape)
+            .background(tokens.colors.surfaceElevated.copy(alpha = 0.78f))
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, badgeShape)
+            .padding(horizontal = NuvioTokens.Space.s6, vertical = NuvioTokens.Space.s2),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1218,24 +1335,20 @@ private fun ImdbEpisodeRatingBadge(
                 contentScale = ContentScale.Fit,
             )
         } else {
-            Text(
-                text = stringResource(Res.string.source_imdb),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = textSize,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.sp,
-                ),
-                color = Color.White.copy(alpha = 0.78f),
-                maxLines = 1,
+            Icon(
+                imageVector = Icons.Rounded.Star,
+                contentDescription = stringResource(Res.string.source_imdb),
+                tint = ImdbYellow,
+                modifier = Modifier.size(12.dp),
             )
         }
         Text(
             text = rating,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = textSize,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
             ),
-            color = Color(0xFFF5C518),
+            color = ImdbYellow,
             maxLines = 1,
         )
     }
@@ -1256,8 +1369,20 @@ private fun EpisodeListCard(
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
 ) {
-    val cornerRadius = rememberPosterCardStyleUiState().cornerRadiusDp.dp
+    val tokens = MaterialTheme.nuvio
+    val cornerRadius = if (isDesktop) 14.dp else rememberPosterCardStyleUiState().cornerRadiusDp.dp
     val cardShape = RoundedCornerShape(cornerRadius)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.65f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "episode_list_card_border",
+    )
     val ratingLabel = remember(imdbRating, episodeRatingsVisibility, isWatched) {
         imdbRating?.takeIf { it > 0.0 && episodeRatingsVisibility.showRating(isWatched) }
             ?.let(::formatEpisodeRating)
@@ -1295,14 +1420,22 @@ private fun EpisodeListCard(
             .fillMaxWidth()
             .height(sizing.cardHeight)
             .clip(cardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .background(tokens.colors.surfaceCard)
             .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.1f),
+                width = NuvioTokens.Border.thin,
+                color = borderColor,
                 shape = cardShape,
             )
             .nuvioFocusBorder(cardShape)
-            .then(if (isDesktop && (onClick != null || onLongPress != null)) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+            .then(
+                if (isDesktop && (onClick != null || onLongPress != null)) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
             .captureSecondaryClickRootOffset(enabled = handleLongPress != null)
             .combinedClickable(
                 enabled = onClick != null || onLongPress != null,
@@ -1339,7 +1472,7 @@ private fun EpisodeListCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surface),
+                            .background(tokens.colors.surfaceElevated),
                     )
                 }
 
@@ -1349,7 +1482,7 @@ private fun EpisodeListCard(
                     radius = sizing.badgeRadius,
                     horizontalPadding = sizing.badgeHorizontalPadding,
                     verticalPadding = sizing.badgeVerticalPadding,
-                    backgroundAlpha = 0.85f,
+                    backgroundAlpha = 0.88f,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(start = 8.dp, top = 8.dp),
@@ -1398,7 +1531,7 @@ private fun EpisodeListCard(
                         lineHeight = sizing.titleLineHeight,
                         letterSpacing = 0.sp,
                     ),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     maxLines = sizing.titleMaxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1415,7 +1548,7 @@ private fun EpisodeListCard(
                                     fontSize = sizing.metaTextSize,
                                     fontWeight = FontWeight.Medium,
                                 ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                color = tokens.colors.textMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -1438,7 +1571,7 @@ private fun EpisodeListCard(
                             fontSize = sizing.bodyTextSize,
                             lineHeight = sizing.bodyLineHeight,
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                         maxLines = sizing.overviewMaxLines,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1449,15 +1582,13 @@ private fun EpisodeListCard(
         progressEntry
             ?.takeIf { it.durationMs > 0L && !it.isCompleted }
             ?.let { entry ->
-                NuvioProgressBar(
+                EpisodeGradientProgressBar(
                     progress = entry.progressFraction,
+                    height = 5.dp,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .width(sizing.imageWidth - 24.dp)
                         .padding(start = 12.dp, bottom = 10.dp),
-                    height = 5.dp,
-                    trackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.14f),
-                    fillColor = MaterialTheme.colorScheme.primary,
                 )
             }
     }

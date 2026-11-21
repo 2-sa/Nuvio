@@ -1,7 +1,14 @@
 package com.nuvio.app.features.details.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,32 +19,46 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.SkeletonBlock
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.trakt.TraktCommentReview
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.flow.distinctUntilChanged
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -56,6 +77,7 @@ fun DetailCommentsSection(
     showHeader: Boolean = true,
     horizontalScrollPadding: Dp = 0.dp,
 ) {
+    val tokens = MaterialTheme.nuvio
     val listState = rememberLazyListState()
 
     LaunchedEffect(listState, comments.size, canLoadMore, isLoadingMore, isLoading, error) {
@@ -100,13 +122,13 @@ fun DetailCommentsSection(
                     Text(
                         text = error,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                     Button(
                         onClick = onRetry,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            containerColor = tokens.colors.surfaceElevated,
+                            contentColor = tokens.colors.textPrimary,
                         ),
                     ) {
                         Text(stringResource(Res.string.action_retry))
@@ -118,7 +140,7 @@ fun DetailCommentsSection(
                 Text(
                     text = stringResource(Res.string.detail_comments_empty),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textSecondary,
                 )
             }
 
@@ -155,6 +177,7 @@ fun DetailCommentsSection(
 
 @Composable
 private fun CommentsHeader() {
+    val tokens = MaterialTheme.nuvio
     BoxWithConstraints {
         val isTablet = maxWidth >= 720.dp
         val titleSize = if (isTablet) 22.sp else 20.sp
@@ -165,7 +188,7 @@ private fun CommentsHeader() {
                 fontSize = titleSize,
                 fontWeight = FontWeight.SemiBold,
             ),
-            color = MaterialTheme.colorScheme.onBackground,
+            color = tokens.colors.textPrimary,
         )
     }
 }
@@ -176,73 +199,140 @@ private fun CommentCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    val isAmoled = colorScheme.background == Color.Black && colorScheme.surface == Color(0xFF050505)
-    val bodyText = if (review.hasSpoilerContent) {
-        stringResource(Res.string.detail_comments_spoiler_card)
-    } else {
-        review.comment
-    }
+    val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(14.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) tokens.colors.borderStrong else tokens.colors.borderSubtle,
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "comment_card_border",
+    )
 
     BoxWithConstraints {
         val isTablet = maxWidth >= 720.dp
         val cardWidth = if (isTablet) 340.dp else 280.dp
-        val cardHeight = if (isTablet) 210.dp else 190.dp
+        val cardHeight = if (isTablet) 216.dp else 196.dp
 
         Surface(
             modifier = modifier
                 .width(cardWidth)
                 .height(cardHeight)
+                .nuvioFocusBorder(cardShape)
+                .then(
+                    if (isDesktop) {
+                        Modifier
+                            .hoverable(interactionSource)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                    } else {
+                        Modifier
+                    },
+                )
                 .clickable(onClick = onClick),
-            shape = RoundedCornerShape(16.dp),
-            color = if (isAmoled) Color(0xFF121212) else colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            tonalElevation = 1.dp,
+            shape = cardShape,
+            color = tokens.colors.surfaceCard,
+            border = BorderStroke(NuvioTokens.Border.thin, borderColor),
+            tonalElevation = 0.dp,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(NuvioTokens.Space.s16),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
             ) {
-                Text(
-                    text = review.authorDisplayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = FontWeight.SemiBold,
-                )
-
-                if (review.review) {
-                    CommentChip(text = stringResource(Res.string.detail_comments_badge_review))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = review.authorDisplayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = tokens.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (review.review) {
+                        CommentChip(text = stringResource(Res.string.detail_comments_badge_review))
+                    }
                 }
 
-                Text(
-                    text = bodyText,
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
-                    color = if (review.hasSpoilerContent) {
-                        MaterialTheme.nuvio.colors.warning
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    maxLines = 5,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                if (review.hasSpoilerContent) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(NuvioTokens.Radius.md))
+                            .background(tokens.colors.surfaceElevated)
+                            .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, RoundedCornerShape(NuvioTokens.Radius.md))
+                            .padding(NuvioTokens.Space.s12),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.VisibilityOff,
+                                contentDescription = null,
+                                tint = tokens.colors.warning,
+                                modifier = Modifier.size(NuvioTokens.Icon.sm),
+                            )
+                            Text(
+                                text = stringResource(Res.string.detail_comments_spoiler_card),
+                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                                color = tokens.colors.warning,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = review.comment,
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                        color = tokens.colors.textSecondary,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                HorizontalDivider(
+                    thickness = NuvioTokens.Border.hairline,
+                    color = tokens.colors.borderSubtle,
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     review.rating?.let { rating ->
-                        Text(
-                            text = stringResource(Res.string.detail_comments_badge_rating, rating),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            maxLines = 1,
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Star,
+                                contentDescription = null,
+                                tint = tokens.colors.warning,
+                                modifier = Modifier.size(13.dp),
+                            )
+                            Text(
+                                text = stringResource(Res.string.detail_comments_badge_rating, rating),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = tokens.colors.textSecondary,
+                                maxLines = 1,
+                            )
+                        }
                     }
                     Text(
                         text = stringResource(Res.string.detail_comments_likes, review.likes),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        color = tokens.colors.textMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -254,18 +344,20 @@ private fun CommentCard(
 
 @Composable
 private fun CommentChip(text: String) {
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(NuvioTokens.Radius.full)
     Box(
         modifier = Modifier
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(999.dp),
-            )
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .clip(shape)
+            .background(tokens.colors.focusBackground)
+            .border(NuvioTokens.Border.thin, tokens.colors.accent.copy(alpha = 0.45f), shape)
+            .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s4),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+            color = tokens.colors.textPrimary,
             maxLines = 1,
         )
     }
@@ -273,15 +365,18 @@ private fun CommentChip(text: String) {
 
 @Composable
 private fun LoadingCommentCard() {
+    val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(14.dp)
     BoxWithConstraints {
         val isTablet = maxWidth >= 720.dp
         val cardWidth = if (isTablet) 340.dp else 280.dp
-        val cardHeight = if (isTablet) 210.dp else 190.dp
+        val cardHeight = if (isTablet) 216.dp else 196.dp
 
         Surface(
             modifier = Modifier.width(cardWidth).height(cardHeight),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = cardShape,
+            color = tokens.colors.surfaceCard,
+            border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),

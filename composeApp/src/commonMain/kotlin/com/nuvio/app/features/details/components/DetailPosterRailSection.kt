@@ -20,6 +20,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.isDesktop
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.nuvioShelfHoverOverdraw
@@ -111,13 +113,14 @@ fun DetailPosterRailSection(
         sourceLabel
             ?.takeIf { it.isNotBlank() }
             ?.let { label ->
+                val tokens = MaterialTheme.nuvio
                 Text(
                     text = label,
                     modifier = Modifier
                         .align(Alignment.End)
-                        .padding(end = headerHorizontalPadding, top = 4.dp),
+                        .padding(end = headerHorizontalPadding, top = NuvioTokens.Space.s4),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

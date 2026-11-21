@@ -3,25 +3,35 @@ package com.nuvio.app.features.details.components
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,12 +47,15 @@ import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.features.details.MetaPerson
 import com.nuvio.app.features.details.castAvatarSharedTransitionKey
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -113,6 +126,7 @@ private fun CastItem(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     onClick: (() -> Unit)? = null,
 ) {
+    val tokens = MaterialTheme.nuvio
     val avatarCacheKey = sharedTransitionKey
     val platformContext = LocalPlatformContext.current
     val avatarRequest = if (!person.photo.isNullOrBlank() && !avatarCacheKey.isNullOrBlank()) {
@@ -144,24 +158,49 @@ private fun CastItem(
     } else {
         Modifier
     }
-    val clickInteractionSource = remember { MutableInteractionSource() }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val cardShape = RoundedCornerShape(14.dp)
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) tokens.colors.borderStrong else tokens.colors.borderSubtle,
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "cast_card_border",
+    )
+    val cardBackground = if (isDesktop && isHovered) {
+        tokens.colors.surfaceElevated
+    } else {
+        tokens.colors.surfaceCard
+    }
 
     Column(
         modifier = modifier
             .width(sizing.itemWidth)
+            .clip(cardShape)
+            .background(cardBackground)
+            .border(NuvioTokens.Border.thin, borderColor, cardShape)
             .then(
                 if (onClick != null) {
                     Modifier
-                        .nuvioFocusBorder(CircleShape)
+                        .nuvioFocusBorder(cardShape)
+                        .then(
+                            if (isDesktop) {
+                                Modifier
+                                    .hoverable(interactionSource)
+                                    .pointerHoverIcon(PointerIcon.Hand)
+                            } else {
+                                Modifier
+                            },
+                        )
                         .clickable(
-                        interactionSource = clickInteractionSource,
-                        indication = null,
-                        onClick = onClick,
-                    )
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = onClick,
+                        )
                 } else {
-                    Modifier
+                    if (isDesktop) Modifier.hoverable(interactionSource) else Modifier
                 },
-            ),
+            )
+            .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s12),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -171,14 +210,14 @@ private fun CastItem(
                 .size(sizing.avatarSize)
                 .clip(CircleShape)
                 .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = tokens.colors.surfaceElevated,
                     shape = CircleShape,
                 )
+                .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, CircleShape)
                 .nuvioCardDepth(
                     shape = CircleShape,
                     surface = NuvioCardDepthSurface.Cast,
-                )
-                .nuvioFocusBorder(CircleShape),
+                ),
             contentAlignment = Alignment.Center,
         ) {
             if (person.photo != null) {
@@ -192,34 +231,41 @@ private fun CastItem(
                 Text(
                     text = person.name.initials(),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textSecondary,
                     fontWeight = FontWeight.Bold,
                 )
             }
         }
-        Text(
-            text = person.name,
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = sizing.nameLabelSize,
-            ),
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (!person.role.isNullOrBlank()) {
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             Text(
-                text = person.role,
+                text = person.name,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = sizing.subLabelSize,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = sizing.nameLabelSize,
+                    fontWeight = FontWeight.SemiBold,
                 ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textPrimary,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (!person.role.isNullOrBlank()) {
+                Text(
+                    text = person.role,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = sizing.subLabelSize,
+                    ),
+                    color = tokens.colors.textMuted,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -236,31 +282,31 @@ private fun castSectionSizing(maxWidthDp: Float): CastSectionSizing =
     when {
         maxWidthDp >= 1200f -> CastSectionSizing(
             avatarSize = 100.dp,
-            itemWidth = 112.dp,
-            avatarGap = 20.dp,
-            nameLabelSize = 16.sp,
-            subLabelSize = 14.sp,
-        )
-        maxWidthDp >= 840f -> CastSectionSizing(
-            avatarSize = 90.dp,
-            itemWidth = 102.dp,
-            avatarGap = 18.dp,
+            itemWidth = 128.dp,
+            avatarGap = 16.dp,
             nameLabelSize = 15.sp,
             subLabelSize = 13.sp,
         )
+        maxWidthDp >= 840f -> CastSectionSizing(
+            avatarSize = 90.dp,
+            itemWidth = 116.dp,
+            avatarGap = 14.dp,
+            nameLabelSize = 14.sp,
+            subLabelSize = 12.sp,
+        )
         maxWidthDp >= 600f -> CastSectionSizing(
             avatarSize = 85.dp,
-            itemWidth = 98.dp,
-            avatarGap = 16.dp,
+            itemWidth = 110.dp,
+            avatarGap = 12.dp,
             nameLabelSize = 14.sp,
             subLabelSize = 12.sp,
         )
         else -> CastSectionSizing(
             avatarSize = 80.dp,
-            itemWidth = 92.dp,
-            avatarGap = 16.dp,
-            nameLabelSize = 14.sp,
-            subLabelSize = 12.sp,
+            itemWidth = 104.dp,
+            avatarGap = 12.dp,
+            nameLabelSize = 13.sp,
+            subLabelSize = 11.sp,
         )
     }
 

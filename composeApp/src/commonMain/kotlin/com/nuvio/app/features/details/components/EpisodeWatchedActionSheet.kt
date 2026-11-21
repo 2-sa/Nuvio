@@ -10,10 +10,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoneAll
@@ -22,6 +26,7 @@ import androidx.compose.material.icons.filled.PlaylistAddCheckCircle
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -33,14 +38,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.DesktopContextMenuPopup
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
-import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
 import com.nuvio.app.core.ui.PosterZoomOverlayAction
 import com.nuvio.app.core.ui.PosterZoomOverlayCoordinator
@@ -186,9 +192,12 @@ fun EpisodeWatchedActionSheet(
         return
     }
 
+    val tokens = MaterialTheme.nuvio
     NuvioModalBottomSheet(
         onDismissRequest = dismiss,
         sheetState = sheetState,
+        containerColor = tokens.colors.surfaceSheet,
+        contentColor = tokens.colors.textPrimary,
     ) {
         Column(
             modifier = Modifier
@@ -199,7 +208,11 @@ fun EpisodeWatchedActionSheet(
                 episode = episode,
                 seasonLabel = seasonLabel,
             )
-            NuvioBottomSheetDivider()
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = tokens.spacing.screenHorizontal),
+                thickness = NuvioTokens.Border.thin,
+                color = tokens.colors.borderSubtle,
+            )
             AnimatedContent(
                 targetState = showRating && ratingMedia != null,
                 transitionSpec = {
@@ -219,7 +232,16 @@ fun EpisodeWatchedActionSheet(
                         modifier = Modifier.padding(top = 20.dp),
                     )
                 } else {
-                    Column {
+                    val groupShape = RoundedCornerShape(NuvioTokens.Radius.lg)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s12)
+                            .clip(groupShape)
+                            .background(tokens.colors.surfaceElevated)
+                            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, groupShape)
+                            .padding(vertical = NuvioTokens.Space.s4),
+                    ) {
                         NuvioBottomSheetActionRow(
                             icon = Icons.Default.CheckCircle,
                             title = if (isEpisodeWatched) {
@@ -227,12 +249,14 @@ fun EpisodeWatchedActionSheet(
                             } else {
                                 stringResource(Res.string.episode_mark_watched)
                             },
+                            selected = isEpisodeWatched,
                             onClick = {
                                 onToggleWatched()
                                 dismiss()
                             },
                         )
                         if (canMarkPreviousEpisodes) {
+                            SheetActionRowDivider()
                             NuvioBottomSheetActionRow(
                                 icon = Icons.Default.DoneAll,
                                 title = if (arePreviousEpisodesWatched) {
@@ -240,12 +264,14 @@ fun EpisodeWatchedActionSheet(
                                 } else {
                                     stringResource(Res.string.episode_mark_previous_watched)
                                 },
+                                selected = arePreviousEpisodesWatched,
                                 onClick = {
                                     onTogglePreviousWatched()
                                     dismiss()
                                 },
                             )
                         }
+                        SheetActionRowDivider()
                         NuvioBottomSheetActionRow(
                             icon = Icons.Default.PlaylistAddCheckCircle,
                             title = if (isSeasonWatched) {
@@ -253,6 +279,7 @@ fun EpisodeWatchedActionSheet(
                             } else {
                                 stringResource(Res.string.episode_mark_season_watched, seasonLabel)
                             },
+                            selected = isSeasonWatched,
                             onClick = {
                                 onToggleSeasonWatched()
                                 dismiss()
@@ -260,9 +287,11 @@ fun EpisodeWatchedActionSheet(
                         )
                         if (ratingState.isAvailable) {
                             val rated = ratingState.rating
+                            SheetActionRowDivider()
                             NuvioBottomSheetActionRow(
                                 icon = if (rated != null) Icons.Rounded.Star else Icons.Rounded.StarOutline,
                                 title = stringResource(Res.string.rating_rate_episode),
+                                selected = rated != null,
                                 onClick = { showRating = true },
                                 trailingContent = if (rated != null) {
                                     {
@@ -270,7 +299,7 @@ fun EpisodeWatchedActionSheet(
                                             text = formatRating(rated),
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.nuvio.colors.accent,
+                                            color = tokens.colors.accent,
                                         )
                                     }
                                 } else {
@@ -279,6 +308,7 @@ fun EpisodeWatchedActionSheet(
                             )
                         }
                         if (showPlayManually && onPlayManually != null) {
+                            SheetActionRowDivider()
                             NuvioBottomSheetActionRow(
                                 icon = Icons.Default.PlayArrow,
                                 title = stringResource(Res.string.play_manually),
@@ -354,6 +384,7 @@ fun SeasonWatchedActionSheet(
         return
     }
 
+    val tokens = MaterialTheme.nuvio
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
 
@@ -364,6 +395,8 @@ fun SeasonWatchedActionSheet(
             }
         },
         sheetState = sheetState,
+        containerColor = tokens.colors.surfaceSheet,
+        contentColor = tokens.colors.textPrimary,
     ) {
         Column(
             modifier = Modifier
@@ -373,41 +406,68 @@ fun SeasonWatchedActionSheet(
             Text(
                 text = seasonLabel,
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = tokens.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             )
-            NuvioBottomSheetDivider()
-            NuvioBottomSheetActionRow(
-                icon = Icons.Default.PlaylistAddCheckCircle,
-                title = if (isSeasonWatched) {
-                    stringResource(Res.string.episode_mark_season_unwatched, seasonLabel)
-                } else {
-                    stringResource(Res.string.episode_mark_season_watched, seasonLabel)
-                },
-                onClick = {
-                    onToggleSeasonWatched()
-                    coroutineScope.launch {
-                        dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
-                    }
-                },
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = tokens.spacing.screenHorizontal),
+                thickness = NuvioTokens.Border.thin,
+                color = tokens.colors.borderSubtle,
             )
-            if (canMarkPreviousSeasons) {
+            val groupShape = RoundedCornerShape(NuvioTokens.Radius.lg)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s12)
+                    .clip(groupShape)
+                    .background(tokens.colors.surfaceElevated)
+                    .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, groupShape)
+                    .padding(vertical = NuvioTokens.Space.s4),
+            ) {
                 NuvioBottomSheetActionRow(
-                    icon = Icons.Default.DoneAll,
-                    title = stringResource(Res.string.episode_mark_previous_seasons_watched),
+                    icon = Icons.Default.PlaylistAddCheckCircle,
+                    title = if (isSeasonWatched) {
+                        stringResource(Res.string.episode_mark_season_unwatched, seasonLabel)
+                    } else {
+                        stringResource(Res.string.episode_mark_season_watched, seasonLabel)
+                    },
+                    selected = isSeasonWatched,
                     onClick = {
-                        onMarkPreviousSeasonsWatched()
+                        onToggleSeasonWatched()
                         coroutineScope.launch {
                             dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
                         }
                     },
                 )
+                if (canMarkPreviousSeasons) {
+                    SheetActionRowDivider()
+                    NuvioBottomSheetActionRow(
+                        icon = Icons.Default.DoneAll,
+                        title = stringResource(Res.string.episode_mark_previous_seasons_watched),
+                        onClick = {
+                            onMarkPreviousSeasonsWatched()
+                            coroutineScope.launch {
+                                dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                            }
+                        },
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SheetActionRowDivider() {
+    val tokens = MaterialTheme.nuvio
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = NuvioTokens.Space.s12),
+        thickness = NuvioTokens.Border.thin,
+        color = tokens.colors.borderSubtle,
+    )
 }
 
 @Composable
@@ -415,35 +475,45 @@ private fun EpisodeActionSheetHeader(
     episode: MetaVideo,
     seasonLabel: String,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val codeLabel = localizedSeasonEpisodeCode(
+        seasonNumber = episode.season,
+        episodeNumber = episode.episode,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             text = localizedEpisodeTitle(episode.title, episode.episode) ?: episode.title,
             style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            text = buildString {
-                localizedSeasonEpisodeCode(
-                    seasonNumber = episode.season,
-                    episodeNumber = episode.episode,
-                )?.let {
-                    append(it)
-                    append(" • ")
-                }
-                append(seasonLabel)
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(NuvioTokens.Radius.sm))
+                .background(tokens.colors.surfaceElevated)
+                .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, RoundedCornerShape(NuvioTokens.Radius.sm))
+                .padding(horizontal = NuvioTokens.Space.s8, vertical = NuvioTokens.Space.s4),
+        ) {
+            Text(
+                text = buildString {
+                    codeLabel?.let {
+                        append(it)
+                        append(" • ")
+                    }
+                    append(seasonLabel)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = tokens.colors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }

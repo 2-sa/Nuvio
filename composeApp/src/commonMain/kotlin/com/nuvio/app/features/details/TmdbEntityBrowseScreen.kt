@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -19,6 +21,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,8 +41,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,24 +54,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.controller.RegisterControllerVerticalScroll
 import com.nuvio.app.isDesktop
+import com.nuvio.app.core.ui.Chip
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.desktopCatalogShelfPosterBaseWidthDp
 import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
-import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
+import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.core.ui.skeleton
 import com.nuvio.app.features.details.components.DetailPosterRailSection
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.tmdb.TmdbEntityBrowseData
 import com.nuvio.app.features.tmdb.TmdbEntityKind
 import com.nuvio.app.features.tmdb.TmdbEntityMediaType
@@ -69,12 +87,19 @@ import com.nuvio.app.features.tmdb.TmdbEntityRailType
 import com.nuvio.app.features.tmdb.TmdbMetadataService
 import com.nuvio.app.core.poster.withCustomPosterUrls
 import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 
 private sealed interface EntityBrowseUiState {
     data object Loading : EntityBrowseUiState
     data class Error(val message: String) : EntityBrowseUiState
     data class Success(val data: TmdbEntityBrowseData) : EntityBrowseUiState
+}
+
+private enum class EntityMediaFilter {
+    ALL,
+    MOVIE,
+    TV,
 }
 
 private val ENTITY_BROWSE_WIDE_LAYOUT_MIN_WIDTH = 900.dp
@@ -90,6 +115,8 @@ fun TmdbEntityBrowseScreen(
     onOpenMeta: (MetaPreview) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
+    var retryNonce by remember(entityKind, entityId) { mutableIntStateOf(0) }
     var uiState by remember(entityKind, entityId) {
         mutableStateOf<EntityBrowseUiState>(EntityBrowseUiState.Loading)
     }
@@ -100,7 +127,7 @@ fun TmdbEntityBrowseScreen(
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val loadFailedMessage = stringResource(Res.string.details_browse_load_failed, entityName)
 
-    LaunchedEffect(entityKind, entityId) {
+    LaunchedEffect(entityKind, entityId, retryNonce) {
         uiState = EntityBrowseUiState.Loading
         val data = TmdbMetadataService.fetchEntityBrowse(
             entityKind = entityKind,
@@ -119,7 +146,11 @@ fun TmdbEntityBrowseScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(tokens.colors.background),
+    ) {
         Crossfade(
             targetState = uiState,
             label = "EntityBrowseCrossfade",
@@ -128,7 +159,7 @@ fun TmdbEntityBrowseScreen(
                 is EntityBrowseUiState.Loading -> EntityBrowseSkeleton()
                 is EntityBrowseUiState.Error -> EntityBrowseError(
                     message = state.message,
-                    onRetry = { uiState = EntityBrowseUiState.Loading },
+                    onRetry = { retryNonce += 1 },
                 )
                 is EntityBrowseUiState.Success -> EntityBrowseContent(
                     data = state.data,
@@ -149,13 +180,14 @@ fun TmdbEntityBrowseScreen(
                             .windowInsetsPadding(WindowInsets.statusBars)
                             .padding(
                                 start = desktopPageHorizontalPaddingForWidth(maxWidth.value),
-                                top = 32.dp,
+                                top = NuvioTokens.Space.s24,
                             )
                             .align(Alignment.TopStart),
-                        containerColor = Color.Transparent,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        buttonSize = 48.dp,
-                        iconSize = 24.dp,
+                        containerColor = tokens.colors.surfaceElevated.copy(alpha = 0.78f),
+                        showContainerOnDesktop = true,
+                        contentColor = tokens.colors.textPrimary,
+                        buttonSize = 40.dp,
+                        iconSize = 20.dp,
                     )
                 }
             } else {
@@ -169,7 +201,7 @@ fun TmdbEntityBrowseScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = stringResource(Res.string.action_back),
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        tint = tokens.colors.textPrimary,
                     )
                 }
             }
@@ -185,6 +217,7 @@ private fun EntityBrowseContent(
     fullyWatchedSeriesKeys: Set<String>,
     onOpenMeta: (MetaPreview) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val backgroundUrl = remember(data.rails, sourceType) {
         val preferredMediaType = if (sourceType.trim().equals("movie", ignoreCase = true)) {
             TmdbEntityMediaType.MOVIE
@@ -203,7 +236,7 @@ private fun EntityBrowseContent(
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                alpha = 0.10f,
+                alpha = 0.08f,
             )
         }
 
@@ -212,16 +245,26 @@ private fun EntityBrowseContent(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0f to MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
-                        0.3f to MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-                        1f to MaterialTheme.colorScheme.background,
+                        0f to tokens.colors.background.copy(alpha = 0.76f),
+                        0.32f to tokens.colors.background.copy(alpha = 0.96f),
+                        1f to tokens.colors.background,
                     ),
                 ),
         )
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val useWideLayout = maxWidth >= ENTITY_BROWSE_WIDE_LAYOUT_MIN_WIDTH
-            if (useWideLayout) {
+            val useDesktopGrid = isDesktop && maxWidth >= 720.dp
+            val useWideLayout = !isDesktop && maxWidth >= ENTITY_BROWSE_WIDE_LAYOUT_MIN_WIDTH
+            if (useDesktopGrid) {
+                DesktopEntityBrowseContent(
+                    data = data,
+                    sourceType = sourceType,
+                    watchedKeys = watchedKeys,
+                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                    pageHorizontalPadding = desktopPageHorizontalPaddingForWidth(maxWidth.value),
+                    onOpenMeta = onOpenMeta,
+                )
+            } else if (useWideLayout) {
                 WideEntityBrowseContent(
                     data = data,
                     watchedKeys = watchedKeys,
@@ -236,7 +279,7 @@ private fun EntityBrowseContent(
                     Text(
                         text = stringResource(Res.string.catalog_empty_title),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                     )
                 }
             } else {
@@ -284,6 +327,394 @@ private fun EntityBrowseContent(
         }
     }
 }
+
+@Composable
+private fun DesktopEntityBrowseContent(
+    data: TmdbEntityBrowseData,
+    sourceType: String,
+    watchedKeys: Set<String>,
+    fullyWatchedSeriesKeys: Set<String>,
+    pageHorizontalPadding: Dp,
+    onOpenMeta: (MetaPreview) -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val posterCardStyle = rememberPosterCardStyleUiState()
+    val hasMovies = remember(data.rails) {
+        data.rails.any { it.mediaType == TmdbEntityMediaType.MOVIE && it.items.isNotEmpty() }
+    }
+    val hasSeries = remember(data.rails) {
+        data.rails.any { it.mediaType == TmdbEntityMediaType.TV && it.items.isNotEmpty() }
+    }
+    val availableSortTypes = remember(data.rails) {
+        TmdbEntityRailType.entries.filter { railType ->
+            data.rails.any { it.railType == railType && it.items.isNotEmpty() }
+        }
+    }
+
+    var selectedMediaFilterName by rememberSaveable(data.header.kind.name, data.header.id) {
+        mutableStateOf(EntityMediaFilter.ALL.name)
+    }
+    var selectedSortName by rememberSaveable(data.header.kind.name, data.header.id) {
+        mutableStateOf((availableSortTypes.firstOrNull() ?: TmdbEntityRailType.POPULAR).name)
+    }
+
+    val selectedMediaFilter = remember(selectedMediaFilterName, hasMovies, hasSeries) {
+        val parsed = EntityMediaFilter.entries.firstOrNull { it.name == selectedMediaFilterName }
+            ?: EntityMediaFilter.ALL
+        when {
+            parsed == EntityMediaFilter.MOVIE && !hasMovies -> EntityMediaFilter.ALL
+            parsed == EntityMediaFilter.TV && !hasSeries -> EntityMediaFilter.ALL
+            else -> parsed
+        }
+    }
+    val selectedSort = remember(selectedSortName, availableSortTypes) {
+        val parsed = TmdbEntityRailType.entries.firstOrNull { it.name == selectedSortName }
+        if (parsed != null && parsed in availableSortTypes) {
+            parsed
+        } else {
+            availableSortTypes.firstOrNull() ?: TmdbEntityRailType.POPULAR
+        }
+    }
+
+    val displayedItems = remember(data.rails, selectedMediaFilter, selectedSort, sourceType) {
+        val preferredFirst = if (sourceType.trim().equals("movie", ignoreCase = true)) {
+            TmdbEntityMediaType.MOVIE
+        } else {
+            TmdbEntityMediaType.TV
+        }
+        data.rails
+            .asSequence()
+            .filter { rail ->
+                rail.railType == selectedSort && when (selectedMediaFilter) {
+                    EntityMediaFilter.ALL -> true
+                    EntityMediaFilter.MOVIE -> rail.mediaType == TmdbEntityMediaType.MOVIE
+                    EntityMediaFilter.TV -> rail.mediaType == TmdbEntityMediaType.TV
+                }
+            }
+            .sortedBy { if (it.mediaType == preferredFirst) 0 else 1 }
+            .flatMap { it.items.asSequence() }
+            .distinctBy { it.stableKey() }
+            .toList()
+    }
+
+    val totalCatalogueCount = remember(data.rails) {
+        data.rails
+            .asSequence()
+            .flatMap { it.items.asSequence() }
+            .distinctBy { it.stableKey() }
+            .count()
+    }
+
+    val effectiveBaseWidthDp = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp)
+    val gridCellWidth = if (posterCardStyle.catalogLandscapeModeEnabled) {
+        landscapePosterWidth(effectiveBaseWidthDp)
+    } else {
+        effectiveBaseWidthDp.dp
+    }
+    val gridState = rememberLazyGridState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.FixedSize(gridCellWidth),
+            state = gridState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = pageHorizontalPadding,
+                top = 80.dp,
+                end = pageHorizontalPadding,
+                bottom = nuvioSafeBottomPadding(36.dp),
+            ),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s16),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s20),
+        ) {
+            item(
+                key = "entity-obsidian-banner",
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                DesktopEntityHeaderBanner(
+                    header = data.header,
+                    catalogueCount = totalCatalogueCount,
+                )
+            }
+
+            if (data.rails.isNotEmpty()) {
+                item(
+                    key = "entity-filter-bar",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                                itemVerticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (hasMovies && hasSeries) {
+                                    Chip(
+                                        label = stringResource(Res.string.home_filter_all),
+                                        selected = selectedMediaFilter == EntityMediaFilter.ALL,
+                                        onClick = { selectedMediaFilterName = EntityMediaFilter.ALL.name },
+                                    )
+                                    Chip(
+                                        label = stringResource(Res.string.home_filter_movies),
+                                        selected = selectedMediaFilter == EntityMediaFilter.MOVIE,
+                                        onClick = { selectedMediaFilterName = EntityMediaFilter.MOVIE.name },
+                                    )
+                                    Chip(
+                                        label = stringResource(Res.string.home_filter_series),
+                                        selected = selectedMediaFilter == EntityMediaFilter.TV,
+                                        onClick = { selectedMediaFilterName = EntityMediaFilter.TV.name },
+                                    )
+                                    if (availableSortTypes.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.width(NuvioTokens.Space.s8))
+                                    }
+                                }
+
+                                availableSortTypes.forEach { sortType ->
+                                    Chip(
+                                        label = entitySortLabel(sortType),
+                                        selected = selectedSort == sortType,
+                                        onClick = { selectedSortName = sortType.name },
+                                    )
+                                }
+                            }
+
+                            if (displayedItems.isNotEmpty()) {
+                                Text(
+                                    text = if (displayedItems.size == 1) {
+                                        stringResource(Res.string.entity_browse_title_count_one, displayedItems.size)
+                                    } else {
+                                        stringResource(Res.string.entity_browse_title_count_other, displayedItems.size)
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = tokens.colors.textMuted,
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(
+                            thickness = NuvioTokens.Border.thin,
+                            color = tokens.colors.borderSubtle,
+                        )
+                    }
+                }
+            }
+
+            if (displayedItems.isEmpty()) {
+                item(
+                    key = "entity-empty-grid",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = NuvioTokens.Space.s40),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.catalog_empty_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = tokens.colors.textMuted,
+                        )
+                    }
+                }
+            } else {
+                items(
+                    items = displayedItems.withDuplicateSafeLazyKeys { it.stableKey() },
+                    key = { it.lazyKey },
+                ) { keyedItem ->
+                    val item = keyedItem.value
+                    HomePosterCard(
+                        item = item,
+                        useLandscapeBackdropMode = posterCardStyle.catalogLandscapeModeEnabled,
+                        isWatched = WatchingState.isPosterWatched(
+                            watchedKeys = watchedKeys,
+                            item = item,
+                            fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                        ),
+                        onClick = { onOpenMeta(item) },
+                    )
+                }
+            }
+        }
+
+        NuvioDesktopVerticalScrollbar(
+            state = gridState,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .padding(vertical = 8.dp, horizontal = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun DesktopEntityHeaderBanner(
+    header: com.nuvio.app.features.tmdb.TmdbEntityHeader,
+    catalogueCount: Int,
+) {
+    val tokens = MaterialTheme.nuvio
+    val bannerShape = RoundedCornerShape(NuvioTokens.Radius.xl)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(bannerShape)
+            .background(tokens.colors.surfaceElevated)
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        tokens.colors.accent.copy(alpha = 0.12f),
+                        tokens.colors.accent.copy(alpha = 0.03f),
+                        Color.Transparent,
+                    ),
+                ),
+            )
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, bannerShape)
+            .padding(NuvioTokens.Space.s24),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s24),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (!header.logo.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .width(184.dp)
+                        .height(104.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White)
+                        .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, RoundedCornerShape(14.dp))
+                        .padding(NuvioTokens.Space.s16),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AsyncImage(
+                        model = header.logo,
+                        contentDescription = header.name,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+            } else {
+                val logoShape = RoundedCornerShape(16.dp)
+                Box(
+                    modifier = Modifier
+                        .size(104.dp)
+                        .clip(logoShape)
+                        .background(tokens.colors.surfaceCard)
+                        .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, logoShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = header.name.initials(),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        color = tokens.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) {
+                    EntityBannerBadge(
+                        text = when (header.kind) {
+                            TmdbEntityKind.COMPANY -> stringResource(Res.string.details_browse_kind_company)
+                            TmdbEntityKind.NETWORK -> stringResource(Res.string.details_browse_kind_network)
+                        },
+                        isAccent = true,
+                    )
+                    header.originCountry?.takeIf { it.isNotBlank() }?.let { country ->
+                        EntityBannerBadge(text = country)
+                    }
+                    header.secondaryLabel?.takeIf { it.isNotBlank() }?.let { secondary ->
+                        EntityBannerBadge(text = secondary)
+                    }
+                    if (catalogueCount > 0) {
+                        EntityBannerBadge(
+                            text = if (catalogueCount == 1) {
+                                stringResource(Res.string.entity_browse_title_count_one, catalogueCount)
+                            } else {
+                                stringResource(Res.string.entity_browse_title_count_other, catalogueCount)
+                            },
+                        )
+                    }
+                }
+
+                Text(
+                    text = header.name,
+                    style = MaterialTheme.typography.displaySmall.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp,
+                    ),
+                    color = tokens.colors.textPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                header.description?.takeIf { it.isNotBlank() }?.let { description ->
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                        color = tokens.colors.textSecondary,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EntityBannerBadge(
+    text: String,
+    isAccent: Boolean = false,
+) {
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(NuvioTokens.Radius.md)
+    Box(
+        modifier = Modifier
+            .clip(shape)
+            .background(if (isAccent) tokens.colors.focusBackground else tokens.colors.surfaceCard)
+            .border(
+                width = NuvioTokens.Border.thin,
+                color = if (isAccent) tokens.colors.accent.copy(alpha = 0.55f) else tokens.colors.borderSubtle,
+                shape = shape,
+            )
+            .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s4),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = if (isAccent) FontWeight.SemiBold else FontWeight.Medium,
+            ),
+            color = if (isAccent) tokens.colors.textPrimary else tokens.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun entitySortLabel(railType: TmdbEntityRailType): String =
+    when (railType) {
+        TmdbEntityRailType.POPULAR -> stringResource(Res.string.details_browse_rail_popular)
+        TmdbEntityRailType.TOP_RATED -> stringResource(Res.string.details_browse_rail_top_rated)
+        TmdbEntityRailType.RECENT -> stringResource(Res.string.details_browse_rail_recent)
+    }
 
 @Composable
 private fun WideEntityBrowseContent(
@@ -651,44 +1082,125 @@ private fun EntityHeroSection(
 
 @Composable
 private fun EntityBrowseSkeleton() {
-    Column(
+    val tokens = MaterialTheme.nuvio
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(top = 56.dp),
+            .background(tokens.colors.background),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            Box(
+        if (isDesktop && maxWidth >= 720.dp) {
+            val pageHorizontalPadding = desktopPageHorizontalPaddingForWidth(maxWidth.value)
+            val bannerShape = RoundedCornerShape(NuvioTokens.Radius.xl)
+            Column(
                 modifier = Modifier
-                    .width(120.dp)
-                    .height(14.dp)
-                    .skeleton(RoundedCornerShape(4.dp)),
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        start = pageHorizontalPadding,
+                        end = pageHorizontalPadding,
+                        top = 80.dp,
+                        bottom = 36.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s20),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(bannerShape)
+                        .background(tokens.colors.surfaceElevated)
+                        .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, bannerShape)
+                        .padding(NuvioTokens.Space.s24),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s24),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(104.dp)
+                                .skeleton(RoundedCornerShape(16.dp)),
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(140.dp)
+                                    .height(22.dp)
+                                    .skeleton(RoundedCornerShape(NuvioTokens.Radius.md)),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .width(260.dp)
+                                    .height(32.dp)
+                                    .skeleton(RoundedCornerShape(NuvioTokens.Radius.md)),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.75f)
+                                    .height(16.dp)
+                                    .skeleton(RoundedCornerShape(4.dp)),
+                            )
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
+                    repeat(5) {
+                        Box(
+                            modifier = Modifier
+                                .width(88.dp)
+                                .height(32.dp)
+                                .skeleton(RoundedCornerShape(NuvioTokens.Radius.md)),
+                        )
+                    }
+                }
+                HomeSkeletonRow(
+                    modifier = Modifier.padding(bottom = 20.dp),
+                    horizontalPadding = 0.dp,
+                )
+            }
+        } else {
+            Column(
                 modifier = Modifier
-                    .width(200.dp)
-                    .height(28.dp)
-                    .skeleton(RoundedCornerShape(6.dp)),
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Box(
-                modifier = Modifier
-                    .width(140.dp)
-                    .height(14.dp)
-                    .skeleton(RoundedCornerShape(4.dp)),
-            )
-        }
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(top = 56.dp),
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(14.dp)
+                            .skeleton(RoundedCornerShape(4.dp)),
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(200.dp)
+                            .height(28.dp)
+                            .skeleton(RoundedCornerShape(6.dp)),
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(140.dp)
+                            .height(14.dp)
+                            .skeleton(RoundedCornerShape(4.dp)),
+                    )
+                }
 
-        Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
-        repeat(3) {
-            HomeSkeletonRow(
-                modifier = Modifier.padding(bottom = 20.dp),
-                horizontalPadding = 20.dp,
-            )
+                repeat(3) {
+                    HomeSkeletonRow(
+                        modifier = Modifier.padding(bottom = 20.dp),
+                        horizontalPadding = 20.dp,
+                    )
+                }
+            }
         }
     }
 }
@@ -698,24 +1210,25 @@ private fun EntityBrowseError(
     message: String,
     onRetry: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(tokens.colors.background),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textSecondary,
             )
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = onRetry,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    containerColor = tokens.colors.accent,
+                    contentColor = tokens.colors.onAccent,
                 ),
             ) {
                 Text(stringResource(Res.string.action_retry))

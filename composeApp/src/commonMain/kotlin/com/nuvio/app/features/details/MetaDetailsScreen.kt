@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarOutline
@@ -71,6 +72,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
@@ -94,6 +97,7 @@ import com.nuvio.app.core.ui.ArtworkBackdrop
 import com.nuvio.app.core.ui.LocalOnBackdrop
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.verticalBarWidth
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
@@ -103,7 +107,9 @@ import com.nuvio.app.core.ui.PosterZoomAnchor
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
 import com.nuvio.app.core.ui.PosterZoomOverlayAction
 import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
+import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
@@ -485,10 +491,11 @@ fun MetaDetailsScreen(
         }
     }
 
+    val tokens = MaterialTheme.nuvio
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(tokens.colors.background),
     ) {
         Box(
             modifier = Modifier
@@ -500,7 +507,7 @@ fun MetaDetailsScreen(
                         Modifier
                     },
                 )
-                .background(MaterialTheme.colorScheme.background),
+                .background(tokens.colors.background),
         ) {
             when {
             displayedMeta == null && uiState.isLoading -> {
@@ -1280,7 +1287,7 @@ fun MetaDetailsScreen(
                             val scrolledBackgroundColor = if (dominantColorEnabled) {
                                 dominantBackdropColor
                             } else {
-                                colorScheme.background
+                                tokens.colors.background
                             }
                             Box(
                                 modifier = Modifier
@@ -1657,17 +1664,18 @@ fun MetaDetailsScreen(
                         }
 
                         if (isDesktop) {
+                            val tokens = MaterialTheme.nuvio
                             NuvioBackButton(
                                 onClick = onBackFromDetails,
                                 modifier = Modifier
                                     .statusBarsPadding()
                                     .padding(start = desktopPageHorizontalPadding, top = 32.dp)
                                     .zIndex(2f),
-                                containerColor = Color.Black.copy(alpha = 0.34f),
+                                containerColor = tokens.colors.surfaceElevated.copy(alpha = 0.78f),
                                 showContainerOnDesktop = true,
-                                contentColor = MaterialTheme.colorScheme.onBackground,
-                                buttonSize = 48.dp,
-                                iconSize = 24.dp,
+                                contentColor = tokens.colors.textPrimary,
+                                buttonSize = 40.dp,
+                                iconSize = 20.dp,
                             )
                         }
 
@@ -1978,17 +1986,22 @@ fun MetaDetailsScreen(
                 } else {
                     8.dp
                 }
+                val tokens = MaterialTheme.nuvio
                 NuvioBackButton(
                     onClick = onBack,
                     modifier = Modifier.padding(
                         start = loadingBackButtonStartPadding,
                         top = loadingBackButtonTopPadding,
                     ),
-                    containerColor = if (isDesktop) Color.Black.copy(alpha = 0.34f) else Color.Transparent,
+                    containerColor = if (isDesktop) {
+                        tokens.colors.surfaceElevated.copy(alpha = 0.78f)
+                    } else {
+                        Color.Transparent
+                    },
                     showContainerOnDesktop = isDesktop,
-                    contentColor = MaterialTheme.colorScheme.onBackground,
-                    buttonSize = if (isDesktop) 48.dp else 40.dp,
-                    iconSize = 24.dp,
+                    contentColor = if (isDesktop) tokens.colors.textPrimary else MaterialTheme.colorScheme.onBackground,
+                    buttonSize = 40.dp,
+                    iconSize = 20.dp,
                 )
             }
         }
@@ -2801,7 +2814,7 @@ private fun TabbedSectionGroup(
     val clampedIndex = selectedIndex.coerceIn(0, tabs.lastIndex)
     if (clampedIndex != selectedIndex) selectedIndex = clampedIndex
 
-    val headerColor = MaterialTheme.colorScheme.onBackground
+    val tokens = MaterialTheme.nuvio
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -2812,35 +2825,37 @@ private fun TabbedSectionGroup(
             val titleSize = if (maxWidth >= 720.dp) 22.sp else 20.sp
             val headerStyle = MaterialTheme.typography.titleLarge.copy(
                 fontSize = titleSize,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                fontWeight = FontWeight.SemiBold,
             )
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+            ) {
                 tabs.forEachIndexed { index, (_, title) ->
-                    if (index > 0) {
-                        Text(
-                            text = "|",
-                            style = headerStyle,
-                            color = headerColor.copy(alpha = 0.45f),
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                        )
-                    }
-
-                    Text(
-                        text = title,
-                        style = headerStyle,
-                        color = if (index == selectedIndex) {
-                            headerColor
-                        } else {
-                            headerColor.copy(alpha = 0.55f)
-                        },
-                        maxLines = 1,
+                    val isSelected = index == selectedIndex
+                    val tabShape = RoundedCornerShape(NuvioTokens.Radius.md)
+                    Box(
                         modifier = Modifier
+                            .nuvioFocusBorder(tabShape)
+                            .clip(tabShape)
+                            .background(
+                                if (isSelected) tokens.colors.focusBackground else Color.Transparent,
+                            )
+                            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                            ) { selectedIndex = index },
-                    )
+                            ) { selectedIndex = index }
+                            .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s6),
+                    ) {
+                        Text(
+                            text = title,
+                            style = headerStyle,
+                            color = if (isSelected) tokens.colors.textPrimary else tokens.colors.textMuted,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
