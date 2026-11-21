@@ -58,6 +58,7 @@ import com.nuvio.app.features.details.seriesPrimaryAction
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
+import com.nuvio.app.features.home.components.HomeFilterEmptyCard
 import com.nuvio.app.features.home.components.HomeHeroReservedSpace
 import com.nuvio.app.features.home.components.HomeHeroSection
 import com.nuvio.app.features.home.components.HomeSkeletonHero
@@ -887,8 +888,19 @@ fun HomeScreen(
     val collectionsMap = remember(visibleCollections) {
         visibleCollections.associateBy { "collection_${it.id}" }
     }
-    val sectionsMap = remember(homeUiState.sections) {
-        homeUiState.sections.associateBy(HomeCatalogSection::key)
+    var selectedCategoryFilter by rememberSaveable { mutableStateOf(HomeCategoryFilter.ALL) }
+    val activeCategoryFilter = if (isDesktop) selectedCategoryFilter else HomeCategoryFilter.ALL
+    val displayedContinueWatchingItems = remember(continueWatchingItems, activeCategoryFilter) {
+        filterContinueWatchingItems(continueWatchingItems, activeCategoryFilter)
+    }
+    val displayedUpcomingItems = remember(upcomingItems, activeCategoryFilter) {
+        filterContinueWatchingItems(upcomingItems, activeCategoryFilter)
+    }
+    val filteredCatalogSections = remember(homeUiState.sections, activeCategoryFilter) {
+        filterHomeCatalogSections(homeUiState.sections, activeCategoryFilter)
+    }
+    val filteredSectionsMap = remember(filteredCatalogSections) {
+        filteredCatalogSections.associateBy(HomeCatalogSection::key)
     }
     val enabledHomeItems = remember(homeSettingsUiState.items) {
         homeSettingsUiState.items.filter { it.enabled }
@@ -1047,12 +1059,23 @@ fun HomeScreen(
                 }
             }
 
+            if (isDesktop && (hasRenderableHomeRows || hasContinueWatchingRows)) {
+                item(key = "home_category_filter_bar", contentType = "filter_bar") {
+                    HomeCategoryFilterBar(
+                        selectedFilter = selectedCategoryFilter,
+                        onSelectFilter = { selectedCategoryFilter = it },
+                        horizontalPadding = homeSectionPadding,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+            }
+
             when {
                 isInitialHomeContentLoading -> {
                     homeContinueWatchingSections(
                         preferences = continueWatchingPreferences,
-                        continueWatchingItems = continueWatchingItems,
-                        upcomingItems = upcomingItems,
+                        continueWatchingItems = displayedContinueWatchingItems,
+                        upcomingItems = displayedUpcomingItems,
                         dataSourceKey = effectiveWatchProgressSource,
                         sectionPadding = homeSectionPadding,
                         layout = continueWatchingLayout,
@@ -1076,8 +1099,8 @@ fun HomeScreen(
                 !hasActiveAddons && !hasServerLibraries && !hasRenderableCollectionRows -> {
                     homeContinueWatchingSections(
                         preferences = continueWatchingPreferences,
-                        continueWatchingItems = continueWatchingItems,
-                        upcomingItems = upcomingItems,
+                        continueWatchingItems = displayedContinueWatchingItems,
+                        upcomingItems = displayedUpcomingItems,
                         dataSourceKey = effectiveWatchProgressSource,
                         sectionPadding = homeSectionPadding,
                         layout = continueWatchingLayout,
@@ -1177,8 +1200,8 @@ fun HomeScreen(
                 else -> {
                     homeContinueWatchingSections(
                         preferences = continueWatchingPreferences,
-                        continueWatchingItems = continueWatchingItems,
-                        upcomingItems = upcomingItems,
+                        continueWatchingItems = displayedContinueWatchingItems,
+                        upcomingItems = displayedUpcomingItems,
                         dataSourceKey = effectiveWatchProgressSource,
                         sectionPadding = homeSectionPadding,
                         layout = continueWatchingLayout,
@@ -1189,23 +1212,48 @@ fun HomeScreen(
                         disintegrationRequest = continueWatchingDisintegrationRequest,
                     )
 
+                    val hasFilteredContinueWatching = continueWatchingPreferences.isVisible &&
+                        (displayedContinueWatchingItems.isNotEmpty() || displayedUpcomingItems.isNotEmpty())
+                    val hasFilteredCatalogRows = enabledHomeItems.any { settingsItem ->
+                        !settingsItem.isCollection && filteredSectionsMap[settingsItem.key]?.items?.isNotEmpty() == true
+                    }
+
+                    if (
+                        activeCategoryFilter != HomeCategoryFilter.ALL &&
+                        !hasFilteredContinueWatching &&
+                        !hasFilteredCatalogRows &&
+                        !homeUiState.isLoading &&
+                        !addonManifestsLoading
+                    ) {
+                        item(key = "home_filter_empty", contentType = "filter_empty") {
+                            HomeFilterEmptyCard(
+                                title = stringResource(Res.string.home_filter_empty_title),
+                                resetLabel = stringResource(Res.string.home_filter_reset),
+                                onReset = { selectedCategoryFilter = HomeCategoryFilter.ALL },
+                                modifier = Modifier.padding(horizontal = homeSectionPadding, vertical = 8.dp),
+                            )
+                        }
+                    }
+
                     keyedEnabledHomeItems.forEach { keyedSettingsItem ->
                         val settingsItem = keyedSettingsItem.value
                         if (settingsItem.isCollection) {
-                            val collection = collectionsMap[settingsItem.key]
-                            if (collection != null) {
-                                item(key = keyedSettingsItem.lazyKey, contentType = "collection") {
-                                    HomeCollectionRowSection(
-                                        collection = collection,
-                                        modifier = Modifier.padding(bottom = 12.dp),
-                                        sectionPadding = homeSectionPadding,
-                                        animateGifs = animateCollectionGifs,
-                                        onFolderClick = onFolderClick,
-                                    )
+                            if (activeCategoryFilter == HomeCategoryFilter.ALL) {
+                                val collection = collectionsMap[settingsItem.key]
+                                if (collection != null) {
+                                    item(key = keyedSettingsItem.lazyKey, contentType = "collection") {
+                                        HomeCollectionRowSection(
+                                            collection = collection,
+                                            modifier = Modifier.padding(bottom = 12.dp),
+                                            sectionPadding = homeSectionPadding,
+                                            animateGifs = animateCollectionGifs,
+                                            onFolderClick = onFolderClick,
+                                        )
+                                    }
                                 }
                             }
                         } else {
-                            val section = sectionsMap[settingsItem.key]
+                            val section = filteredSectionsMap[settingsItem.key]
                             if (section != null && section.items.isNotEmpty()) {
                                 item(key = keyedSettingsItem.lazyKey, contentType = "catalog") {
                                     HomeCatalogRowSection(

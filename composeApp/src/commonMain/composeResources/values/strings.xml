@@ -1713,6 +1713,12 @@
     <string name="home_empty_no_active_addons_message">Enable or add an addon to see catalogs on Home.</string>
     <string name="home_empty_no_rows_message">Your enabled addons do not provide catalogs that can be shown on Home.</string>
     <string name="home_empty_no_rows_title">No Home content available</string>
+    <string name="home_filter_all">All</string>
+    <string name="home_filter_anime">Anime</string>
+    <string name="home_filter_empty_title">No matching titles</string>
+    <string name="home_filter_movies">Movies</string>
+    <string name="home_filter_reset">Show All</string>
+    <string name="home_filter_series">Series</string>
     <string name="home_load_failed_title">Couldn’t load Home</string>
     <string name="home_view_details">View Details</string>
     <string name="meta_section_actions_description">Play and save controls.</string>

@@ -1623,6 +1623,12 @@
     <string name="home_empty_no_active_addons_message">ثبّت وتحقق من إضافة واحدة على الأقل قبل تحميل صفوف الكتالوجات في الرئيسية.</string>
     <string name="home_empty_no_rows_message">لا توفر الإضافات المثبتة حاليًا كتالوجات متوافقة مع الشاشة الرئيسية من دون بيانات إضافية مطلوبة.</string>
     <string name="home_empty_no_rows_title">لا توجد صفوف متاحة للرئيسية</string>
+    <string name="home_filter_all">الكل</string>
+    <string name="home_filter_anime">أنمي</string>
+    <string name="home_filter_empty_title">لا توجد عناوين مطابقة</string>
+    <string name="home_filter_movies">أفلام</string>
+    <string name="home_filter_reset">عرض الكل</string>
+    <string name="home_filter_series">مسلسلات</string>
     <string name="home_load_failed_title">تعذر تحميل الرئيسية</string>
     <string name="home_view_details">عرض التفاصيل</string>
     <string name="meta_section_actions_description">عناصر التحكم بالتشغيل والحفظ.</string>

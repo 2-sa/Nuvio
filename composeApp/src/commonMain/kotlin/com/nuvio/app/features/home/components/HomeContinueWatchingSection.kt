@@ -1,15 +1,24 @@
 package com.nuvio.app.features.home.components
 
 import com.nuvio.app.core.ui.rememberAnimatedArtworkAnimation
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +29,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,7 +57,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.DefaultPosterCardCornerRadiusDp
 import com.nuvio.app.core.ui.DisintegratingContainer
 import com.nuvio.app.core.ui.DisintegrationRequest
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
@@ -55,15 +67,18 @@ import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
+import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.desktopCatalogShelfPosterBaseWidthDp
 import com.nuvio.app.core.ui.PosterCardStyleUiState
 import com.nuvio.app.core.ui.ScopedDisintegrationTracker
 import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.desktopPosterHoverScale
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
 import com.nuvio.app.features.tracking.WatchProgressSource
@@ -79,7 +94,7 @@ import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import com.nuvio.app.core.i18n.localizedEpisodeTitle
 
-private val ContinueWatchingStatusBadgeShape = RoundedCornerShape(4.dp)
+private val ContinueWatchingStatusBadgeShape = RoundedCornerShape(NuvioTokens.Radius.full)
 private val ContinueWatchingNewEpisodeBadgeColor = Color(0xFF1D4ED8)
 private val ContinueWatchingNewSeasonBadgeColor = Color(0xFFB45309)
 private const val ContinueWatchingLandscapeCardScale = 1.2f
@@ -622,50 +637,51 @@ private fun continueWatchingLandscapeCardMetrics(
     cornerRadiusDp: Int,
 ): ContinueWatchingLandscapeCardMetrics {
     val width = continueWatchingLandscapeCardWidth(basePosterWidthDp)
+    val resolvedCornerRadius = if (cornerRadiusDp == DefaultPosterCardCornerRadiusDp) 14.dp else cornerRadiusDp.dp
     return when {
         basePosterWidthDp <= 108 -> ContinueWatchingLandscapeCardMetrics(
             width = width,
-            cornerRadius = cornerRadiusDp.dp,
-            contentPadding = 8.dp,
-            textGap = 1.dp,
-            badgeInset = 6.dp,
-            badgeHorizontalPadding = 6.dp,
-            badgeVerticalPadding = 2.dp,
-            progressHorizontalPadding = 8.dp,
-            progressBottomPadding = 3.dp,
-            progressHeight = 3.dp,
-            titleTextSize = 12.sp,
-            metaTextSize = 9.sp,
-            badgeTextSize = 8.sp,
-        )
-        basePosterWidthDp <= 120 -> ContinueWatchingLandscapeCardMetrics(
-            width = width,
-            cornerRadius = cornerRadiusDp.dp,
-            contentPadding = 9.dp,
-            textGap = 1.dp,
-            badgeInset = 6.dp,
-            badgeHorizontalPadding = 7.dp,
+            cornerRadius = resolvedCornerRadius,
+            contentPadding = 10.dp,
+            textGap = 2.dp,
+            badgeInset = 8.dp,
+            badgeHorizontalPadding = 8.dp,
             badgeVerticalPadding = 3.dp,
-            progressHorizontalPadding = 8.dp,
-            progressBottomPadding = 3.dp,
-            progressHeight = 3.dp,
-            titleTextSize = 13.sp,
+            progressHorizontalPadding = 10.dp,
+            progressBottomPadding = 5.dp,
+            progressHeight = 3.5.dp,
+            titleTextSize = 12.sp,
             metaTextSize = 10.sp,
             badgeTextSize = 9.sp,
         )
-        else -> ContinueWatchingLandscapeCardMetrics(
+        basePosterWidthDp <= 120 -> ContinueWatchingLandscapeCardMetrics(
             width = width,
-            cornerRadius = cornerRadiusDp.dp,
+            cornerRadius = resolvedCornerRadius,
             contentPadding = 10.dp,
             textGap = 2.dp,
-            badgeInset = 7.dp,
-            badgeHorizontalPadding = 7.dp,
+            badgeInset = 8.dp,
+            badgeHorizontalPadding = 8.dp,
             badgeVerticalPadding = 3.dp,
-            progressHorizontalPadding = 9.dp,
-            progressBottomPadding = 4.dp,
-            progressHeight = 3.dp,
-            titleTextSize = 14.sp,
+            progressHorizontalPadding = 10.dp,
+            progressBottomPadding = 5.dp,
+            progressHeight = 3.5.dp,
+            titleTextSize = 13.sp,
             metaTextSize = 10.sp,
+            badgeTextSize = 10.sp,
+        )
+        else -> ContinueWatchingLandscapeCardMetrics(
+            width = width,
+            cornerRadius = resolvedCornerRadius,
+            contentPadding = 12.dp,
+            textGap = 2.dp,
+            badgeInset = 8.dp,
+            badgeHorizontalPadding = 9.dp,
+            badgeVerticalPadding = 4.dp,
+            progressHorizontalPadding = 12.dp,
+            progressBottomPadding = 6.dp,
+            progressHeight = 3.5.dp,
+            titleTextSize = 14.sp,
+            metaTextSize = 11.sp,
             badgeTextSize = 10.sp,
         )
     }
@@ -679,6 +695,8 @@ private fun ContinueWatchingCard(
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
     val posterCardStyle = rememberPosterCardStyleUiState()
     val cardMetrics = remember(posterCardStyle.widthDp, posterCardStyle.cornerRadiusDp) {
         val basePosterWidthDp = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp)
@@ -687,6 +705,18 @@ private fun ContinueWatchingCard(
             cornerRadiusDp = posterCardStyle.cornerRadiusDp,
         )
     }
+    val cardShape = RoundedCornerShape(cardMetrics.cornerRadius)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.65f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "continue_watching_card_border",
+    )
     val todayIsoDate = CurrentDateProvider.todayIsoDate()
     val airDateText = if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
         computeAirDateBadgeText(item.released, todayIsoDate)
@@ -710,12 +740,24 @@ private fun ContinueWatchingCard(
     }
     val episodeTitle = localizedEpisodeTitle(item.episodeTitle, item.episodeNumber) ?: airDateText
     val badgeText = continueWatchingCardBadgeText(item = item, airDateText = airDateText)
-    val backgroundColor = MaterialTheme.colorScheme.background
-    val badgeBackground = continueWatchingBadgeBackground(item)
+    val scrimColor = tokens.colors.background
+    val isAlertBadge = item.isNewSeasonRelease || item.isReleaseAlert
+    val badgeBackground = if (isAlertBadge) {
+        continueWatchingBadgeBackground(item)
+    } else {
+        tokens.colors.surfaceElevated.copy(alpha = 0.80f)
+    }
+    val badgeBorderColor = if (isAlertBadge) {
+        Color.White.copy(alpha = 0.16f)
+    } else {
+        tokens.colors.borderSubtle
+    }
+    val badgeTextColor = if (isAlertBadge) Color.White else tokens.colors.textPrimary
 
     Box(
         modifier = Modifier
-            .nuvioFocusBorder(RoundedCornerShape(cardMetrics.cornerRadius))
+            .nuvioFocusBorder(cardShape)
+            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
             .posterCardClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
@@ -724,12 +766,13 @@ private fun ContinueWatchingCard(
             )
             .width(cardMetrics.width)
             .aspectRatio(PosterLandscapeAspectRatio)
-            .clip(RoundedCornerShape(cardMetrics.cornerRadius))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clip(cardShape)
+            .background(tokens.colors.surfaceCard)
             .nuvioCardDepth(
-                shape = RoundedCornerShape(cardMetrics.cornerRadius),
+                shape = cardShape,
                 surface = NuvioCardDepthSurface.ContinueWatching,
-            ),
+            )
+            .border(width = NuvioTokens.Border.thin, color = borderColor, shape = cardShape),
     ) {
         if (imageUrl != null) {
             val cwFallbackUrl = item.fallbackUrlForArtwork(imageUrl)
@@ -746,12 +789,12 @@ private fun ContinueWatchingCard(
                     .drawWithContent {
                         drawContent()
 
-                        val startY = size.height * 0.45f
+                        val startY = size.height * 0.38f
                         val gradient = Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0.0f to Color.Transparent,
-                                0.60f to backgroundColor.copy(alpha = 0.70f),
-                                1.0f to backgroundColor.copy(alpha = 0.95f),
+                                0.55f to scrimColor.copy(alpha = 0.62f),
+                                1.0f to scrimColor.copy(alpha = 0.90f),
                             ),
                             startY = startY,
                             endY = size.height,
@@ -767,11 +810,42 @@ private fun ContinueWatchingCard(
                 desktopAnimation = rememberAnimatedArtworkAnimation(),
             )
         }
+        if (isDesktop && onClick != null) {
+            AnimatedVisibility(
+                visible = isHovered,
+                enter = fadeIn(tween(NuvioTokens.Motion.fastMillis)) +
+                    scaleIn(initialScale = 0.88f, animationSpec = tween(NuvioTokens.Motion.fastMillis)),
+                exit = fadeOut(tween(NuvioTokens.Motion.fastMillis)) +
+                    scaleOut(targetScale = 0.88f, animationSpec = tween(NuvioTokens.Motion.fastMillis)),
+                modifier = Modifier.align(Alignment.Center),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(tokens.colors.surfaceElevated.copy(alpha = 0.82f))
+                        .border(NuvioTokens.Border.thin, tokens.colors.borderStrong, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = tokens.colors.textPrimary,
+                        modifier = Modifier.size(NuvioTokens.Icon.lg),
+                    )
+                }
+            }
+        }
         if (item.shufflePlayback) ShuffleBadge(Modifier.align(Alignment.TopStart).padding(8.dp))
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(cardMetrics.contentPadding),
+                .padding(
+                    start = cardMetrics.contentPadding,
+                    top = cardMetrics.contentPadding,
+                    end = cardMetrics.contentPadding,
+                    bottom = cardMetrics.contentPadding + if (item.progressFraction > 0f) 5.dp else 0.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(cardMetrics.textGap),
         ) {
             if (episodeCode != null) {
@@ -781,7 +855,7 @@ private fun ContinueWatchingCard(
                         fontSize = cardMetrics.metaTextSize,
                         fontWeight = FontWeight.SemiBold,
                     ),
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = tokens.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -790,9 +864,9 @@ private fun ContinueWatchingCard(
                 text = item.title,
                 style = MaterialTheme.typography.titleSmall.copy(
                     fontSize = cardMetrics.titleTextSize,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                 ),
-                color = MaterialTheme.colorScheme.onBackground,
+                color = tokens.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -803,7 +877,7 @@ private fun ContinueWatchingCard(
                         fontSize = cardMetrics.metaTextSize,
                         fontWeight = FontWeight.Medium,
                     ),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+                    color = tokens.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -815,6 +889,7 @@ private fun ContinueWatchingCard(
                 .padding(cardMetrics.badgeInset)
                 .clip(ContinueWatchingStatusBadgeShape)
                 .background(badgeBackground)
+                .border(NuvioTokens.Border.thin, badgeBorderColor, ContinueWatchingStatusBadgeShape)
                 .padding(
                     horizontal = cardMetrics.badgeHorizontalPadding,
                     vertical = cardMetrics.badgeVerticalPadding,
@@ -826,7 +901,7 @@ private fun ContinueWatchingCard(
                     fontSize = cardMetrics.badgeTextSize,
                     fontWeight = FontWeight.SemiBold,
                 ),
-                color = Color.White,
+                color = badgeTextColor,
                 maxLines = 1,
             )
         }
@@ -839,16 +914,16 @@ private fun ContinueWatchingCard(
                         vertical = cardMetrics.progressBottomPadding,
                     )
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(NuvioTokens.Radius.full))
                     .height(cardMetrics.progressHeight)
-                    .background(Color.Black.copy(alpha = 0.30f)),
+                    .background(tokens.colors.playerTimelineTrack),
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(item.progressFraction.coerceIn(0f, 1f))
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(MaterialTheme.colorScheme.primary),
+                        .clip(RoundedCornerShape(NuvioTokens.Radius.full))
+                        .background(palette.accentBrush()),
                 )
             }
         }
@@ -899,19 +974,34 @@ private fun ContinueWatchingWideCard(
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
 ) {
-    val cornerRadius = rememberPosterCardStyleUiState().cornerRadiusDp.dp
+    val tokens = MaterialTheme.nuvio
+    val cornerRadiusDp = rememberPosterCardStyleUiState().cornerRadiusDp
+    val cornerRadius = if (cornerRadiusDp == DefaultPosterCardCornerRadiusDp) 14.dp else cornerRadiusDp.dp
+    val cardShape = RoundedCornerShape(cornerRadius)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.65f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "continue_watching_wide_border",
+    )
     Row(
         modifier = Modifier
-            .nuvioFocusBorder(RoundedCornerShape(cornerRadius))
+            .nuvioFocusBorder(cardShape)
+            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
             .posterCardClickable(onClick = onClick, onLongClick = onLongClick)
             .width(layout.wideCardWidth)
             .height(layout.wideCardHeight)
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
+            .clip(cardShape)
+            .background(tokens.colors.surfaceCard)
             .border(
-                width = 1.5.dp,
-                color = Color.White.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(cornerRadius),
+                width = NuvioTokens.Border.thin,
+                color = borderColor,
+                shape = cardShape,
             ),
     ) {
         val artworkUrl = item.continueWatchingArtworkUrl(useEpisodeThumbnails)
@@ -951,7 +1041,7 @@ private fun ContinueWatchingWideCard(
                             fontSize = layout.wideTitleSize,
                             fontWeight = FontWeight.Bold,
                         ),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = tokens.colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -977,7 +1067,7 @@ private fun ContinueWatchingWideCard(
                         fontSize = layout.wideMetaSize,
                         fontWeight = FontWeight.Medium,
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -988,7 +1078,7 @@ private fun ContinueWatchingWideCard(
                             fontSize = layout.wideMetaSize,
                             fontWeight = FontWeight.Medium,
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1001,7 +1091,7 @@ private fun ContinueWatchingWideCard(
                         progress = item.progressFraction,
                         modifier = Modifier.fillMaxWidth(),
                         height = layout.progressHeight,
-                        trackColor = Color.White.copy(alpha = 0.10f),
+                        trackColor = tokens.colors.playerTimelineTrack,
                     )
                     Text(
                         text = stringResource(
@@ -1012,7 +1102,7 @@ private fun ContinueWatchingWideCard(
                             fontSize = layout.progressLabelSize,
                             fontWeight = FontWeight.Medium,
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = tokens.colors.textMuted,
                     )
                 }
             }
@@ -1029,7 +1119,21 @@ private fun ContinueWatchingPosterCard(
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
 ) {
-    val cornerRadius = rememberPosterCardStyleUiState().cornerRadiusDp.dp
+    val tokens = MaterialTheme.nuvio
+    val cornerRadiusDp = rememberPosterCardStyleUiState().cornerRadiusDp
+    val cornerRadius = if (cornerRadiusDp == DefaultPosterCardCornerRadiusDp) 14.dp else cornerRadiusDp.dp
+    val cardShape = RoundedCornerShape(cornerRadius)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.65f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "continue_watching_poster_border",
+    )
     val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
     Column(
         modifier = Modifier
@@ -1041,13 +1145,15 @@ private fun ContinueWatchingPosterCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .let { if (isDesktop) it.aspectRatio(0.675f) else it.height(layout.posterCardHeight) }
-                .nuvioFocusBorder(RoundedCornerShape(cornerRadius))
-                .clip(RoundedCornerShape(cornerRadius))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .nuvioFocusBorder(cardShape)
+                .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
+                .clip(cardShape)
+                .background(tokens.colors.surfaceCard)
                 .nuvioCardDepth(
-                    shape = RoundedCornerShape(cornerRadius),
+                    shape = cardShape,
                     surface = NuvioCardDepthSurface.ContinueWatching,
                 )
+                .border(NuvioTokens.Border.thin, borderColor, cardShape)
                 .posterCardClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,
@@ -1103,15 +1209,16 @@ private fun ContinueWatchingPosterCard(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(horizontal = 10.dp, vertical = 10.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(MaterialTheme.colorScheme.surface)
+                        .clip(RoundedCornerShape(NuvioTokens.Radius.full))
+                        .background(tokens.colors.surfaceElevated.copy(alpha = 0.90f))
+                        .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, RoundedCornerShape(NuvioTokens.Radius.full))
                         .padding(horizontal = 6.dp, vertical = 6.dp),
                 ) {
                     NuvioProgressBar(
                         progress = item.progressFraction,
                         modifier = Modifier.width(layout.posterCardWidth - 32.dp),
                         height = layout.progressHeight,
-                        trackColor = MaterialTheme.colorScheme.surfaceTint.copy(alpha = 0.16f),
+                        trackColor = tokens.colors.playerTimelineTrack,
                     )
                 }
             }
@@ -1137,7 +1244,7 @@ private fun ContinueWatchingPosterCard(
                         fontWeight = FontWeight.SemiBold,
                         lineHeight = 18.sp,
                     ),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1154,7 +1261,7 @@ private fun ContinueWatchingPosterCard(
                         fontSize = layout.posterMetaSize,
                         fontWeight = FontWeight.SemiBold,
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textSecondary,
                 )
             }
         }
@@ -1173,7 +1280,7 @@ private fun ArtworkPanel(
     Box(
         modifier = modifier
             .width(width)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.nuvio.colors.surfaceElevated),
     ) {
         if (imageUrl != null) {
             val artworkModel = continuewatchingImageModel(
@@ -1197,7 +1304,7 @@ private fun ArtworkPanel(
 private fun continueWatchingBadgeBackground(item: ContinueWatchingItem): Color = when {
     item.isNewSeasonRelease -> ContinueWatchingNewSeasonBadgeColor
     item.isReleaseAlert -> ContinueWatchingNewEpisodeBadgeColor
-    else -> MaterialTheme.colorScheme.background.copy(alpha = 0.80f)
+    else -> MaterialTheme.nuvio.colors.surfaceElevated.copy(alpha = 0.80f)
 }
 
 @Composable
@@ -1207,10 +1314,18 @@ private fun UpNextBadge(
     compact: Boolean,
     textSize: androidx.compose.ui.unit.TextUnit,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val isAlert = item.isNewSeasonRelease || item.isReleaseAlert
+    val shape = RoundedCornerShape(if (compact) NuvioTokens.Radius.xs else NuvioTokens.Radius.full)
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(if (compact) 4.dp else 12.dp))
+            .clip(shape)
             .background(continueWatchingBadgeBackground(item))
+            .border(
+                width = NuvioTokens.Border.thin,
+                color = if (isAlert) Color.White.copy(alpha = 0.16f) else tokens.colors.borderSubtle,
+                shape = shape,
+            )
             .padding(
                 horizontal = if (compact) 6.dp else 8.dp,
                 vertical = if (compact) 3.dp else 4.dp,
@@ -1222,7 +1337,7 @@ private fun UpNextBadge(
                 fontSize = textSize,
                 fontWeight = FontWeight.Bold,
             ),
-            color = Color.White,
+            color = if (isAlert) Color.White else tokens.colors.textPrimary,
             maxLines = 1,
         )
     }

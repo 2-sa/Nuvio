@@ -1,5 +1,11 @@
 package com.nuvio.app.features.home.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,20 +21,26 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.LocalScreenActive
+import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioShelfSection
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
 import com.nuvio.app.core.ui.desktopCatalogShelfPosterBaseWidthDp
+import com.nuvio.app.core.ui.desktopPosterHoverScale
 import com.nuvio.app.core.ui.landscapePosterWidth
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.posterCardClickable
@@ -36,6 +48,7 @@ import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.collection.Collection
 import com.nuvio.app.features.collection.CollectionFolder
 import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.isDesktop
 
 @Composable
 fun HomeCollectionRowSection(
@@ -76,12 +89,14 @@ private fun HomeCollectionRowSectionContent(
     animateGifs: Boolean,
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)?,
 ) {
+    val tokens = MaterialTheme.nuvio
     NuvioShelfSection(
         title = collection.title,
         entries = collection.folders,
         modifier = modifier,
         headerHorizontalPadding = sectionPadding,
         rowContentPadding = PaddingValues(horizontal = sectionPadding),
+        itemSpacing = if (isDesktop) tokens.spacing.railGap else 10.dp,
         key = { folder -> "collection_${collection.id}_folder_${folder.id}" },
     ) { folder ->
         CollectionFolderCard(
@@ -99,6 +114,7 @@ private fun CollectionFolderCard(
     animateGifs: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
+    val tokens = MaterialTheme.nuvio
     val posterCardStyle = rememberPosterCardStyleUiState()
     val basePosterWidthDp = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp)
     val isLandscapeMode = posterCardStyle.catalogLandscapeModeEnabled
@@ -121,14 +137,28 @@ private fun CollectionFolderCard(
         }
     }
 
-    val shapeCorner = RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp)
+    val shapeCorner = RoundedCornerShape(resolvedPosterCornerRadius(posterCardStyle.cornerRadiusDp))
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.70f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "collection_folder_card_border",
+    )
+
     Column(
         modifier = Modifier
+            .desktopPosterHoverScale()
             .nuvioFocusBorder(shapeCorner)
+            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
             .posterCardClickable(onClick = onClick, onLongClick = null)
             .then(modifier)
             .width(cardWidth),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
     ) {
         val imageUrl = collectionFolderCardImageUrl(folder)
         Card(
@@ -141,10 +171,11 @@ private fun CollectionFolderCard(
                 ),
             shape = shapeCorner,
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = tokens.colors.surfaceCard,
             ),
+            border = BorderStroke(NuvioTokens.Border.thin, borderColor),
             elevation = CardDefaults.cardElevation(
-                defaultElevation = 2.dp,
+                defaultElevation = tokens.elevation.flat,
             ),
         ) {
             Box(
@@ -173,21 +204,24 @@ private fun CollectionFolderCard(
                     else -> {
                         Text(
                             text = folder.title.take(2).uppercase(),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.headlineSmall.copy(letterSpacing = 0.sp),
+                            color = tokens.colors.textSecondary,
                             textAlign = TextAlign.Center,
                         )
                     }
                 }
-
             }
         }
 
         if (!folder.hideTitle) {
             Text(
                 text = folder.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.sp,
+                    lineHeight = 19.sp,
+                ),
+                color = tokens.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

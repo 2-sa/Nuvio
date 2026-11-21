@@ -5,10 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,7 +32,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +61,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -76,9 +72,11 @@ import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterZoomOverlayCoordinator
+import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.secondaryClick
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.core.ui.platformTouchScroll
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.details.components.DetailIconAction
@@ -347,8 +345,9 @@ private fun HomePosterPreviewCard(
     onSaveClick: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
     val shape = RoundedCornerShape(NuvioTokens.Radius.xl)
-    val previewBackground = tokens.colors.background
+    val previewBackground = tokens.colors.surfacePopover
     val clickInteractionSource = remember { MutableInteractionSource() }
     var logoLoadError by remember(item.type, item.id, item.logo) { mutableStateOf(false) }
     val logoUrl = item.logo?.takeIf { it.isNotBlank() && !logoLoadError }
@@ -357,10 +356,10 @@ private fun HomePosterPreviewCard(
         modifier = modifier
             .focusProperties { canFocus = false }
             .width(HoverPreviewWidth)
-            .shadow(tokens.elevation.overlay, shape)
+            .shadow(elevation = tokens.elevation.overlay, shape = shape)
             .clip(shape)
             .background(previewBackground)
-            .border(tokens.borders.hairline, tokens.colors.borderStrong, shape)
+            .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, shape)
             .clickable(
                 interactionSource = clickInteractionSource,
                 indication = null,
@@ -374,7 +373,7 @@ private fun HomePosterPreviewCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .background(tokens.colors.surface),
+                .background(tokens.colors.surfaceCard),
         ) {
             val artworkUrl = item.banner ?: item.poster
             if (!artworkUrl.isNullOrBlank()) {
@@ -430,9 +429,11 @@ private fun HomePosterPreviewCard(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(horizontal = NuvioTokens.Space.s18, vertical = NuvioTokens.Space.s16),
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.sp,
+                    ),
                     color = tokens.colors.textPrimary,
-                    fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -492,31 +493,31 @@ private fun HomePosterPreviewCard(
                     horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Surface(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(NuvioTokens.Space.s40),
-                        color = tokens.colors.accent,
-                        contentColor = tokens.colors.onAccent,
-                        shape = tokens.shapes.button,
+                            .height(NuvioTokens.Space.s40)
+                            .clip(tokens.shapes.button)
+                            .background(palette.accentBrush())
+                            .clickable(onClick = onClick)
+                            .padding(horizontal = NuvioTokens.Space.s16),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clickable(onClick = onClick)
-                                .padding(horizontal = NuvioTokens.Space.s16),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = stringResource(Res.string.home_view_details),
                                 style = MaterialTheme.typography.labelLarge,
+                                color = tokens.colors.onAccent,
                                 maxLines = 1,
                             )
                             Spacer(modifier = Modifier.width(NuvioTokens.Space.s8))
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                                 contentDescription = null,
+                                tint = tokens.colors.onAccent,
                                 modifier = Modifier.size(NuvioTokens.Icon.sm),
                             )
                         }
