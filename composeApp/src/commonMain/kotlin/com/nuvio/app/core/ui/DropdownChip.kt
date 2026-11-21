@@ -1,7 +1,12 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.isDesktop
@@ -59,15 +66,43 @@ fun NuvioDropdownChip(
     var isSheetVisible by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
 
     Box(modifier = modifier) {
         Row(
             modifier = (if (fillWidth) Modifier.fillMaxWidth() else Modifier)
                 .clip(tokens.shapes.compactCard)
-                .background(tokens.colors.surface)
+                .background(
+                    if (isDesktop && enabled && isHovered) {
+                        tokens.colors.surfaceCard
+                    } else {
+                        tokens.colors.surfaceElevated
+                    },
+                )
+                .border(
+                    width = tokens.borders.thin,
+                    color = when {
+                        !enabled -> tokens.colors.borderSubtle
+                        isSheetVisible -> tokens.colors.accent
+                        isDesktop && isHovered -> tokens.colors.borderStrong
+                        else -> tokens.colors.borderDefault
+                    },
+                    shape = tokens.shapes.compactCard,
+                )
                 .then(
                     if (enabled) {
-                        Modifier.clickable { isSheetVisible = true }
+                        Modifier
+                            .then(
+                                if (isDesktop) {
+                                    Modifier
+                                        .hoverable(interactionSource)
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .clickable { isSheetVisible = true }
                     } else {
                         Modifier
                     },
@@ -98,6 +133,8 @@ fun NuvioDropdownChip(
                 onDismissRequest = { isSheetVisible = false },
                 modifier = Modifier.platformTouchScroll().widthIn(min = 180.dp, max = 360.dp),
                 containerColor = tokens.colors.surfacePopover,
+                shadowElevation = tokens.elevation.overlay,
+                border = BorderStroke(tokens.borders.thin, tokens.colors.borderDefault),
                 shape = tokens.shapes.compactCard,
             ) {
                 options.forEach { option ->

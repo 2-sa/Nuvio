@@ -8,8 +8,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +37,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,10 +58,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -79,7 +88,7 @@ import com.nuvio.app.navigation.LocalUseNativeNavigation
 @Composable
 fun NuvioScreen(
     modifier: Modifier = Modifier,
-    horizontalPadding: Dp = MaterialTheme.nuvio.spacing.screenHorizontal,
+    horizontalPadding: Dp = if (isDesktop) NuvioTokens.Space.s24 else MaterialTheme.nuvio.spacing.screenHorizontal,
     topPadding: Dp? = null,
     listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
@@ -96,6 +105,23 @@ fun NuvioScreen(
             .fillMaxSize()
             .background(tokens.colors.background),
     ) {
+        if (isDesktop) {
+            val ambientAlpha = if (tokens.colors.background == Color.Black) 0.03f else 0.055f
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                tokens.colors.accent.copy(alpha = ambientAlpha),
+                                Color.Transparent,
+                            ),
+                        ),
+                    ),
+            )
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -140,8 +166,9 @@ fun NuvioSurfaceCard(
     val tokens = MaterialTheme.nuvio
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = tokens.colors.surface,
+        color = tokens.colors.surfaceCard,
         shape = tokens.shapes.card,
+        border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
         tonalElevation = tonalElevation.dp,
         shadowElevation = tokens.elevation.flat,
     ) {
@@ -191,22 +218,60 @@ fun NuvioScreenHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = resolvedTopPadding, bottom = NuvioTokens.Space.s4),
+                .padding(
+                    top = resolvedTopPadding,
+                    bottom = if (isDesktop) NuvioTokens.Space.s8 else NuvioTokens.Space.s4,
+                ),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,
         ) {
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
+                horizontalArrangement = Arrangement.spacedBy(
+                    if (isDesktop) NuvioTokens.Space.s12 else tokens.spacing.controlGap,
+                ),
             ) {
                 if (onBack != null) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(Res.string.action_back),
-                            tint = tokens.colors.textPrimary,
-                        )
+                    val backInteractionSource = remember { MutableInteractionSource() }
+                    val isBackHovered by backInteractionSource.collectIsHoveredAsState()
+                    Surface(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .size(NuvioTokens.Space.s40)
+                            .then(
+                                if (isDesktop) {
+                                    Modifier.pointerHoverIcon(PointerIcon.Hand)
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .nuvioFocusBorder(CircleShape),
+                        shape = CircleShape,
+                        color = if (isDesktop && isBackHovered) {
+                            tokens.colors.surfaceCard
+                        } else {
+                            tokens.colors.surfaceElevated
+                        },
+                        contentColor = tokens.colors.textPrimary,
+                        border = BorderStroke(
+                            width = NuvioTokens.Border.thin,
+                            color = if (isDesktop && isBackHovered) {
+                                tokens.colors.borderStrong
+                            } else {
+                                tokens.colors.borderDefault
+                            },
+                        ),
+                        interactionSource = backInteractionSource,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(Res.string.action_back),
+                                tint = tokens.colors.textPrimary,
+                                modifier = Modifier.size(NuvioTokens.Icon.md),
+                            )
+                        }
                     }
                 }
                 AnimatedContent(
@@ -311,13 +376,41 @@ fun NuvioBackButton(
     contentDescription: String = stringResource(Res.string.action_back),
 ) {
     if (LocalUseNativeNavigation.current && !LocalNativeNavigationBarHidden.current) return
-    val effectiveContainerColor = if (isDesktop && !showContainerOnDesktop) Color.Transparent else containerColor
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val effectiveContainerColor = when {
+        isDesktop && !showContainerOnDesktop && isHovered -> tokens.colors.overlayHover
+        isDesktop && !showContainerOnDesktop -> Color.Transparent
+        else -> containerColor
+    }
+    val hasContainer = effectiveContainerColor != Color.Transparent
 
     Box(
         modifier = modifier
             .size(buttonSize)
             .clip(shape)
             .background(effectiveContainerColor)
+            .then(
+                if (hasContainer) {
+                    Modifier.border(
+                        width = NuvioTokens.Border.thin,
+                        color = if (isDesktop && isHovered) tokens.colors.borderStrong else tokens.colors.borderDefault,
+                        shape = shape,
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
             .nuvioFocusBorder(shape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -395,7 +488,7 @@ fun NuvioInputField(
         textStyle = textStyle.copy(color = tokens.colors.textPrimary),
         trailingIcon = trailingContent,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = tokens.colors.borderFocus,
+            focusedBorderColor = tokens.colors.accent,
             unfocusedBorderColor = tokens.colors.borderDefault,
             focusedContainerColor = tokens.colors.surfaceCard,
             unfocusedContainerColor = tokens.colors.surfaceCard,
@@ -416,6 +509,7 @@ fun NuvioInfoBadge(
                 color = tokens.colors.surfaceCard,
                 shape = tokens.shapes.chip,
             )
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, tokens.shapes.chip)
             .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s6),
     ) {
         Text(
@@ -540,6 +634,7 @@ fun NuvioToastHost(
             Surface(
                 shape = RoundedCornerShape(NuvioTokens.Radius.xl),
                 color = tokens.colors.surfacePopover,
+                border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderDefault),
                 tonalElevation = tokens.elevation.raised,
                 shadowElevation = tokens.elevation.overlay,
             ) {

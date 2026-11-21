@@ -62,6 +62,7 @@ fun NuvioModalBottomSheet(
     fullHeight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     if (isDesktop) {
         Dialog(
             onDismissRequest = onDismissRequest,
@@ -77,7 +78,7 @@ fun NuvioModalBottomSheet(
                         .widthIn(min = 320.dp, max = if (fullHeight) 620.dp else 520.dp)
                         .heightIn(max = 680.dp)
                         .then(modifier)
-                        .border(1.dp, SurfaceEdge, DesktopDialogShape),
+                        .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, DesktopDialogShape),
                     shape = DesktopDialogShape,
                     color = containerColor,
                     contentColor = contentColor,
@@ -103,7 +104,6 @@ fun NuvioModalBottomSheet(
             content = content,
         )
     } else {
-        val tokens = MaterialTheme.nuvio
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
             sheetState = sheetState,
@@ -119,7 +119,7 @@ fun NuvioModalBottomSheet(
                         .padding(NuvioTokens.Space.s10)
                         .clip(SheetShape)
                         .background(containerColor)
-                        .border(tokens.borders.thin, SurfaceEdge, SheetShape),
+                        .border(tokens.borders.thin, tokens.colors.borderDefault, SheetShape),
                 ) {
                     if (showDragHandle) {
                         NuvioBottomSheetDragHandle(Modifier.align(Alignment.CenterHorizontally))

@@ -486,6 +486,7 @@ private fun NuvioShelfSectionHeader(
     viewAllPillSize: NuvioViewAllPillSize = NuvioViewAllPillSize.Default,
 ) {
     val tokens = MaterialTheme.nuvio
+    val accentBrush = MaterialTheme.themePalette.accentBrush()
     Column(
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -494,8 +495,7 @@ private fun NuvioShelfSectionHeader(
             horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = title,
+            Row(
                 modifier = Modifier
                     .weight(1f)
                     .then(if (onTitleClick != null) {
@@ -504,11 +504,24 @@ private fun NuvioShelfSectionHeader(
                             .nuvioFocusBorder(RoundedCornerShape(NuvioTokens.Radius.md))
                             .clickable(onClick = onTitleClick)
                     } else Modifier),
-                style = MaterialTheme.typography.titleLarge,
-                color = tokens.colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = NuvioTokens.Space.s3, height = NuvioTokens.Space.s18)
+                        .clip(RoundedCornerShape(NuvioTokens.Radius.full))
+                        .background(accentBrush),
+                )
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = tokens.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             val viewAllPlaceholderModifier = if (onViewAllClick == null) {
                 Modifier
                     .alpha(0f)
@@ -535,15 +548,46 @@ private fun NuvioViewAllPill(
     val actionSize = if (size == NuvioViewAllPillSize.Compact) NuvioTokens.Space.s32 else NuvioTokens.Space.s40
     val iconSize = if (size == NuvioViewAllPillSize.Compact) NuvioTokens.Icon.sm else tokens.icons.md
     val viewAllText = stringResource(Res.string.home_view_all)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
 
     val pillShape = RoundedCornerShape(NuvioTokens.Radius.xl)
+    val containerColor = when {
+        isDesktop && onClick != null && isHovered -> tokens.colors.surfaceElevated
+        isDesktop -> tokens.colors.surfaceElevated.copy(alpha = 0.45f)
+        else -> tokens.colors.surface
+    }
     Box(
         modifier = modifier
             .size(actionSize)
-            .background(color = tokens.colors.surface, shape = pillShape)
+            .clip(pillShape)
+            .background(color = containerColor, shape = pillShape)
+            .then(
+                if (isDesktop) {
+                    Modifier.border(
+                        width = NuvioTokens.Border.thin,
+                        color = if (onClick != null && isHovered) {
+                            tokens.colors.borderDefault
+                        } else {
+                            tokens.colors.borderSubtle
+                        },
+                        shape = pillShape,
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .then(if (onClick != null) {
                 Modifier
-                    .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                    .then(
+                        if (isDesktop) {
+                            Modifier
+                                .hoverable(interactionSource)
+                                .pointerHoverIcon(PointerIcon.Hand)
+                        } else {
+                            Modifier
+                        },
+                    )
                     .nuvioFocusBorder(pillShape)
                     .clickable(onClick = onClick)
             } else Modifier),
@@ -552,7 +596,7 @@ private fun NuvioViewAllPill(
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
             contentDescription = viewAllText,
-            tint = tokens.colors.textMuted,
+            tint = if (isDesktop && onClick != null && isHovered) tokens.colors.textPrimary else tokens.colors.textMuted,
             modifier = Modifier.size(iconSize),
         )
     }

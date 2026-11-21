@@ -3,6 +3,9 @@ package com.nuvio.app.core.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -18,14 +21,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.isDesktop
 
 private val MenuShape = RoundedCornerShape(NuvioTokens.Space.s20)
 
@@ -49,7 +57,7 @@ fun Menu(
         containerColor = tokens.colors.surfacePopover,
         tonalElevation = tokens.elevation.flat,
         shadowElevation = tokens.elevation.overlay,
-        border = BorderStroke(tokens.borders.thin, SurfaceEdge),
+        border = BorderStroke(tokens.borders.thin, tokens.colors.borderDefault),
         content = content,
     )
 }
@@ -63,12 +71,29 @@ fun MenuItem(
     enabled: Boolean = true,
 ) {
     val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = NuvioTokens.Space.s8)
             .clip(tokens.shapes.compactCard)
-            .background(if (selected) tokens.colors.accent.copy(alpha = tokens.opacity.hover) else Color.Transparent)
+            .background(
+                when {
+                    selected -> tokens.colors.accent.copy(alpha = tokens.opacity.hover)
+                    isDesktop && enabled && isHovered -> tokens.colors.overlayHover
+                    else -> Color.Transparent
+                },
+            )
+            .then(
+                if (isDesktop && enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
             .clickable(enabled = enabled, onClick = onClick)
             .padding(NuvioTokens.Space.s12),
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),

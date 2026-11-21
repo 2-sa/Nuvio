@@ -60,7 +60,7 @@ internal actual fun NuvioDesktopVerticalScrollbar(
 
 @Composable
 private fun nuvioDesktopScrollbarStyle(backgroundColor: Color?): ScrollbarStyle {
-    val colorScheme = MaterialTheme.colorScheme
+    val tokens = MaterialTheme.nuvio
     val adaptiveThumbColor = backgroundColor?.let { color ->
         if (color.luminance() > EqualBlackWhiteContrastLuminance) Color.Black else Color.White
     }
@@ -70,9 +70,9 @@ private fun nuvioDesktopScrollbarStyle(backgroundColor: Color?): ScrollbarStyle 
         shape = RoundedCornerShape(100),
         hoverDurationMillis = 180,
         unhoverColor = adaptiveThumbColor?.copy(alpha = 0.72f)
-            ?: colorScheme.onSurfaceVariant.copy(alpha = 0.34f),
+            ?: tokens.colors.textMuted.copy(alpha = 0.32f),
         hoverColor = adaptiveThumbColor?.copy(alpha = 0.94f)
-            ?: colorScheme.primary.copy(alpha = 0.78f),
+            ?: tokens.colors.accent.copy(alpha = 0.72f),
     )
 }
 

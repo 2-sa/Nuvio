@@ -2,6 +2,10 @@ package com.nuvio.app.core.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -26,9 +30,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import com.nuvio.app.isDesktop
 
 enum class DialogButtonStyle {
     Primary,
@@ -66,7 +75,7 @@ fun DialogSurface(
             shape = tokens.shapes.dialog,
             color = tokens.colors.surfaceDialog,
             contentColor = tokens.colors.textPrimary,
-            border = BorderStroke(tokens.borders.thin, SurfaceEdge),
+            border = BorderStroke(tokens.borders.thin, tokens.colors.borderDefault),
         ) {
             Column(
                 modifier = Modifier.padding(tokens.spacing.dialogPadding),
@@ -145,12 +154,25 @@ fun DialogButton(
     val contentColor = if (style == DialogButtonStyle.Secondary) tokens.colors.textPrimary else tokens.colors.onAccent
     Button(
         onClick = onClick,
-        modifier = modifier.heightIn(min = NuvioTokens.Space.s48),
+        modifier = modifier
+            .heightIn(min = NuvioTokens.Space.s48)
+            .then(
+                if (isDesktop && enabled && !loading) {
+                    Modifier.pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            ),
         enabled = enabled && !loading,
         elevation = ButtonDefaults.buttonElevation(
             hoveredElevation = 0.dp,
         ),
         shape = tokens.shapes.button,
+        border = if (style == DialogButtonStyle.Secondary) {
+            BorderStroke(tokens.borders.thin, tokens.colors.borderSubtle)
+        } else {
+            null
+        },
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor,
@@ -187,15 +209,35 @@ fun DialogOption(
     leading: (@Composable () -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(tokens.shapes.compactCard)
             .background(
-                if (selected) {
-                    tokens.colors.accent.copy(alpha = tokens.opacity.selected)
+                when {
+                    selected -> tokens.colors.accent.copy(alpha = tokens.opacity.selected)
+                    isDesktop && enabled && isHovered -> tokens.colors.overlayHover
+                    else -> tokens.colors.textPrimary.copy(alpha = tokens.opacity.subtle)
+                },
+            )
+            .border(
+                width = tokens.borders.thin,
+                color = when {
+                    selected -> tokens.colors.accent.copy(alpha = 0.5f)
+                    isDesktop && enabled && isHovered -> tokens.colors.borderDefault
+                    else -> tokens.colors.borderSubtle
+                },
+                shape = tokens.shapes.compactCard,
+            )
+            .then(
+                if (isDesktop && enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
                 } else {
-                    tokens.colors.textPrimary.copy(alpha = tokens.opacity.subtle)
+                    Modifier
                 },
             )
             .selectable(selected = selected, enabled = enabled, role = role, onClick = onClick)
