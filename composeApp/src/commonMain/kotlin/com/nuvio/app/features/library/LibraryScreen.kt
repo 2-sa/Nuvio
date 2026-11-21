@@ -682,6 +682,7 @@ private fun DesktopLibraryToolbar(
             ) {
                 Text(
                     text = title,
+                    modifier = Modifier.weight(1f, fill = false),
                     style = MaterialTheme.typography.displayLarge,
                     color = tokens.colors.textPrimary,
                     maxLines = 1,

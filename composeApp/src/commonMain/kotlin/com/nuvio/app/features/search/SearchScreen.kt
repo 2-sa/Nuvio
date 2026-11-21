@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
@@ -344,12 +345,11 @@ fun SearchScreen(
                                 placeholder = stringResource(Res.string.compose_search_placeholder),
                                 clearContentDescription = stringResource(Res.string.compose_search_clear),
                                 isFocused = isSearchFocused,
-                                modifier = Modifier
-                                    .focusRequester(focusRequester)
-                                    .onFocusChanged {
-                                        isSearchFocused = it.isFocused
-                                        if (query.isNotBlank()) focusRequester.captureFocus()
-                                    },
+                                focusRequester = focusRequester,
+                                onFocusChanged = {
+                                    isSearchFocused = it.isFocused
+                                    if (query.isNotBlank()) focusRequester.captureFocus()
+                                },
                             )
                         }
                         Spacer(modifier = Modifier.height(NuvioTokens.Space.s12))
@@ -483,12 +483,14 @@ private fun ObsidianSearchBar(
     placeholder: String,
     clearContentDescription: String,
     isFocused: Boolean,
+    focusRequester: FocusRequester,
+    onFocusChanged: (FocusState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
     val barShape = RoundedCornerShape(14.dp)
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
+    val containerInteractionSource = remember { MutableInteractionSource() }
+    val isHovered by containerInteractionSource.collectIsHoveredAsState()
     val borderColor by animateColorAsState(
         targetValue = when {
             isFocused -> tokens.colors.accent
@@ -520,7 +522,13 @@ private fun ObsidianSearchBar(
             .clip(barShape)
             .background(containerColor)
             .border(NuvioTokens.Border.thin, borderColor, barShape)
-            .then(if (isDesktop) Modifier.hoverable(interactionSource) else Modifier)
+            .then(if (isDesktop) Modifier.hoverable(containerInteractionSource) else Modifier)
+            .clickable(
+                interactionSource = containerInteractionSource,
+                indication = null,
+            ) {
+                focusRequester.requestFocus()
+            }
             .padding(horizontal = NuvioTokens.Space.s14),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
@@ -547,7 +555,10 @@ private fun ObsidianSearchBar(
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+                    .onFocusChanged(onFocusChanged),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     color = tokens.colors.textPrimary,
