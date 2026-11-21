@@ -13,7 +13,7 @@
   gap: 10px;
   padding: 6px;
   border-radius: 999px;
-  color: #fff;
+  color: var(--theme-text-primary);
   opacity: 0;
   pointer-events: none;
   transform: translate3d(-50%, -6px, 0);
@@ -29,7 +29,7 @@
 }
 
 .party-pill:hover .party-pill-text {
-  color: rgba(255, 255, 255, .86);
+  color: var(--theme-text-secondary);
 }
 
 .party-pill-text {
@@ -101,7 +101,7 @@
   overflow: hidden;
   border-radius: 999px;
   background: var(--theme-surface-card);
-  color: #fff;
+  color: var(--theme-text-primary);
   font-size: calc(var(--party-avatar-size, 44px) * .4);
   line-height: 1;
   font-weight: 600;
@@ -304,8 +304,9 @@
   gap: 8px;
   padding: 0 16px;
   overflow: hidden;
+  border: 1px solid var(--theme-border-default);
   border-radius: 12px;
-  background: rgba(255, 255, 255, .1);
+  background: var(--theme-surface-card);
   color: var(--theme-text-primary);
   font-size: 14px;
   line-height: 20px;
@@ -326,15 +327,17 @@
 }
 
 .party-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, .15);
+  background: color-mix(in srgb, var(--theme-surface-card) 82%, rgba(255, 255, 255, .14));
 }
 
 .party-button.primary {
+  border-color: transparent;
   background: var(--theme-accent);
   color: var(--theme-on-accent);
 }
 
 .party-button.danger {
+  border-color: transparent;
   background: var(--theme-danger, #e36a8a);
   color: var(--theme-on-accent);
 }
@@ -380,7 +383,7 @@
 }
 
 .party-icon-button:hover {
-  background: rgba(255, 255, 255, .1);
+  background: var(--theme-surface-card);
 }
 
 .party-icon-button svg {
@@ -511,7 +514,7 @@
 }
 
 .party-open-seat-row:hover {
-  background: rgba(255, 255, 255, .06);
+  background: var(--theme-surface-card);
 }
 
 .party-member-copy {
@@ -668,7 +671,7 @@
   padding: 24px;
   border-radius: 24px;
   border: 1px solid var(--theme-border-default);
-  background: var(--theme-surface-elevated);
+  background: color-mix(in srgb, var(--theme-surface-popover) 96%, transparent);
   box-shadow: 0 20px 70px rgba(0, 0, 0, .45);
   animation: party-card-in var(--motion-panel) var(--ease-out);
 }
@@ -797,6 +800,7 @@
   margin-top: 20px;
   padding: 3px;
   box-sizing: border-box;
+  border: 1px solid var(--theme-border-default);
   border-radius: 12px;
   background: var(--theme-surface-card);
 }
@@ -812,8 +816,9 @@
   bottom: 3px;
   left: 3px;
   width: calc((100% - 6px) / 2);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 28%, var(--theme-border-default));
   border-radius: 9px;
-  background: rgba(255, 255, 255, .12);
+  background: var(--theme-selected-surface);
   transition: transform 520ms cubic-bezier(.34, 1.36, .5, 1);
 }
 
@@ -844,7 +849,7 @@
 }
 
 .party-tab:not(.selected):hover {
-  background: rgba(255, 255, 255, .06);
+  background: color-mix(in srgb, var(--theme-surface-card) 60%, rgba(255, 255, 255, .08));
 }
 
 .party-tab .party-unread {
@@ -993,6 +998,7 @@
   max-width: 78%;
   box-sizing: border-box;
   padding: 9px 14px;
+  border: 1px solid var(--theme-border-default);
   border-radius: 6px 18px 18px 6px;
   background: var(--theme-surface-card);
   color: var(--theme-text-primary);
@@ -1012,6 +1018,7 @@
 }
 
 .party-chat-row.mine .party-chat-bubble {
+  border-color: transparent;
   border-radius: 18px 6px 6px 18px;
   background: var(--theme-accent);
   color: var(--theme-on-accent);
@@ -1042,7 +1049,7 @@
 }
 
 .party-chat-failed:hover {
-  background: rgba(255, 255, 255, .06);
+  background: var(--theme-surface-card);
 }
 
 .party-chat-empty {
@@ -1153,7 +1160,7 @@
   box-sizing: border-box;
   display: block;
   padding: 11px 16px;
-  border: 0;
+  border: 1px solid var(--theme-border-default);
   border-radius: 22px;
   outline: 0;
   background: var(--theme-surface-card);
@@ -1164,6 +1171,11 @@
   line-height: 20px;
   resize: none;
   scrollbar-width: none;
+  transition: border-color var(--motion-standard) ease;
+}
+
+.party-chat-input:focus-visible {
+  border-color: var(--theme-focus);
 }
 
 .party-chat-input::-webkit-scrollbar {
@@ -1181,16 +1193,19 @@
   height: 44px;
   display: grid;
   place-items: center;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: var(--theme-accent);
   color: var(--theme-on-accent);
   transition:
     background-color 300ms ease,
+    border-color 300ms ease,
     color 300ms ease,
     transform var(--motion-fast) var(--ease-out);
 }
 
 .party-chat-send:disabled {
+  border-color: var(--theme-border-default);
   background: var(--theme-surface-card);
   color: var(--theme-text-muted);
   pointer-events: none;

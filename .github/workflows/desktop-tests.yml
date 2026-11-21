@@ -7,7 +7,7 @@ on:
         description: Space-separated Gradle --tests filter patterns (pass "all" for the full desktopTest suite)
         required: false
         type: string
-        default: com.nuvio.app.core.ui.HeroStretchOverscrollTest com.nuvio.app.features.details.components.DetailSeriesContentWheelScrollTest com.nuvio.app.features.trakt.TraktIdUtilsTest com.nuvio.app.features.trakt.TraktTrackingLibraryProviderTest
+        default: com.nuvio.app.core.ui.CinemaObsidianThemeTest com.nuvio.app.features.membership.ThemeAccessTest com.nuvio.app.core.ui.DesktopNavigationBarTest com.nuvio.app.core.ui.HeroStretchOverscrollTest com.nuvio.app.features.home.components.HomeHeroLayoutTest com.nuvio.app.features.home.components.HomeHeroSectionTest com.nuvio.app.features.home.HomeCategoryFilterTest com.nuvio.app.features.details.components.DetailSeriesContentWheelScrollTest com.nuvio.app.features.trakt.TraktIdUtilsTest com.nuvio.app.features.trakt.TraktTrackingLibraryProviderTest com.nuvio.app.features.details.EpisodeRatingsAlignmentTest com.nuvio.app.features.tmdb.TmdbMetadataServiceTest
 
 jobs:
   desktop-tests:
@@ -32,11 +32,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Validate Player Web UI JS & Windows MSI WiX XML
+      - name: Validate Player Web UI JS & XML Resources
         run: |
           node --check composeApp/src/desktopMain/resources/player-ui/controls.js
           node --check composeApp/src/desktopMain/resources/player-ui/party.js
-          python3 -c "import xml.etree.ElementTree as ET; ET.parse('composeApp/packaging/windows/main.wxs'); print('WXS_XML_OK')"
+          python3 -c "import xml.etree.ElementTree as ET; [ET.parse(p) for p in ('composeApp/packaging/windows/main.wxs', 'composeApp/src/commonMain/composeResources/values/strings.xml', 'composeApp/src/commonMain/composeResources/values-ar/strings.xml')]; print('XML_OK')"
 
       - name: Ensure local.properties exists
         run: |
@@ -46,7 +46,7 @@ jobs:
 
       - name: Compile Desktop & Run Unit Tests
         env:
-          TEST_FILTER: ${{ inputs.test_filter || 'com.nuvio.app.core.ui.HeroStretchOverscrollTest com.nuvio.app.features.details.components.DetailSeriesContentWheelScrollTest com.nuvio.app.features.trakt.TraktIdUtilsTest com.nuvio.app.features.trakt.TraktTrackingLibraryProviderTest' }}
+          TEST_FILTER: ${{ inputs.test_filter || 'com.nuvio.app.core.ui.CinemaObsidianThemeTest com.nuvio.app.features.membership.ThemeAccessTest com.nuvio.app.core.ui.DesktopNavigationBarTest com.nuvio.app.core.ui.HeroStretchOverscrollTest com.nuvio.app.features.home.components.HomeHeroLayoutTest com.nuvio.app.features.home.components.HomeHeroSectionTest com.nuvio.app.features.home.HomeCategoryFilterTest com.nuvio.app.features.details.components.DetailSeriesContentWheelScrollTest com.nuvio.app.features.trakt.TraktIdUtilsTest com.nuvio.app.features.trakt.TraktTrackingLibraryProviderTest com.nuvio.app.features.details.EpisodeRatingsAlignmentTest com.nuvio.app.features.tmdb.TmdbMetadataServiceTest' }}
         run: |
           set -euo pipefail
           test_args=()
