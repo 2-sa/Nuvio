@@ -1,6 +1,9 @@
 name: Desktop Tests
 
 on:
+  push:
+    branches:
+      - Dev
   workflow_dispatch:
     inputs:
       test_filter:
