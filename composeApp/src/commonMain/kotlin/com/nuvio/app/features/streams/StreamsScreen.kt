@@ -1,32 +1,41 @@
 package com.nuvio.app.features.streams
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -34,12 +43,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -57,67 +69,73 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.i18n.localizedByteUnit
+import com.nuvio.app.core.i18n.localizedEpisodeTitle
 import com.nuvio.app.core.ui.ArtworkBackdrop
 import com.nuvio.app.core.ui.LocalOnBackdrop
+import com.nuvio.app.core.ui.LocalVerticalBarPadding
+import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioBackButton
-import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.backdropControlColor
-import com.nuvio.app.core.ui.dismissNuvioBottomSheet
-import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
-import com.nuvio.app.core.ui.featherArtwork
-import com.nuvio.app.core.ui.rememberArtworkBackdrop
-import com.nuvio.app.core.ui.platformTouchScroll
-import com.nuvio.app.features.downloads.DownloadsRepository
-import com.nuvio.app.features.details.MetaScreenSettingsRepository
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.rememberModalBottomSheetState
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
-import com.nuvio.app.core.ui.nuvioSafeBottomPadding
-import com.nuvio.app.core.ui.shimmer
-import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.centeredVerticalBarPadding
+import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
+import com.nuvio.app.core.ui.dismissNuvioBottomSheet
+import com.nuvio.app.core.ui.featherArtwork
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
+import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.platformTouchScroll
+import com.nuvio.app.core.ui.rememberArtworkBackdrop
+import com.nuvio.app.core.ui.secondaryClickAt
+import com.nuvio.app.core.ui.shimmer
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
+import com.nuvio.app.features.debrid.DebridProviders
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DirectDebridPlayableResult
 import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.debrid.toastMessage
 import com.nuvio.app.features.details.MetaScreenBackgroundMode
+import com.nuvio.app.features.details.MetaScreenSettingsRepository
+import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
-import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watched.watchedItemKeys
 import com.nuvio.app.isDesktop
-import com.nuvio.app.navigation.LocalUseNativeNavigation
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
-import com.nuvio.app.core.i18n.localizedEpisodeTitle
+import kotlin.math.round
+import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------------------
 // Streams Screen
@@ -257,10 +275,11 @@ fun StreamsScreen(
 
     if (showLoadingScreen) return
 
+    val tokens = MaterialTheme.nuvio
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(tokens.colors.background),
     ) {
         val isTabletLayout = maxWidth >= 768.dp
 
@@ -336,14 +355,14 @@ fun StreamsScreen(
                 onClick = onBack,
                 modifier = if (isDesktop) Modifier else Modifier.size(40.dp),
                 containerColor = if (isDesktop) {
-                    Color.Black.copy(alpha = 0.34f)
+                    tokens.colors.surfaceElevated.copy(alpha = 0.88f)
                 } else {
-                    MaterialTheme.colorScheme.background.copy(alpha = 0.45f)
+                    tokens.colors.background.copy(alpha = 0.55f)
                 },
                 showContainerOnDesktop = true,
-                contentColor = MaterialTheme.colorScheme.onBackground,
-                buttonSize = if (isDesktop) 48.dp else 40.dp,
-                iconSize = if (isDesktop) 24.dp else 20.dp,
+                contentColor = tokens.colors.textPrimary,
+                buttonSize = if (isDesktop) 46.dp else 40.dp,
+                iconSize = if (isDesktop) 22.dp else 20.dp,
             )
 
         }
@@ -573,16 +592,25 @@ internal fun ResumeBanner(
         else -> null
     } ?: return
 
+    val tokens = MaterialTheme.nuvio
+    val bannerShape = RoundedCornerShape(12.dp)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(backdropControlColor(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)))
+            .clip(bannerShape)
+            .background(
+                if (isDesktop) {
+                    tokens.colors.focusBackground.copy(alpha = 0.85f)
+                } else {
+                    backdropControlColor(tokens.colors.surfaceElevated.copy(alpha = 0.78f))
+                },
+            )
+            .border(NuvioTokens.Border.thin, tokens.colors.accent.copy(alpha = 0.45f), bannerShape)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Text(
             text = resumeText,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -763,6 +791,143 @@ private data class StreamCardRenderModel(
     val stream: StreamItem,
 )
 
+internal enum class StreamsResolutionFilter(val matchLabel: String?) {
+    ALL(null),
+    UHD_4K("4K"),
+    FHD_1080P("1080p"),
+    HD_720P("720p"),
+}
+
+internal enum class StreamsSortOrder {
+    DEFAULT,
+    QUALITY,
+    SIZE_DESC,
+    SIZE_ASC,
+}
+
+internal data class StreamCinemaMetadata(
+    val resolution: String?,
+    val resolutionRank: Int,
+    val hdrTags: List<String>,
+    val codec: String?,
+    val audio: String?,
+    val seeders: Int?,
+    val sizeBytes: Long?,
+)
+
+private val RES_4K_REGEX = Regex("\\b(2160p|4k|uhd)\\b", RegexOption.IGNORE_CASE)
+private val RES_1080_REGEX = Regex("\\b(1080p|1080i|fhd)\\b", RegexOption.IGNORE_CASE)
+private val RES_720_REGEX = Regex("\\b(720p)\\b", RegexOption.IGNORE_CASE)
+private val RES_480_REGEX = Regex("\\b(480p|576p)\\b", RegexOption.IGNORE_CASE)
+private val HDR_DV_REGEX = Regex("\\b(dolby\\s*vision|dovi|dv)\\b", RegexOption.IGNORE_CASE)
+private val HDR10_PLUS_REGEX = Regex("hdr10\\+", RegexOption.IGNORE_CASE)
+private val HDR10_REGEX = Regex("\\bhdr10\\b", RegexOption.IGNORE_CASE)
+private val HDR_REGEX = Regex("\\bhdr\\b", RegexOption.IGNORE_CASE)
+private val HLG_REGEX = Regex("\\bhlg\\b", RegexOption.IGNORE_CASE)
+private val CODEC_HEVC_REGEX = Regex("\\b(hevc|x265|h\\.?265)\\b", RegexOption.IGNORE_CASE)
+private val CODEC_AV1_REGEX = Regex("\\bav1\\b", RegexOption.IGNORE_CASE)
+private val CODEC_H264_REGEX = Regex("\\b(x264|h\\.?264|avc)\\b", RegexOption.IGNORE_CASE)
+private val AUDIO_ATMOS_REGEX = Regex("\\batmos\\b", RegexOption.IGNORE_CASE)
+private val AUDIO_TRUEHD_REGEX = Regex("\\btruehd\\b", RegexOption.IGNORE_CASE)
+private val AUDIO_DTS_HD_REGEX = Regex("\\b(dts-?hd|dts:?x)\\b", RegexOption.IGNORE_CASE)
+private val AUDIO_DTS_REGEX = Regex("\\bdts\\b", RegexOption.IGNORE_CASE)
+private val AUDIO_DDP_REGEX = Regex("(dd\\+|\\be-?ac-?3\\b|\\bddp\\b)", RegexOption.IGNORE_CASE)
+private val AUDIO_AC3_REGEX = Regex("\\b(ac3|dd5\\.1)\\b", RegexOption.IGNORE_CASE)
+private val AUDIO_AAC_REGEX = Regex("\\baac\\b", RegexOption.IGNORE_CASE)
+private val SEEDERS_PREFIX_REGEX = Regex("(?:👤|👥|seeders?|seeds?)\\s*[:\\-]?\\s*(\\d+)", RegexOption.IGNORE_CASE)
+private val SEEDERS_SUFFIX_REGEX = Regex("(\\d+)\\s*(?:seeders?|seeds?)", RegexOption.IGNORE_CASE)
+
+internal fun StreamItem.extractCinemaMetadata(): StreamCinemaMetadata {
+    val raw = clientResolve?.stream?.raw
+    val parsed = raw?.parsed
+    val searchableText = listOfNotNull(
+        name,
+        title,
+        description,
+        behaviorHints.filename,
+        debridCacheStatus?.cachedName,
+        raw?.torrentName,
+        raw?.filename,
+        clientResolve?.torrentName,
+        clientResolve?.filename,
+        parsed?.rawTitle,
+        parsed?.parsedTitle,
+    ).joinToString(" ")
+
+    val rawResolution = parsed?.resolution?.trim()?.takeIf { it.isNotBlank() }
+    val (resolution, resolutionRank) = when {
+        rawResolution != null && RES_4K_REGEX.containsMatchIn(rawResolution) -> "4K" to 4
+        rawResolution != null && RES_1080_REGEX.containsMatchIn(rawResolution) -> "1080p" to 3
+        rawResolution != null && RES_720_REGEX.containsMatchIn(rawResolution) -> "720p" to 2
+        rawResolution != null && RES_480_REGEX.containsMatchIn(rawResolution) -> "480p" to 1
+        RES_4K_REGEX.containsMatchIn(searchableText) -> "4K" to 4
+        RES_1080_REGEX.containsMatchIn(searchableText) -> "1080p" to 3
+        RES_720_REGEX.containsMatchIn(searchableText) -> "720p" to 2
+        RES_480_REGEX.containsMatchIn(searchableText) -> "480p" to 1
+        else -> rawResolution to 0
+    }
+
+    val hdrSource = buildString {
+        if (!parsed?.hdr.isNullOrEmpty()) {
+            append(parsed?.hdr?.joinToString(" ").orEmpty())
+            append(' ')
+        }
+        append(searchableText)
+    }
+    val hdrTags = buildList {
+        if (HDR_DV_REGEX.containsMatchIn(hdrSource)) add("DV")
+        when {
+            HDR10_PLUS_REGEX.containsMatchIn(hdrSource) -> add("HDR10+")
+            HDR10_REGEX.containsMatchIn(hdrSource) -> add("HDR10")
+            HDR_REGEX.containsMatchIn(hdrSource) -> add("HDR")
+        }
+        if (HLG_REGEX.containsMatchIn(hdrSource)) add("HLG")
+    }
+
+    val codecSource = listOfNotNull(parsed?.codec, searchableText).joinToString(" ")
+    val codec = when {
+        CODEC_HEVC_REGEX.containsMatchIn(codecSource) -> "HEVC"
+        CODEC_AV1_REGEX.containsMatchIn(codecSource) -> "AV1"
+        CODEC_H264_REGEX.containsMatchIn(codecSource) -> "H.264"
+        else -> parsed?.codec?.trim()?.takeIf { it.isNotBlank() }?.uppercase()
+    }
+
+    val audioSource = buildString {
+        if (!parsed?.audio.isNullOrEmpty()) {
+            append(parsed?.audio?.joinToString(" ").orEmpty())
+            append(' ')
+        }
+        append(searchableText)
+    }
+    val audio = when {
+        AUDIO_ATMOS_REGEX.containsMatchIn(audioSource) -> "Atmos"
+        AUDIO_TRUEHD_REGEX.containsMatchIn(audioSource) -> "TrueHD"
+        AUDIO_DTS_HD_REGEX.containsMatchIn(audioSource) -> "DTS-HD"
+        AUDIO_DTS_REGEX.containsMatchIn(audioSource) -> "DTS"
+        AUDIO_DDP_REGEX.containsMatchIn(audioSource) -> "DD+"
+        AUDIO_AC3_REGEX.containsMatchIn(audioSource) -> "AC3"
+        AUDIO_AAC_REGEX.containsMatchIn(audioSource) -> "AAC"
+        else -> parsed?.audio?.firstOrNull()?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    val seeders = SEEDERS_PREFIX_REGEX.find(searchableText)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        ?: SEEDERS_SUFFIX_REGEX.find(searchableText)?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+    val sizeBytes = behaviorHints.videoSize
+        ?: raw?.size
+        ?: debridCacheStatus?.cachedSize
+
+    return StreamCinemaMetadata(
+        resolution = resolution,
+        resolutionRank = resolutionRank,
+        hdrTags = hdrTags,
+        codec = codec,
+        audio = audio,
+        seeders = seeders,
+        sizeBytes = sizeBytes,
+    )
+}
+
 @Composable
 internal fun StreamList(
     uiState: StreamsUiState,
@@ -774,8 +939,45 @@ internal fun StreamList(
     resumePositionMs: Long?,
     resumeProgressFraction: Float?,
     modifier: Modifier = Modifier,
+    resolutionFilterKey: String = StreamsResolutionFilter.ALL.name,
+    sortOrderKey: String = StreamsSortOrder.DEFAULT.name,
 ) {
-    val filteredGroups = uiState.filteredGroups
+    val resolutionFilter = remember(resolutionFilterKey) {
+        StreamsResolutionFilter.entries.firstOrNull { it.name == resolutionFilterKey } ?: StreamsResolutionFilter.ALL
+    }
+    val sortOrder = remember(sortOrderKey) {
+        StreamsSortOrder.entries.firstOrNull { it.name == sortOrderKey } ?: StreamsSortOrder.DEFAULT
+    }
+    val filteredGroups = remember(uiState.filteredGroups, resolutionFilter, sortOrder) {
+        uiState.filteredGroups.mapNotNull { group ->
+            val filtered = if (resolutionFilter == StreamsResolutionFilter.ALL) {
+                group.streams
+            } else {
+                group.streams.filter { stream ->
+                    stream.extractCinemaMetadata().resolution == resolutionFilter.matchLabel
+                }
+            }
+            val ordered = when (sortOrder) {
+                StreamsSortOrder.DEFAULT -> filtered
+                StreamsSortOrder.QUALITY -> filtered.sortedWith(
+                    compareByDescending<StreamItem> { it.extractCinemaMetadata().resolutionRank }
+                        .thenByDescending { it.extractCinemaMetadata().hdrTags.size }
+                        .thenByDescending { it.extractCinemaMetadata().sizeBytes ?: 0L },
+                )
+                StreamsSortOrder.SIZE_DESC -> filtered.sortedByDescending {
+                    it.extractCinemaMetadata().sizeBytes ?: 0L
+                }
+                StreamsSortOrder.SIZE_ASC -> filtered.sortedBy {
+                    it.extractCinemaMetadata().sizeBytes ?: Long.MAX_VALUE
+                }
+            }
+            if (ordered.isEmpty() && !group.isLoading && resolutionFilter != StreamsResolutionFilter.ALL) {
+                null
+            } else {
+                group.copy(streams = ordered)
+            }
+        }
+    }
     val hasGroups = filteredGroups.isNotEmpty()
     val hasAnyStreams = filteredGroups.any { it.streams.isNotEmpty() }
     val anyLoading = filteredGroups.any { it.isLoading }
@@ -822,16 +1024,29 @@ internal fun StreamList(
                             isLoading = false,
                             fetchingText = fetchingText,
                         )
-                        StreamCard(
-                            stream = shared.stream,
-                            enabled = true,
-                            appendInstantServiceToDefaultName = false,
-                            showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
-                            showAddonLogo = streamBadgeSettings.showAddonLogo,
-                            badgePlacement = streamBadgeSettings.badgePlacement,
-                            onClick = { onStreamSelected(shared.stream, resumePositionMs, resumeProgressFraction) },
-                            outlined = true,
-                        )
+                        if (isDesktop) {
+                            CinemaStreamCard(
+                                stream = shared.stream,
+                                enabled = true,
+                                appendInstantServiceToDefaultName = false,
+                                showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                                showAddonLogo = streamBadgeSettings.showAddonLogo,
+                                badgePlacement = streamBadgeSettings.badgePlacement,
+                                onClick = { onStreamSelected(shared.stream, resumePositionMs, resumeProgressFraction) },
+                                outlined = true,
+                            )
+                        } else {
+                            StreamCard(
+                                stream = shared.stream,
+                                enabled = true,
+                                appendInstantServiceToDefaultName = false,
+                                showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                                showAddonLogo = streamBadgeSettings.showAddonLogo,
+                                badgePlacement = streamBadgeSettings.badgePlacement,
+                                onClick = { onStreamSelected(shared.stream, resumePositionMs, resumeProgressFraction) },
+                                outlined = true,
+                            )
+                        }
                         Spacer(modifier = Modifier.height(10.dp))
                     }
                 }
@@ -992,34 +1207,417 @@ private fun LazyListScope.streamSection(
                 stream.needsLocalDebridResolve &&
                     !AppFeaturePolicy.p2pEnabled &&
                     !(debridEnabled && stream.isAddonDebridCandidate)
-            StreamCard(
-                stream = stream,
-                enabled = isSelectable || isUnsupportedTorrentStream,
-                appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
-                showFileSizeBadges = showFileSizeBadges,
-                showAddonLogo = showAddonLogo,
-                badgePlacement = badgePlacement,
-                onClick = {
-                    if (isSelectable) {
-                        onStreamSelected(stream, resumePositionMs, resumeProgressFraction)
-                    } else if (isUnsupportedTorrentStream) {
-                        NuvioToastController.show(torrentNotSupportedText)
-                    }
-                },
-                onLongClick = {
-                    if (stream.playableDirectUrl != null || stream.shouldOpenExternally || stream.isAddonDebridCandidate) {
-                        onStreamLongPress(stream)
-                    }
-                },
-                onSecondaryClick = { position ->
-                    if (stream.playableDirectUrl != null || stream.shouldOpenExternally || stream.isAddonDebridCandidate) {
-                        onStreamSecondaryClick(stream, position)
-                    }
-                },
-            )
+            val cardOnClick = {
+                if (isSelectable) {
+                    onStreamSelected(stream, resumePositionMs, resumeProgressFraction)
+                } else if (isUnsupportedTorrentStream) {
+                    NuvioToastController.show(torrentNotSupportedText)
+                }
+            }
+            val cardOnLongClick = {
+                if (stream.playableDirectUrl != null || stream.shouldOpenExternally || stream.isAddonDebridCandidate) {
+                    onStreamLongPress(stream)
+                }
+            }
+            val cardOnSecondaryClick: (Offset) -> Unit = { position ->
+                if (stream.playableDirectUrl != null || stream.shouldOpenExternally || stream.isAddonDebridCandidate) {
+                    onStreamSecondaryClick(stream, position)
+                }
+            }
+            if (isDesktop) {
+                CinemaStreamCard(
+                    stream = stream,
+                    enabled = isSelectable || isUnsupportedTorrentStream,
+                    appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
+                    showFileSizeBadges = showFileSizeBadges,
+                    showAddonLogo = showAddonLogo,
+                    badgePlacement = badgePlacement,
+                    onClick = cardOnClick,
+                    onLongClick = cardOnLongClick,
+                    onSecondaryClick = cardOnSecondaryClick,
+                )
+            } else {
+                StreamCard(
+                    stream = stream,
+                    enabled = isSelectable || isUnsupportedTorrentStream,
+                    appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
+                    showFileSizeBadges = showFileSizeBadges,
+                    showAddonLogo = showAddonLogo,
+                    badgePlacement = badgePlacement,
+                    onClick = cardOnClick,
+                    onLongClick = cardOnLongClick,
+                    onSecondaryClick = cardOnSecondaryClick,
+                )
+            }
             Spacer(modifier = Modifier.height(10.dp))
         }
     }
+}
+
+@Composable
+private fun CinemaStreamCard(
+    stream: StreamItem,
+    enabled: Boolean,
+    appendInstantServiceToDefaultName: Boolean,
+    showFileSizeBadges: Boolean,
+    showAddonLogo: Boolean,
+    badgePlacement: StreamBadgePlacement,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    onSecondaryClick: ((Offset) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    isCurrent: Boolean = false,
+    currentLabel: String? = null,
+    outlined: Boolean = false,
+) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val cardShape = RoundedCornerShape(14.dp)
+    val partyLabel = if (isCurrent) null else LocalStreamHighlight.current(stream)
+    val metadata = remember(stream) { stream.extractCinemaMetadata() }
+    val badgeImages = remember(stream.badges) { stream.badges.filter { it.imageURL.isNotBlank() } }
+    val hasExtractedBadges = metadata.resolution != null ||
+        metadata.hdrTags.isNotEmpty() ||
+        metadata.codec != null ||
+        metadata.audio != null ||
+        metadata.seeders != null ||
+        (showFileSizeBadges && metadata.sizeBytes != null)
+    val hasBadges = badgeImages.isNotEmpty() || hasExtractedBadges
+    var cardPositionInRoot by remember { mutableStateOf(Offset.Zero) }
+
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isCurrent || outlined -> tokens.colors.accent
+            enabled && isHovered -> tokens.colors.accent.copy(alpha = 0.7f)
+            else -> tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "cinemaStreamCardBorder",
+    )
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            isCurrent -> tokens.colors.focusBackground.copy(alpha = 0.75f)
+            enabled && isHovered -> tokens.colors.surfaceElevated
+            else -> tokens.colors.surfaceCard
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "cinemaStreamCardBackground",
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 72.dp)
+            .clip(cardShape)
+            .background(containerColor)
+            .border(NuvioTokens.Border.thin, borderColor, cardShape)
+            .nuvioFocusBorder(cardShape)
+            .onGloballyPositioned { coordinates ->
+                cardPositionInRoot = coordinates.positionInRoot()
+            }
+            .hoverable(interactionSource)
+            .then(
+                if (enabled) {
+                    Modifier.pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .combinedClickable(
+                enabled = enabled,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .secondaryClickAt(
+                if (enabled && onSecondaryClick != null) {
+                    { localPosition -> onSecondaryClick(cardPositionInRoot + localPosition) }
+                } else {
+                    null
+                },
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (hasBadges && badgePlacement == StreamBadgePlacement.TOP) {
+                CinemaStreamMetadataRow(
+                    metadata = metadata,
+                    badgeImages = badgeImages,
+                    stream = stream,
+                    showFileSizeBadges = showFileSizeBadges,
+                )
+            }
+
+            CinemaStreamTitleRow(
+                stream = stream,
+                appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
+                isCurrent = isCurrent,
+                currentLabel = currentLabel,
+                partyLabel = partyLabel,
+            )
+
+            val subtitle = stream.streamSubtitle
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    ),
+                    color = tokens.colors.textSecondary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            if (hasBadges && badgePlacement == StreamBadgePlacement.BOTTOM) {
+                CinemaStreamMetadataRow(
+                    metadata = metadata,
+                    badgeImages = badgeImages,
+                    stream = stream,
+                    showFileSizeBadges = showFileSizeBadges,
+                )
+            }
+        }
+
+        if (showAddonLogo) {
+            Spacer(modifier = Modifier.width(14.dp))
+            val addonChipShape = RoundedCornerShape(10.dp)
+            Column(
+                modifier = Modifier
+                    .clip(addonChipShape)
+                    .background(tokens.colors.surfaceElevated)
+                    .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, addonChipShape)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (!stream.addonLogo.isNullOrBlank()) {
+                    AsyncImage(
+                        model = stream.addonLogo,
+                        contentDescription = stream.addonName,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(6.dp)),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                Text(
+                    text = stream.addonName,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = tokens.colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CinemaStreamTitleRow(
+    stream: StreamItem,
+    appendInstantServiceToDefaultName: Boolean,
+    isCurrent: Boolean,
+    currentLabel: String?,
+    partyLabel: String?,
+) {
+    val tokens = MaterialTheme.nuvio
+    val instantLabel = if (appendInstantServiceToDefaultName) {
+        stream.cinemaInstantServiceLabel()
+    } else {
+        null
+    }
+    val visibleState = remember(stream.streamLabel) {
+        MutableTransitionState(instantLabel != null)
+    }
+    visibleState.targetState = instantLabel != null
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stream.streamLabel,
+            modifier = Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 20.sp,
+            ),
+            color = tokens.colors.textPrimary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        AnimatedVisibility(
+            visibleState = visibleState,
+            enter = fadeIn(tween(260)) + expandHorizontally(tween(260), expandFrom = Alignment.Start),
+            exit = fadeOut(tween(120)) + shrinkHorizontally(tween(120), shrinkTowards = Alignment.Start),
+        ) {
+            Text(
+                text = " ${instantLabel.orEmpty()}",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = tokens.colors.accent,
+                maxLines = 1,
+            )
+        }
+        if (isCurrent && !currentLabel.isNullOrBlank()) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(tokens.colors.accent)
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = currentLabel,
+                    color = tokens.colors.onAccent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (partyLabel != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = partyLabel,
+                color = tokens.colors.accent,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CinemaStreamMetadataRow(
+    metadata: StreamCinemaMetadata,
+    badgeImages: List<StreamBadge>,
+    stream: StreamItem,
+    showFileSizeBadges: Boolean,
+) {
+    val tokens = MaterialTheme.nuvio
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        metadata.resolution?.let { resolution ->
+            val isUhd = resolution == "4K"
+            StreamMetadataPill(
+                text = resolution,
+                highlighted = isUhd,
+            )
+        }
+        metadata.hdrTags.forEach { hdrTag ->
+            StreamMetadataPill(
+                text = hdrTag,
+                accentTextColor = tokens.colors.warning,
+            )
+        }
+        metadata.codec?.let { codec ->
+            StreamMetadataPill(text = codec)
+        }
+        metadata.audio?.let { audio ->
+            StreamMetadataPill(text = audio)
+        }
+        metadata.seeders?.let { seeders ->
+            StreamMetadataPill(
+                text = seeders.toString(),
+                leadingIcon = Icons.Rounded.ArrowUpward,
+                accentTextColor = tokens.colors.success,
+            )
+        }
+        badgeImages.forEach { badge ->
+            StreamBadgeImage(badge = badge)
+        }
+        if (showFileSizeBadges) {
+            if (stream.behaviorHints.videoSize != null) {
+                StreamFileSizeBadge(stream = stream)
+            } else {
+                metadata.sizeBytes?.takeIf { it > 0L }?.let { bytes ->
+                    StreamMetadataPill(text = formatStreamSizeBytes(bytes))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StreamMetadataPill(
+    text: String,
+    highlighted: Boolean = false,
+    accentTextColor: Color? = null,
+    leadingIcon: ImageVector? = null,
+) {
+    val tokens = MaterialTheme.nuvio
+    val pillShape = RoundedCornerShape(6.dp)
+    val bgColor = if (highlighted) tokens.colors.focusBackground else tokens.colors.surfaceElevated
+    val borderColor = if (highlighted) tokens.colors.accent.copy(alpha = 0.65f) else tokens.colors.borderDefault
+    val textColor = when {
+        highlighted -> tokens.colors.accent
+        accentTextColor != null -> accentTextColor
+        else -> tokens.colors.textSecondary
+    }
+    Row(
+        modifier = Modifier
+            .clip(pillShape)
+            .background(bgColor)
+            .border(NuvioTokens.Border.thin, borderColor, pillShape)
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leadingIcon != null) {
+            Icon(
+                imageVector = leadingIcon,
+                contentDescription = null,
+                tint = textColor,
+                modifier = Modifier.size(11.dp),
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.2.sp,
+            ),
+            color = textColor,
+            maxLines = 1,
+        )
+    }
+}
+
+private fun formatStreamSizeBytes(bytes: Long): String {
+    val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+    return if (gib >= 1.0) {
+        val roundedGiB = round(gib * 10.0) / 10.0
+        "$roundedGiB ${localizedByteUnit("GB")}"
+    } else {
+        val mib = bytes.toDouble() / (1024.0 * 1024.0)
+        val roundedMiB = round(mib * 10.0) / 10.0
+        "$roundedMiB ${localizedByteUnit("MB")}"
+    }
+}
+
+private fun StreamItem.cinemaInstantServiceLabel(): String? {
+    val status = debridCacheStatus ?: return null
+    if (status.state != StreamDebridCacheState.CACHED) return null
+    val providerLabel = DebridProviders.shortName(status.providerId)
+        .ifBlank { status.providerName.trim() }
+        .ifBlank { DebridProviders.displayName(status.providerId) }
+    return "• $providerLabel Instant"
 }
 
 internal fun streamSectionRenderKey(group: AddonStreamGroup): String = buildString {
@@ -1071,6 +1669,7 @@ private fun StreamSectionHeader(
     fetchingText: String,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -1084,14 +1683,14 @@ private fun StreamSectionHeader(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
             ),
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f),
+            color = tokens.colors.textPrimary,
         )
         AnimatedVisibility(visible = isLoading, enter = fadeIn(), exit = fadeOut()) {
             Text(
                 text = fetchingText,
                 modifier = Modifier.shimmer(),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                color = MaterialTheme.colorScheme.primary,
+                color = tokens.colors.accent,
             )
         }
     }
@@ -1110,7 +1709,7 @@ private fun StreamSourceHeader(
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.2.sp,
         ),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.nuvio.colors.textMuted,
     )
 }
 
@@ -1178,9 +1777,10 @@ private fun DesktopStreamActionsMenu(
     onDownload: (StreamItem) -> Unit,
     onOpen: (StreamItem, openExternally: Boolean) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val density = LocalDensity.current
     val edgeMarginPx = with(density) { 8.dp.roundToPx() }
-    val menuShape = RoundedCornerShape(8.dp)
+    val menuShape = RoundedCornerShape(12.dp)
     val actions = buildList {
         add(
             DesktopStreamAction(
@@ -1234,13 +1834,13 @@ private fun DesktopStreamActionsMenu(
                 .width(244.dp)
                 .shadow(elevation = 14.dp, shape = menuShape)
                 .clip(menuShape)
-                .background(MaterialTheme.colorScheme.surface)
+                .background(tokens.colors.surfacePopover)
                 .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                    width = NuvioTokens.Border.thin,
+                    color = tokens.colors.borderDefault,
                     shape = menuShape,
                 )
-                .padding(4.dp),
+                .padding(6.dp),
         ) {
             actions.forEach { action ->
                 DesktopStreamActionRow(
@@ -1260,9 +1860,10 @@ private fun DesktopStreamActionRow(
     action: DesktopStreamAction,
     onSelected: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val rowShape = RoundedCornerShape(5.dp)
+    val rowShape = RoundedCornerShape(8.dp)
 
     Row(
         modifier = Modifier
@@ -1271,12 +1872,13 @@ private fun DesktopStreamActionRow(
             .clip(rowShape)
             .background(
                 if (isHovered) {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f)
+                    tokens.colors.overlayHover
                 } else {
                     Color.Transparent
                 },
             )
             .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -1289,13 +1891,13 @@ private fun DesktopStreamActionRow(
         Icon(
             imageVector = action.icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (isHovered) tokens.colors.textPrimary else tokens.colors.textSecondary,
             modifier = Modifier.size(17.dp),
         )
         Text(
             text = action.title,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1373,6 +1975,7 @@ private fun StreamActionsSheet(
                 .fillMaxWidth()
                 .padding(bottom = nuvioSafeBottomPadding(16.dp)),
         ) {
+            val tokens = MaterialTheme.nuvio
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1382,7 +1985,7 @@ private fun StreamActionsSheet(
                 Text(
                     text = stream.streamLabel,
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1393,7 +1996,7 @@ private fun StreamActionsSheet(
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = tokens.colors.textSecondary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -1476,6 +2079,7 @@ private fun LoadingStateBlock(
     findingStreamsText: String,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1486,10 +2090,27 @@ private fun LoadingStateBlock(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
                 .shimmer(),
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-            color = MaterialTheme.colorScheme.primary,
+            color = tokens.colors.accent,
         )
         repeat(4) {
-            StreamCardSkeleton()
+            if (isDesktop) {
+                val skeletonShape = RoundedCornerShape(14.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 72.dp)
+                        .clip(skeletonShape)
+                        .background(tokens.colors.surfaceCard)
+                        .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, skeletonShape)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                ) {
+                    com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.fillMaxWidth(0.55f), height = 14.dp, cornerRadius = 4.dp)
+                    com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.fillMaxWidth(0.85f), height = 10.dp, cornerRadius = 4.dp)
+                }
+            } else {
+                StreamCardSkeleton()
+            }
         }
     }
 }
@@ -1499,6 +2120,7 @@ private fun EmptyStateBlock(
     reason: StreamsEmptyStateReason?,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
     val title: String
     val message: String
 
@@ -1520,32 +2142,38 @@ private fun EmptyStateBlock(
         }
     }
 
+    val cardShape = RoundedCornerShape(16.dp)
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(32.dp),
+            .padding(24.dp)
+            .clip(cardShape)
+            .background(tokens.colors.surfaceCard)
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, cardShape)
+            .padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(
             imageVector = Icons.Rounded.SearchOff,
             contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(44.dp),
+            tint = tokens.colors.textMuted,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
             ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textPrimary,
+            textAlign = TextAlign.Center,
         )
         Text(
             text = message,
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            color = tokens.colors.textSecondary,
             textAlign = TextAlign.Center,
         )
     }
@@ -1570,7 +2198,7 @@ private fun FooterLoadingBlock(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             ),
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.nuvio.colors.accent,
         )
     }
 }

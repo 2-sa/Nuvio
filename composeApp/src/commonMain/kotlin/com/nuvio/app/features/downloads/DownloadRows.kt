@@ -1,15 +1,32 @@
 package com.nuvio.app.features.downloads
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Download
@@ -23,18 +40,30 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.gradientMask
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.nuvioTypeScale
+import com.nuvio.app.core.ui.secondaryClickAt
 import com.nuvio.app.core.ui.themePalette
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_resume
 import nuvio.composeapp.generated.resources.action_retry
@@ -80,11 +109,80 @@ internal fun ActiveDownloadRow(
             } else {
                 StatusText(text = activeStatusText(item, speedBytesPerSecond))
             }
+            Spacer(modifier = Modifier.height(6.dp))
+            DownloadGradientProgressBar(
+                item = item,
+                progress = progress,
+            )
         },
         trailing = {
             TransferButton(item = item, progress = progress, onClick = onToggle)
         },
     )
+}
+
+@Composable
+private fun DownloadGradientProgressBar(
+    item: DownloadItem,
+    progress: Float,
+) {
+    val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
+    val trackShape = RoundedCornerShape(999.dp)
+    val isDownloading = item.status == DownloadStatus.Downloading
+    val isIndeterminate = isDownloading && !item.hasKnownSize
+    val fillBrush = when (item.status) {
+        DownloadStatus.Failed -> SolidColor(tokens.colors.danger)
+        DownloadStatus.Paused -> SolidColor(tokens.colors.textMuted.copy(alpha = 0.65f))
+        DownloadStatus.Downloading, DownloadStatus.Completed -> palette.accentBrush()
+    }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(5.dp)
+            .clip(trackShape)
+            .background(tokens.colors.surfaceElevated)
+            .border(NuvioTokens.Border.hairline, tokens.colors.borderSubtle, trackShape),
+    ) {
+        if (isIndeterminate) {
+            val transition = rememberInfiniteTransition(label = "downloadIndeterminateProgress")
+            val travel by transition.animateFloat(
+                initialValue = -0.35f,
+                targetValue = 1.0f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1400, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+                label = "downloadIndeterminateTravel",
+            )
+            val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+            val segmentFraction = 0.35f
+            val travelDp = maxWidth.value
+            val offsetFraction = if (isRtl) -travel else travel
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(segmentFraction)
+                    .graphicsLayer {
+                        translationX = offsetFraction * travelDp * density
+                    }
+                    .clip(trackShape)
+                    .background(fillBrush),
+            )
+        } else {
+            val clamped = progress.coerceIn(0f, 1f)
+            if (clamped > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(clamped)
+                        .clip(trackShape)
+                        .background(fillBrush),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -137,7 +235,10 @@ internal fun DownloadedShowRow(
         onLongClick = null,
         footer = {
             if (downloadingCount > 0) {
-                StatusText(text = stringResource(Res.string.downloads_downloading_count, downloadingCount))
+                StatusText(
+                    text = stringResource(Res.string.downloads_downloading_count, downloadingCount),
+                    color = tokens.colors.accent,
+                )
             }
         },
         trailing = {
@@ -145,7 +246,7 @@ internal fun DownloadedShowRow(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = tokens.colors.textMuted,
-                modifier = Modifier.padding(horizontal = NuvioTokens.Space.s12),
+                modifier = Modifier.padding(horizontal = NuvioTokens.Space.s8),
             )
         },
     )
@@ -189,17 +290,63 @@ private fun DownloadRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val rowShape = RoundedCornerShape(14.dp)
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.6f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "downloadRowBorder",
+    )
+    val containerColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.surfaceElevated
+        } else {
+            tokens.colors.surfaceCard
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "downloadRowBg",
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+            .clip(rowShape)
+            .background(containerColor)
+            .border(NuvioTokens.Border.thin, borderColor, rowShape)
+            .nuvioFocusBorder(rowShape)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = if (isDesktop) null else onLongClick,
+            )
+            .secondaryClickAt(
+                if (isDesktop && onLongClick != null) {
+                    { onLongClick() }
+                } else {
+                    null
+                },
+            )
+            .padding(horizontal = NuvioTokens.Space.s14, vertical = NuvioTokens.Space.s12),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         artwork()
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s2),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s3),
         ) {
             Text(
                 text = title,
@@ -230,7 +377,10 @@ private fun TransferButton(
     onClick: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    IconButton(onClick = onClick) {
+    IconButton(
+        onClick = onClick,
+        modifier = if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier,
+    ) {
         if (item.status == DownloadStatus.Failed) {
             Icon(
                 imageVector = Icons.Rounded.Refresh,
@@ -296,7 +446,10 @@ private fun TransferButton(
 
 @Composable
 private fun MoreActionsButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
+    IconButton(
+        onClick = onClick,
+        modifier = if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier,
+    ) {
         Icon(
             imageVector = Icons.Rounded.MoreVert,
             contentDescription = stringResource(Res.string.details_actions_menu_label),

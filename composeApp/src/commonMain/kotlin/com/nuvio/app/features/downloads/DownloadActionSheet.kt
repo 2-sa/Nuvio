@@ -1,10 +1,14 @@
 package com.nuvio.app.features.downloads
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
@@ -20,7 +24,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
@@ -37,6 +44,8 @@ import nuvio.composeapp.generated.resources.action_resume
 import nuvio.composeapp.generated.resources.action_retry
 import nuvio.composeapp.generated.resources.compose_action_pause
 import nuvio.composeapp.generated.resources.cw_action_go_to_details
+import nuvio.composeapp.generated.resources.downloads_status_failed
+import nuvio.composeapp.generated.resources.episodes_cd_watched
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,10 +130,15 @@ private fun DownloadSheetHeader(
     watchStatus: DownloadWatchStatus,
 ) {
     val tokens = MaterialTheme.nuvio
+    val headerCardShape = RoundedCornerShape(14.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = tokens.spacing.screenHorizontal, vertical = NuvioTokens.Space.s14),
+            .padding(horizontal = tokens.spacing.screenHorizontal, vertical = NuvioTokens.Space.s12)
+            .clip(headerCardShape)
+            .background(tokens.colors.surfaceCard)
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, headerCardShape)
+            .padding(NuvioTokens.Space.s12),
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -149,16 +163,44 @@ private fun DownloadSheetHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                text = listOfNotNull(
-                    formatBytes(item.sizeOnDiskBytes).takeIf { item.sizeOnDiskBytes > 0L },
-                    item.providerName.takeIf { it.isNotBlank() },
-                ).joinToString(DownloadTextSeparator),
-                style = MaterialTheme.nuvioTypeScale.bodySm,
-                color = tokens.colors.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            val metaLine = listOfNotNull(
+                formatBytes(item.sizeOnDiskBytes).takeIf { item.sizeOnDiskBytes > 0L },
+                item.providerName.takeIf { it.isNotBlank() },
+            ).joinToString(DownloadTextSeparator)
+            if (metaLine.isNotBlank()) {
+                Text(
+                    text = metaLine,
+                    style = MaterialTheme.nuvioTypeScale.bodySm,
+                    color = tokens.colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (item.status == DownloadStatus.Failed || watchStatus.isWatched) {
+                val isFailed = item.status == DownloadStatus.Failed
+                val badgeShape = RoundedCornerShape(6.dp)
+                Box(
+                    modifier = Modifier
+                        .padding(top = NuvioTokens.Space.s2)
+                        .clip(badgeShape)
+                        .background(if (isFailed) tokens.colors.danger.copy(alpha = 0.16f) else tokens.colors.focusBackground)
+                        .border(
+                            NuvioTokens.Border.thin,
+                            if (isFailed) tokens.colors.danger.copy(alpha = 0.5f) else tokens.colors.accent.copy(alpha = 0.6f),
+                            badgeShape,
+                        )
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (isFailed) Res.string.downloads_status_failed else Res.string.episodes_cd_watched,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isFailed) tokens.colors.danger else tokens.colors.accent,
+                    )
+                }
+            }
         }
     }
 }

@@ -1,20 +1,32 @@
 package com.nuvio.app.features.downloads
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,7 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioScreen
@@ -38,9 +56,11 @@ import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.nuvioTypeScale
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.action_delete
@@ -74,6 +94,7 @@ fun DownloadsScreen(
     onNavigateToShow: ((showId: String, title: String) -> Unit)? = null,
     onBackFromShow: (() -> Unit)? = null,
 ) {
+    val tokens = MaterialTheme.nuvio
     val uiState by remember {
         DownloadsRepository.ensureLoaded()
         DownloadsRepository.uiState
@@ -104,6 +125,11 @@ fun DownloadsScreen(
         }
     }
     val onOpenActions: (DownloadItem) -> Unit = { actionsItemId = it.id }
+    val onOpenFolder: () -> Unit = {
+        if (!DownloadsPlatformDownloader.openDownloadsDirectory()) {
+            NuvioToastController.show(openDownloadsDirectoryFailedText)
+        }
+    }
 
     PlatformBackHandler(enabled = selectedShowId != null && onBackFromShow == null) {
         selectedShowId = null
@@ -111,34 +137,36 @@ fun DownloadsScreen(
 
     NuvioScreen {
         stickyHeader {
-            NuvioScreenHeader(
-                title = if (selectedShowId == null) {
-                    stringResource(Res.string.compose_settings_root_downloads_title)
-                } else {
-                    selectedShowTitle ?: stringResource(Res.string.downloads_show_downloads)
-                },
-                onBack = {
-                    if (selectedShowId != null) {
-                        onBackFromShow?.invoke() ?: run { selectedShowId = null }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                NuvioScreenHeader(
+                    title = if (selectedShowId == null) {
+                        stringResource(Res.string.compose_settings_root_downloads_title)
                     } else {
-                        onBack()
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            if (!DownloadsPlatformDownloader.openDownloadsDirectory()) {
-                                NuvioToastController.show(openDownloadsDirectoryFailedText)
-                            }
-                        },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Folder,
+                        selectedShowTitle ?: stringResource(Res.string.downloads_show_downloads)
+                    },
+                    onBack = {
+                        if (selectedShowId != null) {
+                            onBackFromShow?.invoke() ?: run { selectedShowId = null }
+                        } else {
+                            onBack()
+                        }
+                    },
+                    actions = {
+                        DownloadsToolbarPillButton(
+                            icon = Icons.Rounded.Folder,
+                            label = if (isDesktop) stringResource(Res.string.downloads_open_directory) else null,
                             contentDescription = stringResource(Res.string.downloads_open_directory),
+                            onClick = onOpenFolder,
                         )
-                    }
-                },
-            )
+                    },
+                )
+                if (isDesktop) {
+                    HorizontalDivider(
+                        thickness = NuvioTokens.Border.thin,
+                        color = tokens.colors.borderSubtle,
+                    )
+                }
+            }
         }
 
         val showId = selectedShowId
@@ -152,6 +180,7 @@ fun DownloadsScreen(
                     onNavigateToShow?.invoke(item.parentMetaId, item.title) ?: run { selectedShowId = item.parentMetaId }
                 },
                 onOpenActions = onOpenActions,
+                onOpenFolder = onOpenFolder,
             )
         } else {
             downloadsShowContent(
@@ -197,6 +226,7 @@ private fun LazyListScope.downloadsRootContent(
     onPlay: (DownloadItem) -> Unit,
     onOpenShow: (DownloadItem) -> Unit,
     onOpenActions: (DownloadItem) -> Unit,
+    onOpenFolder: () -> Unit,
 ) {
     if (items.isEmpty()) {
         item(key = "empty") {
@@ -210,25 +240,31 @@ private fun LazyListScope.downloadsRootContent(
 
     val activeItems = items.filter { it.status != DownloadStatus.Completed }
     val entries = items.downloadedEntries()
+    val hasDownloading = activeItems.any { it.status == DownloadStatus.Downloading }
+    val hasPaused = activeItems.any { it.status == DownloadStatus.Paused }
 
     item(key = "summary") {
         val titleCount = items.distinctBy { it.parentMetaId }.size
-        SummaryText(
-            listOf(
+        DownloadsSummaryToolbarCard(
+            parts = listOf(
                 pluralStringResource(Res.plurals.downloads_titles, titleCount, titleCount),
                 formatBytes(items.sumOf { it.sizeOnDiskBytes }),
             ),
+            showPauseAll = hasDownloading,
+            showResumeAll = hasPaused,
+            showOpenFolder = isDesktop,
+            onPauseAll = DownloadsRepository::pauseActiveDownloads,
+            onResumeAll = DownloadsRepository::resumePausedDownloads,
+            onOpenFolder = onOpenFolder,
         )
     }
 
     if (activeItems.isNotEmpty()) {
         item(key = "active_header") {
-            val hasDownloading = activeItems.any { it.status == DownloadStatus.Downloading }
-            val hasPaused = activeItems.any { it.status == DownloadStatus.Paused }
             SectionHeader(
                 title = stringResource(Res.string.downloads_section_active),
                 actionText = when {
-                    activeItems.size < 2 -> null
+                    isDesktop || activeItems.size < 2 -> null
                     hasDownloading -> stringResource(Res.string.downloads_pause_all)
                     hasPaused -> stringResource(Res.string.downloads_resume_all)
                     else -> null
@@ -293,8 +329,8 @@ private fun LazyListScope.downloadsShowContent(
 
     item(key = "summary") {
         val watchedCount = episodes.count { watchStatusOf(it).isWatched }
-        SummaryText(
-            listOfNotNull(
+        DownloadsSummaryToolbarCard(
+            parts = listOfNotNull(
                 pluralStringResource(Res.plurals.downloads_episodes, episodes.size, episodes.size),
                 formatBytes(episodes.sumOf { it.sizeOnDiskBytes }),
                 stringResource(Res.string.downloads_watched_count, watchedCount).takeIf { watchedCount > 0 },
@@ -341,13 +377,140 @@ private fun LazyListScope.downloadsShowContent(
         }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SummaryText(parts: List<String>) {
-    Text(
-        text = parts.joinToString(DownloadTextSeparator),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.nuvio.colors.textSecondary,
+private fun DownloadsSummaryToolbarCard(
+    parts: List<String>,
+    showPauseAll: Boolean = false,
+    showResumeAll: Boolean = false,
+    showOpenFolder: Boolean = false,
+    onPauseAll: () -> Unit = {},
+    onResumeAll: () -> Unit = {},
+    onOpenFolder: () -> Unit = {},
+) {
+    val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(16.dp)
+    val hasActions = showPauseAll || showResumeAll || showOpenFolder
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .background(tokens.colors.surfaceElevated)
+            .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, cardShape)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = parts.joinToString(DownloadTextSeparator),
+            modifier = Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = tokens.colors.textSecondary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (hasActions) {
+            FlowRow(
+                modifier = Modifier.padding(start = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (showPauseAll) {
+                    DownloadsToolbarPillButton(
+                        icon = Icons.Rounded.Pause,
+                        label = stringResource(Res.string.downloads_pause_all),
+                        contentDescription = stringResource(Res.string.downloads_pause_all),
+                        onClick = onPauseAll,
+                    )
+                }
+                if (showResumeAll) {
+                    DownloadsToolbarPillButton(
+                        icon = Icons.Rounded.PlayArrow,
+                        label = stringResource(Res.string.downloads_resume_all),
+                        contentDescription = stringResource(Res.string.downloads_resume_all),
+                        onClick = onResumeAll,
+                    )
+                }
+                if (showOpenFolder) {
+                    DownloadsToolbarPillButton(
+                        icon = Icons.Rounded.Folder,
+                        label = stringResource(Res.string.downloads_open_directory),
+                        contentDescription = stringResource(Res.string.downloads_open_directory),
+                        onClick = onOpenFolder,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadsToolbarPillButton(
+    icon: ImageVector,
+    label: String?,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val pillShape = RoundedCornerShape(10.dp)
+    val bgColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "downloadsToolbarPillBg",
     )
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) tokens.colors.borderStrong else tokens.colors.borderDefault,
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "downloadsToolbarPillBorder",
+    )
+
+    Row(
+        modifier = Modifier
+            .clip(pillShape)
+            .background(bgColor)
+            .border(NuvioTokens.Border.thin, borderColor, pillShape)
+            .nuvioFocusBorder(pillShape)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(
+                horizontal = if (label != null) 12.dp else 10.dp,
+                vertical = 8.dp,
+            ),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = if (label == null) contentDescription else null,
+            tint = if (isDesktop && isHovered) tokens.colors.accent else tokens.colors.textPrimary,
+            modifier = Modifier.size(16.dp),
+        )
+        if (label != null) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = tokens.colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 @Composable
@@ -382,10 +545,14 @@ private fun DownloadsEmptyState(
     message: String? = null,
 ) {
     val tokens = MaterialTheme.nuvio
+    val cardShape = RoundedCornerShape(16.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = NuvioTokens.Space.s24, vertical = NuvioTokens.Space.s64),
+            .clip(cardShape)
+            .background(tokens.colors.surfaceCard)
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, cardShape)
+            .padding(horizontal = NuvioTokens.Space.s24, vertical = NuvioTokens.Space.s48),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
     ) {
@@ -394,7 +561,8 @@ private fun DownloadsEmptyState(
                 .padding(bottom = NuvioTokens.Space.s8)
                 .size(NuvioTokens.Space.s64)
                 .clip(tokens.shapes.avatar)
-                .background(tokens.colors.surfaceCard),
+                .background(tokens.colors.surfaceElevated)
+                .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, tokens.shapes.avatar),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
