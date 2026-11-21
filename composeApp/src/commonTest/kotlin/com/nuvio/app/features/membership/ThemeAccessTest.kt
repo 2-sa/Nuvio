@@ -2,6 +2,7 @@ package com.nuvio.app.features.membership
 
 import com.nuvio.app.core.ui.AppTheme
 import com.nuvio.app.core.ui.CustomThemeColors
+import com.nuvio.app.core.ui.defaultPlatformAppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -15,9 +16,9 @@ class ThemeAccessTest {
     }
 
     @Test
-    fun unavailableSupporterThemeFallsBackToWhite() {
+    fun unavailableSupporterThemeFallsBackToPlatformDefault() {
         assertEquals(
-            AppTheme.WHITE,
+            defaultPlatformAppTheme(),
             resolveAppTheme(AppTheme.JADE, CosmeticEntitlements.None),
         )
     }
@@ -28,6 +29,7 @@ class ThemeAccessTest {
         val themes = availableAppThemes(entitlements)
 
         assertEquals(AppTheme.ROSE_GOLD, themes.first())
+        assertTrue(AppTheme.CINEMA_OBSIDIAN in themes)
         assertTrue(AppTheme.WHITE in themes)
         assertTrue(AppTheme.CRIMSON in themes)
         assertTrue(AppTheme.GOLD !in themes)
@@ -39,7 +41,7 @@ class ThemeAccessTest {
 
         assertEquals(AppTheme.CUSTOM, themes.first())
         assertEquals(AppTheme.CUSTOM, resolveAppTheme(AppTheme.CUSTOM, CosmeticEntitlements.None))
-        assertEquals(AppTheme.WHITE, resolveAppTheme(null, CosmeticEntitlements.None))
+        assertEquals(defaultPlatformAppTheme(), resolveAppTheme(null, CosmeticEntitlements.None))
     }
 
     @Test
@@ -75,7 +77,7 @@ class ThemeAccessTest {
             CosmeticEntitlements(setOf(CosmeticEntitlement.GOLD_THEME)),
         )
 
-        assertEquals(listOf(AppTheme.GOLD, AppTheme.CUSTOM, AppTheme.WHITE), themes.take(3))
+        assertEquals(listOf(AppTheme.GOLD, AppTheme.CUSTOM, AppTheme.CINEMA_OBSIDIAN, AppTheme.WHITE), themes.take(4))
         assertEquals(themes.size, themes.distinct().size)
     }
 }

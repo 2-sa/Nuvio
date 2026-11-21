@@ -2,6 +2,7 @@ package com.nuvio.app.core.ui
 
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.theme_amber
+import nuvio.composeapp.generated.resources.theme_cinema_obsidian
 import nuvio.composeapp.generated.resources.theme_crimson
 import nuvio.composeapp.generated.resources.theme_emerald
 import nuvio.composeapp.generated.resources.theme_ocean
@@ -23,6 +24,7 @@ enum class AppTheme {
     ARCTIC_BLUE,
     GRAPHITE,
     CUSTOM,
+    CINEMA_OBSIDIAN,
     CRIMSON,
     OCEAN,
     VIOLET,
@@ -40,6 +42,7 @@ val AppTheme.labelRes: StringResource
         AppTheme.ARCTIC_BLUE -> Res.string.theme_arctic_blue
         AppTheme.GRAPHITE -> Res.string.theme_graphite
         AppTheme.CUSTOM -> Res.string.theme_custom
+        AppTheme.CINEMA_OBSIDIAN -> Res.string.theme_cinema_obsidian
         AppTheme.CRIMSON -> Res.string.theme_crimson
         AppTheme.OCEAN -> Res.string.theme_ocean
         AppTheme.VIOLET -> Res.string.theme_violet

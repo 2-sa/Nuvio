@@ -14,6 +14,13 @@ data class ThemeColorPalette(
     val background: Color = Color(0xFF0D0D0D),
     val backgroundElevated: Color = Color(0xFF1A1A1A),
     val backgroundCard: Color = Color(0xFF242424),
+    val surfacePopover: Color = backgroundCard,
+    val borderSubtle: Color = Color(0xFF252A2A).copy(alpha = 0.55f),
+    val borderDefault: Color = Color(0xFF252A2A),
+    val borderStrong: Color = Color(0xFF3A4040),
+    val textPrimary: Color = Color(0xFFF5F7F8),
+    val textSecondary: Color = Color(0xFFB8BEC5),
+    val textMuted: Color = Color(0xFF969CA3),
 )
 
 internal fun dominantBackdropBlendColor(dominantColor: Color, backgroundColor: Color): Color {
@@ -27,6 +34,27 @@ internal fun dominantBackdropBlendColor(dominantColor: Color, backgroundColor: C
 }
 
 object ThemeColors {
+
+    val CinemaObsidian = ThemeColorPalette(
+        secondary = Color(0xFF3B82F6),
+        secondaryVariant = Color(0xFF6366F1),
+        accentGradient = listOf(Color(0xFF38BDF8), Color(0xFF3B82F6), Color(0xFF6366F1)),
+        nativeAccentHex = "#3B82F6",
+        onSecondary = Color.White,
+        onSecondaryVariant = Color.White,
+        focusRing = Color(0xFF60A5FA),
+        focusBackground = Color(0xFF172542),
+        background = Color(0xFF090C12),
+        backgroundElevated = Color(0xFF111622),
+        backgroundCard = Color(0xFF171E2E),
+        surfacePopover = Color(0xFF1B2336),
+        borderSubtle = Color(0xFF1E293B).copy(alpha = 0.55f),
+        borderDefault = Color(0xFF24324A),
+        borderStrong = Color(0xFF3B4F72),
+        textPrimary = Color(0xFFF8FAFC),
+        textSecondary = Color(0xFFCBD5E1),
+        textMuted = Color(0xFF94A3B8),
+    )
 
     val Gold = ThemeColorPalette(
         secondary = Color(0xFFE8A91C),
@@ -188,6 +216,7 @@ object ThemeColors {
         customColors: CustomThemeColors = CustomThemeColors.Default,
     ): ThemeColorPalette = when (theme) {
         AppTheme.CUSTOM -> customColors.toColorPalette()
+        AppTheme.CINEMA_OBSIDIAN -> CinemaObsidian
         AppTheme.GOLD -> Gold
         AppTheme.JADE -> Jade
         AppTheme.ROSE_GOLD -> RoseGold

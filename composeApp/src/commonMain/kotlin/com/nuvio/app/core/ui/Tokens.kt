@@ -357,7 +357,11 @@ data class NuvioThemeTokens(
 )
 
 internal val LocalNuvioThemeTokens = staticCompositionLocalOf {
-    defaultNuvioThemeTokens(ThemeColors.White, amoled = false, colorScheme = null)
+    defaultNuvioThemeTokens(
+        ThemeColors.getColorPalette(defaultPlatformAppTheme()),
+        amoled = false,
+        colorScheme = null,
+    )
 }
 
 val MaterialTheme.nuvio: NuvioThemeTokens
@@ -371,15 +375,17 @@ internal fun defaultNuvioThemeTokens(
     colorScheme: ColorScheme?,
 ): NuvioThemeTokens {
     val background = if (amoled) Color.Black else palette.background
-    val textPrimary = Color(0xFFF5F7F8)
-    val textSecondary = Color(0xFFB8BEC5)
-    val textMuted = Color(0xFF969CA3)
+    val textPrimary = palette.textPrimary
+    val textSecondary = palette.textSecondary
+    val textMuted = palette.textMuted
     val surface = palette.backgroundElevated
     val surfaceCard = palette.backgroundCard
+    val surfacePopover = palette.surfacePopover
     val accent = palette.secondary
     val accentStrong = palette.secondaryVariant
-    val borderSubtle = Color(0xFF252A2A).copy(alpha = 0.55f)
-    val borderDefault = Color(0xFF252A2A)
+    val borderSubtle = palette.borderSubtle
+    val borderDefault = palette.borderDefault
+    val borderStrong = palette.borderStrong
     val overlayScrim = Color.Black.copy(alpha = NuvioTokens.Opacity.overlayMedium)
 
     return NuvioThemeTokens(
@@ -391,7 +397,7 @@ internal fun defaultNuvioThemeTokens(
             surfaceCard = surfaceCard,
             surfaceSheet = surface,
             surfaceDialog = surface,
-            surfacePopover = surfaceCard,
+            surfacePopover = surfacePopover,
             nativeChrome = background,
             textPrimary = textPrimary,
             textSecondary = textSecondary,
@@ -405,7 +411,7 @@ internal fun defaultNuvioThemeTokens(
             focusBackground = palette.focusBackground,
             borderSubtle = borderSubtle,
             borderDefault = borderDefault,
-            borderStrong = Color(0xFF3A4040),
+            borderStrong = borderStrong,
             borderFocus = palette.focusRing,
             borderSelected = accent.copy(alpha = NuvioTokens.Opacity.strong),
             success = Color(0xFF66BB6A),

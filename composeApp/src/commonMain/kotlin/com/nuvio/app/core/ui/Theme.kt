@@ -26,8 +26,11 @@ import nuvio.composeapp.generated.resources.jetbrains_sans_regular
 import nuvio.composeapp.generated.resources.jetbrains_sans_semibold
 import org.jetbrains.compose.resources.Font
 
-val LocalAppTheme = staticCompositionLocalOf { AppTheme.WHITE }
-val LocalThemePalette = staticCompositionLocalOf { ThemeColors.White }
+internal fun defaultPlatformAppTheme(): AppTheme =
+    if (isDesktop) AppTheme.CINEMA_OBSIDIAN else AppTheme.WHITE
+
+val LocalAppTheme = staticCompositionLocalOf { defaultPlatformAppTheme() }
+val LocalThemePalette = staticCompositionLocalOf { ThemeColors.getColorPalette(defaultPlatformAppTheme()) }
 
 val MaterialTheme.themePalette: ThemeColorPalette
     @Composable
@@ -54,12 +57,12 @@ private fun buildColorScheme(palette: ThemeColorPalette, amoled: Boolean = false
     secondary = palette.secondaryVariant,
     onSecondary = palette.onSecondaryVariant,
     background = if (amoled) Color.Black else palette.background,
-    onBackground = Color(0xFFF5F7F8),
+    onBackground = palette.textPrimary,
     surface = palette.backgroundElevated,
-    onSurface = Color(0xFFF5F7F8),
+    onSurface = palette.textPrimary,
     surfaceVariant = palette.backgroundCard,
-    onSurfaceVariant = Color(0xFF969CA3),
-    outline = Color(0xFF252A2A),
+    onSurfaceVariant = palette.textMuted,
+    outline = palette.borderDefault,
     error = Color(0xFFE36A8A),
     onError = Color(0xFFFCE5EC),
 )
@@ -207,7 +210,7 @@ internal fun desktopUiScaleForWindow(widthDp: Float, heightDp: Float): Float = N
 @Composable
 fun NuvioTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    appTheme: AppTheme = AppTheme.WHITE,
+    appTheme: AppTheme = defaultPlatformAppTheme(),
     amoled: Boolean = false,
     desktopUiScale: Float = NuvioDesktopMinUiScale,
     customThemeColors: CustomThemeColors = CustomThemeColors.Default,

@@ -1448,6 +1448,7 @@
     <string name="theme_rose">الوردي</string>
     <string name="theme_violet">البنفسجي</string>
     <string name="theme_white">الأبيض</string>
+    <string name="theme_cinema_obsidian">سينما أوبسيديان</string>
     <string name="theme_custom">مخصص</string>
     <string name="custom_theme_title">تدرجك المخصص</string>
     <string name="custom_theme_subtitle">اختر ثلاثة ألوان لسمتك. حدّد لونًا لتعديله.</string>
