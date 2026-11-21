@@ -51,9 +51,12 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -499,7 +502,8 @@ private fun HomePosterPreviewCard(
                             .height(NuvioTokens.Space.s40)
                             .clip(tokens.shapes.button)
                             .background(palette.accentBrush())
-                            .clickable(onClick = onClick)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                            .clickable(role = Role.Button, onClick = onClick)
                             .padding(horizontal = NuvioTokens.Space.s16),
                         contentAlignment = Alignment.Center,
                     ) {

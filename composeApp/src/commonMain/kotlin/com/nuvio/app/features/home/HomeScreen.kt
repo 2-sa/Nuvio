@@ -888,7 +888,10 @@ fun HomeScreen(
     val collectionsMap = remember(visibleCollections) {
         visibleCollections.associateBy { "collection_${it.id}" }
     }
-    var selectedCategoryFilter by rememberSaveable { mutableStateOf(HomeCategoryFilter.ALL) }
+    var selectedCategoryFilterName by rememberSaveable { mutableStateOf(HomeCategoryFilter.ALL.name) }
+    val selectedCategoryFilter = remember(selectedCategoryFilterName) {
+        runCatching { HomeCategoryFilter.valueOf(selectedCategoryFilterName) }.getOrDefault(HomeCategoryFilter.ALL)
+    }
     val activeCategoryFilter = if (isDesktop) selectedCategoryFilter else HomeCategoryFilter.ALL
     val displayedContinueWatchingItems = remember(continueWatchingItems, activeCategoryFilter) {
         filterContinueWatchingItems(continueWatchingItems, activeCategoryFilter)
@@ -1059,11 +1062,11 @@ fun HomeScreen(
                 }
             }
 
-            if (isDesktop && (hasRenderableHomeRows || hasContinueWatchingRows)) {
+            if (isDesktop && (hasRenderableHomeRows || (hasContinueWatchingRows && continueWatchingPreferences.isVisible))) {
                 item(key = "home_category_filter_bar", contentType = "filter_bar") {
                     HomeCategoryFilterBar(
                         selectedFilter = selectedCategoryFilter,
-                        onSelectFilter = { selectedCategoryFilter = it },
+                        onSelectFilter = { selectedCategoryFilterName = it.name },
                         horizontalPadding = homeSectionPadding,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
@@ -1110,44 +1113,64 @@ fun HomeScreen(
                         onItemLongPress = onContinueWatchingLongPress,
                         disintegrationRequest = continueWatchingDisintegrationRequest,
                     )
-                    item(key = "home_empty", contentType = "empty") {
-                        when {
-                            networkStatusUiState.isOfflineLike && addonManifestErrorMessage != null -> {
-                                NuvioNetworkOfflineCard(
-                                    condition = networkStatusUiState.condition,
-                                    modifier = Modifier.padding(
-                                        horizontal = if (isDesktop) homeSectionPadding else 16.dp,
-                                    ),
-                                    onRetry = {
-                                        NetworkStatusRepository.requestRefresh(force = true)
-                                        AddonRepository.refreshAll()
-                                    },
-                                )
-                            }
+                    val hasFilteredContinueWatching = continueWatchingPreferences.isVisible &&
+                        (displayedContinueWatchingItems.isNotEmpty() || displayedUpcomingItems.isNotEmpty())
+                    val showFilterEmpty =
+                        activeCategoryFilter != HomeCategoryFilter.ALL &&
+                            continueWatchingPreferences.isVisible &&
+                            hasContinueWatchingRows &&
+                            !hasFilteredContinueWatching &&
+                            addonManifestErrorMessage == null
 
-                            addonManifestErrorMessage != null -> {
-                                HomeEmptyStateCard(
-                                    modifier = Modifier.padding(
-                                        horizontal = if (isDesktop) homeSectionPadding else 16.dp,
-                                    ),
-                                    title = stringResource(Res.string.home_load_failed_title),
-                                    message = addonManifestErrorMessage,
-                                    actionLabel = stringResource(Res.string.action_retry),
-                                    onActionClick = {
-                                        NetworkStatusRepository.requestRefresh(force = true)
-                                        AddonRepository.refreshAll()
-                                    },
-                                )
-                            }
+                    if (showFilterEmpty) {
+                        item(key = "home_filter_empty", contentType = "filter_empty") {
+                            HomeFilterEmptyCard(
+                                title = stringResource(Res.string.home_filter_empty_title),
+                                resetLabel = stringResource(Res.string.home_filter_reset),
+                                onReset = { selectedCategoryFilterName = HomeCategoryFilter.ALL.name },
+                                modifier = Modifier.padding(horizontal = homeSectionPadding, vertical = 8.dp),
+                            )
+                        }
+                    } else {
+                        item(key = "home_empty", contentType = "empty") {
+                            when {
+                                networkStatusUiState.isOfflineLike && addonManifestErrorMessage != null -> {
+                                    NuvioNetworkOfflineCard(
+                                        condition = networkStatusUiState.condition,
+                                        modifier = Modifier.padding(
+                                            horizontal = if (isDesktop) homeSectionPadding else 16.dp,
+                                        ),
+                                        onRetry = {
+                                            NetworkStatusRepository.requestRefresh(force = true)
+                                            AddonRepository.refreshAll()
+                                        },
+                                    )
+                                }
 
-                            else -> {
-                                HomeEmptyStateCard(
-                                    modifier = Modifier.padding(
-                                        horizontal = if (isDesktop) homeSectionPadding else 16.dp,
-                                    ),
-                                    title = stringResource(Res.string.home_empty_no_sources_title),
-                                    message = stringResource(Res.string.home_empty_no_sources_message),
-                                )
+                                addonManifestErrorMessage != null -> {
+                                    HomeEmptyStateCard(
+                                        modifier = Modifier.padding(
+                                            horizontal = if (isDesktop) homeSectionPadding else 16.dp,
+                                        ),
+                                        title = stringResource(Res.string.home_load_failed_title),
+                                        message = addonManifestErrorMessage,
+                                        actionLabel = stringResource(Res.string.action_retry),
+                                        onActionClick = {
+                                            NetworkStatusRepository.requestRefresh(force = true)
+                                            AddonRepository.refreshAll()
+                                        },
+                                    )
+                                }
+
+                                else -> {
+                                    HomeEmptyStateCard(
+                                        modifier = Modifier.padding(
+                                            horizontal = if (isDesktop) homeSectionPadding else 16.dp,
+                                        ),
+                                        title = stringResource(Res.string.home_empty_no_sources_title),
+                                        message = stringResource(Res.string.home_empty_no_sources_message),
+                                    )
+                                }
                             }
                         }
                     }
@@ -1229,7 +1252,7 @@ fun HomeScreen(
                             HomeFilterEmptyCard(
                                 title = stringResource(Res.string.home_filter_empty_title),
                                 resetLabel = stringResource(Res.string.home_filter_reset),
-                                onReset = { selectedCategoryFilter = HomeCategoryFilter.ALL },
+                                onReset = { selectedCategoryFilterName = HomeCategoryFilter.ALL.name },
                                 modifier = Modifier.padding(horizontal = homeSectionPadding, vertical = 8.dp),
                             )
                         }

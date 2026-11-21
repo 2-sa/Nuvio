@@ -57,7 +57,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nuvio.app.core.ui.DefaultPosterCardCornerRadiusDp
 import com.nuvio.app.core.ui.DisintegratingContainer
 import com.nuvio.app.core.ui.DisintegrationRequest
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
@@ -637,7 +636,7 @@ private fun continueWatchingLandscapeCardMetrics(
     cornerRadiusDp: Int,
 ): ContinueWatchingLandscapeCardMetrics {
     val width = continueWatchingLandscapeCardWidth(basePosterWidthDp)
-    val resolvedCornerRadius = if (cornerRadiusDp == DefaultPosterCardCornerRadiusDp) 14.dp else cornerRadiusDp.dp
+    val resolvedCornerRadius = resolvedPosterCornerRadius(cornerRadiusDp)
     return when {
         basePosterWidthDp <= 108 -> ContinueWatchingLandscapeCardMetrics(
             width = width,
@@ -976,7 +975,7 @@ private fun ContinueWatchingWideCard(
 ) {
     val tokens = MaterialTheme.nuvio
     val cornerRadiusDp = rememberPosterCardStyleUiState().cornerRadiusDp
-    val cornerRadius = if (cornerRadiusDp == DefaultPosterCardCornerRadiusDp) 14.dp else cornerRadiusDp.dp
+    val cornerRadius = resolvedPosterCornerRadius(cornerRadiusDp)
     val cardShape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -1121,7 +1120,7 @@ private fun ContinueWatchingPosterCard(
 ) {
     val tokens = MaterialTheme.nuvio
     val cornerRadiusDp = rememberPosterCardStyleUiState().cornerRadiusDp
-    val cornerRadius = if (cornerRadiusDp == DefaultPosterCardCornerRadiusDp) 14.dp else cornerRadiusDp.dp
+    val cornerRadius = resolvedPosterCornerRadius(cornerRadiusDp)
     val cardShape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
