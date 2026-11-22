@@ -1007,11 +1007,12 @@ internal fun DesktopSettingsPageHeader(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .nuvioConsumePointerEvents(),
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .nuvioConsumePointerEvents(),
+            )
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),

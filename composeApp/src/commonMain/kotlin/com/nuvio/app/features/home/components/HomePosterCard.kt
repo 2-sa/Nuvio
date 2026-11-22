@@ -294,7 +294,7 @@ internal fun BoxScope.PosterCardImage(
     desktopAnimation: NuvioDesktopAnimation,
     modifier: Modifier = Modifier,
 ) {
-    if (imageUrl != null) {
+    if (!imageUrl.isNullOrBlank()) {
         var loadState by remember(imageUrl) { mutableStateOf(PosterLoadState.Loading) }
         var retryAttempt by remember(imageUrl) { mutableStateOf(0) }
 

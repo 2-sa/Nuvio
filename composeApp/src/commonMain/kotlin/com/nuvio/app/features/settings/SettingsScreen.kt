@@ -1441,7 +1441,7 @@ private fun DesktopSettingsScreen(
                                             if (item.id == lastSidebarItemId) {
                                                 down = FocusRequester.Cancel
                                             }
-                                            right = ContentEntry.requester
+                                            end = ContentEntry.requester
                                         }
                                         .then(
                                             if (isSelected) {

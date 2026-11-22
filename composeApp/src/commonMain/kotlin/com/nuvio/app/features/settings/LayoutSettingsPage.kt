@@ -77,7 +77,7 @@ internal fun LazyListScope.layoutSettingsContent(
     onCollectionsClick: () -> Unit,
     onContinueWatchingClick: () -> Unit,
     onPosterCustomizationClick: () -> Unit,
-    onHoverPreviewClick: () -> Unit,
+    onHoverPreviewClick: () -> Unit = {},
 ) {
     if (isDesktop) {
         item {

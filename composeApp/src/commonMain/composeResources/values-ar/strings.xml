@@ -710,7 +710,16 @@
     <string name="settings_appearance_app_language_restart_title">إعادة التشغيل مطلوبة</string>
     <string name="settings_appearance_app_language_restart_message">أغلق التطبيق وأعد فتحه لتحديث التخطيط لهذه اللغة.</string>
     <string name="settings_appearance_nav_bar_style">شريط التنقل</string>
+    <string name="settings_appearance_sidebar_style">نمط الشريط الجانبي</string>
+    <string name="settings_appearance_top_bar_style">نمط الشريط العلوي</string>
     <string name="settings_appearance_nav_bar_style_sheet_title">نمط شريط التنقل</string>
+    <string name="settings_appearance_sidebar_style_sheet_title">نمط الشريط الجانبي</string>
+    <string name="settings_appearance_top_bar_style_sheet_title">نمط الشريط العلوي</string>
+    <string name="settings_appearance_desktop_navigation">التنقل على سطح المكتب</string>
+    <string name="settings_appearance_desktop_navigation_sheet_title">اختر نمط التنقل على سطح المكتب</string>
+    <string name="settings_appearance_desktop_navigation_sidebar">شريط جانبي</string>
+    <string name="settings_appearance_desktop_navigation_top_bar">شريط علوي</string>
+    <string name="settings_appearance_desktop_navigation_bottom_bar">شريط سفلي</string>
     <string name="settings_nav_bar_glow">توهج زجاجي</string>
     <string name="settings_nav_bar_glow_description">يضيف ضوءًا ناعمًا حول الشريط العائم.</string>
     <string name="settings_nav_bar_glow_on">التوهج مفعّل</string>
