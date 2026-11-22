@@ -34,13 +34,17 @@ class SettingsNavigationTest {
     @Test
     fun bufferOptionsFollowThePlatformAndPlaybackEngine() {
         AndroidPlaybackEngine.entries.forEach { engine ->
-            val android = visiblePlaybackSections(ios = false, engine = engine, p2pVisible = false)
-            val ios = visiblePlaybackSections(ios = true, engine = engine, p2pVisible = false)
+            val android = visiblePlaybackSections(ios = false, engine = engine, p2pVisible = false, desktop = false)
+            val desktop = visiblePlaybackSections(ios = false, engine = engine, p2pVisible = false, desktop = true)
+            val ios = visiblePlaybackSections(ios = true, engine = engine, p2pVisible = false, desktop = false)
             assertEquals(engine != AndroidPlaybackEngine.Libmpv, PlaybackSection.Buffer in android)
+            assertFalse(PlaybackSection.Buffer in desktop)
             assertFalse(PlaybackSection.Buffer in ios)
             assertFalse(PlaybackSection.P2p in android)
+            assertFalse(PlaybackSection.P2p in desktop)
             assertFalse(PlaybackSection.P2p in ios)
             assertTrue(PlaybackSection.Interface in android)
+            assertTrue(PlaybackSection.Interface in desktop)
             assertTrue(PlaybackSection.Interface in ios)
         }
         assertTrue(PlaybackSection.P2p in visiblePlaybackSections(false, AndroidPlaybackEngine.Auto, true))
