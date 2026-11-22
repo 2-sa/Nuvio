@@ -27,11 +27,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,12 +49,18 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -57,19 +68,27 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioSectionLabel
 import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
 import com.nuvio.app.core.ui.nuvioFocusBorder
+import com.nuvio.app.core.ui.nuvioTypeScale
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_search_clear
+import nuvio.composeapp.generated.resources.settings_back_to_format
 import nuvio.composeapp.generated.resources.settings_homescreen_collection_with_addon
 import nuvio.composeapp.generated.resources.settings_homescreen_display_name
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_source
@@ -79,6 +98,7 @@ import nuvio.composeapp.generated.resources.settings_homescreen_pinned
 import nuvio.composeapp.generated.resources.settings_homescreen_pinned_to_top
 import nuvio.composeapp.generated.resources.settings_homescreen_reorder
 import nuvio.composeapp.generated.resources.settings_homescreen_visible
+import nuvio.composeapp.generated.resources.settings_search_placeholder
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 
@@ -740,6 +760,366 @@ internal fun HomescreenCatalogRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+internal fun DesktopSettingsSidebarSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val focusRequester = remember { FocusRequester() }
+    val containerInteraction = remember { MutableInteractionSource() }
+    val isHovered by containerInteraction.collectIsHoveredAsState()
+    var isFocused by remember { mutableStateOf(false) }
+    val pillShape = RoundedCornerShape(10.dp)
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isFocused -> tokens.colors.accent
+            isHovered -> tokens.colors.borderStrong
+            else -> tokens.colors.borderDefault
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "desktopSidebarSearchBorder",
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (isFocused) tokens.colors.accent else tokens.colors.textMuted,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "desktopSidebarSearchIconTint",
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(NuvioTokens.Space.s40)
+            .clip(pillShape)
+            .background(tokens.colors.surfaceCard)
+            .border(NuvioTokens.Border.thin, borderColor, pillShape)
+            .hoverable(containerInteraction)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(
+                interactionSource = containerInteraction,
+                indication = null,
+            ) {
+                focusRequester.requestFocus()
+            }
+            .padding(horizontal = NuvioTokens.Space.s12),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Search,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(NuvioTokens.Icon.sm),
+        )
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (query.isEmpty()) {
+                Text(
+                    text = stringResource(Res.string.settings_search_placeholder),
+                    style = MaterialTheme.nuvioTypeScale.bodySm.copy(fontSize = 13.5.sp),
+                    color = tokens.colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { isFocused = it.isFocused },
+                singleLine = true,
+                textStyle = MaterialTheme.nuvioTypeScale.bodySm.copy(
+                    fontSize = 13.5.sp,
+                    color = tokens.colors.textPrimary,
+                    textDirection = TextDirection.Content,
+                ),
+                cursorBrush = SolidColor(tokens.colors.accent),
+            )
+        }
+        if (query.isNotEmpty()) {
+            val clearInteraction = remember { MutableInteractionSource() }
+            val isClearHovered by clearInteraction.collectIsHoveredAsState()
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(if (isClearHovered) tokens.colors.surfaceElevated else tokens.colors.overlayHover)
+                    .hoverable(clearInteraction)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .nuvioFocusBorder(CircleShape)
+                    .clickable(
+                        interactionSource = clearInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = { onQueryChange("") },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(Res.string.compose_search_clear),
+                    tint = if (isClearHovered) tokens.colors.textPrimary else tokens.colors.textMuted,
+                    modifier = Modifier.size(NuvioTokens.Icon.xs),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DesktopSettingsSidebarSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    Text(
+        text = title,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(
+                top = NuvioTokens.Space.s14,
+                bottom = NuvioTokens.Space.s6,
+                start = NuvioTokens.Space.s12,
+                end = NuvioTokens.Space.s12,
+            ),
+        style = MaterialTheme.nuvioTypeScale.labelXs.copy(
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+        ),
+        color = tokens.colors.textMuted,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+internal fun DesktopSettingsSidebarItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
+    val indicatorBrush = remember(palette) { palette.accentBrush() }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val itemShape = RoundedCornerShape(10.dp)
+    val accent = tokens.colors.accent
+
+    val background by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.focusBackground
+            isHovered -> tokens.colors.overlayHover
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "desktopSidebarItemBg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            selected -> accent.copy(alpha = 0.35f)
+            isHovered -> tokens.colors.borderSubtle
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "desktopSidebarItemBorder",
+    )
+    val contentColor = when {
+        selected -> tokens.colors.textPrimary
+        isHovered -> tokens.colors.textSecondary
+        else -> tokens.colors.textMuted
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(38.dp)
+            .clip(itemShape)
+            .background(background, itemShape)
+            .border(tokens.borders.thin, borderColor, itemShape)
+            .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .nuvioFocusBorder(itemShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(horizontal = NuvioTokens.Space.s10),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(NuvioTokens.Space.s3)
+                .height(NuvioTokens.Space.s18)
+                .clip(RoundedCornerShape(NuvioTokens.Radius.full))
+                .then(
+                    if (selected) {
+                        Modifier.background(indicatorBrush)
+                    } else {
+                        Modifier.background(Color.Transparent)
+                    },
+                ),
+        )
+        Spacer(modifier = Modifier.width(NuvioTokens.Space.s10))
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) accent else contentColor,
+            modifier = Modifier.size(NuvioTokens.Space.s18),
+        )
+        Spacer(modifier = Modifier.width(NuvioTokens.Space.s10))
+        Text(
+            text = label,
+            style = MaterialTheme.nuvioTypeScale.bodySm.copy(fontSize = 13.5.sp),
+            color = contentColor,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+internal fun DesktopSettingsPageHeader(
+    title: String,
+    subtitle: String?,
+    icon: ImageVector,
+    parentTitle: String? = null,
+    onParentClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .nuvioConsumePointerEvents(),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+            ) {
+                if (parentTitle != null && onParentClick != null) {
+                    val breadcrumbInteraction = remember { MutableInteractionSource() }
+                    val isBreadcrumbHovered by breadcrumbInteraction.collectIsHoveredAsState()
+                    val breadcrumbShape = RoundedCornerShape(NuvioTokens.Radius.full)
+                    Row(
+                        modifier = Modifier
+                            .clip(breadcrumbShape)
+                            .background(
+                                if (isBreadcrumbHovered) {
+                                    tokens.colors.surfaceCard
+                                } else {
+                                    tokens.colors.surfaceElevated
+                                },
+                            )
+                            .border(
+                                width = tokens.borders.thin,
+                                color = if (isBreadcrumbHovered) {
+                                    tokens.colors.accent.copy(alpha = 0.45f)
+                                } else {
+                                    tokens.colors.borderSubtle
+                                },
+                                shape = breadcrumbShape,
+                            )
+                            .hoverable(breadcrumbInteraction)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                            .nuvioFocusBorder(breadcrumbShape)
+                            .clickable(
+                                interactionSource = breadcrumbInteraction,
+                                indication = null,
+                                onClick = onParentClick,
+                            )
+                            .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s5),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = null,
+                            tint = if (isBreadcrumbHovered) tokens.colors.accent else tokens.colors.textSecondary,
+                            modifier = Modifier.size(NuvioTokens.Space.s14),
+                        )
+                        Text(
+                            text = stringResource(Res.string.settings_back_to_format, parentTitle),
+                            style = MaterialTheme.nuvioTypeScale.labelSm,
+                            color = if (isBreadcrumbHovered) tokens.colors.textPrimary else tokens.colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
+                ) {
+                    Surface(
+                        modifier = Modifier.size(44.dp),
+                        color = tokens.colors.focusBackground,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(
+                            width = tokens.borders.thin,
+                            color = tokens.colors.accent.copy(alpha = 0.30f),
+                        ),
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = tokens.colors.accent,
+                                modifier = Modifier.size(tokens.icons.md),
+                            )
+                        }
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s3),
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.nuvioTypeScale.titleMd.copy(
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = tokens.colors.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (!subtitle.isNullOrBlank()) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = tokens.colors.textSecondary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        HorizontalDivider(
+            thickness = tokens.borders.hairline,
+            color = tokens.colors.borderSubtle,
+        )
     }
 }
 

@@ -1086,8 +1086,9 @@ internal fun LazyListScope.settingsSearchRootContent(
     animateSearchField: Boolean,
     onQueryChange: (String) -> Unit,
     onTargetClick: (SettingsSearchTarget) -> Unit,
+    allowSearchField: Boolean = true,
 ) {
-    if (showSearchField || query.isNotBlank()) {
+    if (allowSearchField && (showSearchField || query.isNotBlank())) {
         item(key = "settings-search-field") {
             SettingsSearchRevealItem(animate = animateSearchField) {
                 SettingsSearchField(

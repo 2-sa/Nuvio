@@ -512,6 +512,7 @@
     <string name="compose_settings_page_continue_watching">متابعة المشاهدة</string>
     <string name="compose_settings_page_debrid">الحسابات المرتبطة</string>
     <string name="compose_settings_page_homescreen">تنسيق الواجهة الرئيسية</string>
+    <string name="compose_settings_page_hover_preview">معاينة التمرير</string>
     <string name="compose_settings_page_integrations">التكاملات</string>
     <string name="compose_settings_page_licenses_attributions">التراخيص والإسناد</string>
     <string name="compose_settings_page_mdblist_ratings">تقييمات MDBList</string>
@@ -554,6 +555,8 @@
     <string name="settings_search_empty">لم يُعثر على إعدادات.</string>
     <string name="settings_search_placeholder">البحث في الإعدادات...</string>
     <string name="settings_search_results_section">النتائج</string>
+    <string name="settings_search_results_for">نتائج البحث عن "%1$s"</string>
+    <string name="settings_back_to_format">العودة إلى %1$s</string>
     <string name="settings_advanced_section_startup">بدء التشغيل</string>
     <string name="settings_advanced_section_diagnostics">التشخيصات</string>
     <string name="settings_advanced_section_cache">ذاكرة التخزين المؤقت</string>
@@ -720,6 +723,7 @@
     <string name="settings_nav_bar_style_compact">مدمج دائمًا</string>
     <string name="settings_nav_bar_style_classic">كلاسيكي</string>
     <string name="settings_appearance_continue_watching_description">إعدادات قسم متابعة المشاهدة.</string>
+    <string name="settings_appearance_hover_preview_description">ضبط بطاقات المعاينة عند التمرير وتأخير فتحها.</string>
     <string name="settings_appearance_liquid_glass">الزجاج السائل</string>
     <string name="settings_appearance_liquid_glass_description">استخدام شريط تبويب iPhone الأصلي على iOS 26 والإصدارات الأحدث.</string>
     <string name="settings_appearance_poster_customization_description">ضبط عرض البطاقة وزوايا الانحناء.</string>
