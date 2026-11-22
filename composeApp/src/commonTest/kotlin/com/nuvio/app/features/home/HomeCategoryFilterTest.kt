@@ -143,6 +143,181 @@ class HomeCategoryFilterTest {
         )
     }
 
+    @Test
+    fun `isMovieType and isSeriesType normalize case whitespace plural and Arabic variants`() {
+        assertTrue(isMovieType("movie"))
+        assertTrue(isMovieType(" Movies "))
+        assertTrue(isMovieType("Films"))
+        assertTrue(isMovieType("أفلام"))
+        assertTrue(isMovieType("فيلم"))
+        assertFalse(isMovieType("series"))
+        assertFalse(isMovieType("Shows"))
+
+        assertTrue(isSeriesType("series"))
+        assertTrue(isSeriesType(" Shows "))
+        assertTrue(isSeriesType("TV"))
+        assertTrue(isSeriesType("tv-series"))
+        assertTrue(isSeriesType("TV Series"))
+        assertTrue(isSeriesType("مسلسلات"))
+        assertFalse(isSeriesType("Movies"))
+        assertFalse(isSeriesType("film"))
+    }
+
+    @Test
+    fun `filterHomeCatalogSections MOVIES matches plural and film contentType catalogs and excludes series`() {
+        val lumiereMovies = catalogSection(
+            key = "lumiere_movies",
+            title = "LumiereDB Popular - Movies",
+            contentType = "Movies",
+            catalogId = "lumiere.popular",
+        )
+        val lowerMovies = catalogSection(
+            key = "lower_movies",
+            title = "Trending",
+            contentType = "movies",
+            catalogId = "aio.movies",
+        )
+        val filmsSection = catalogSection(
+            key = "films",
+            title = "Cinema",
+            contentType = "Films",
+            catalogId = "cinema.films",
+        )
+        val showsSection = catalogSection(
+            key = "shows",
+            title = "Popular Shows",
+            contentType = "Shows",
+            catalogId = "aio.shows",
+        )
+
+        val sections = listOf(lumiereMovies, lowerMovies, filmsSection, showsSection)
+
+        assertEquals(
+            listOf(lumiereMovies, lowerMovies, filmsSection),
+            filterHomeCatalogSections(sections, HomeCategoryFilter.MOVIES),
+        )
+        assertEquals(
+            listOf(showsSection),
+            filterHomeCatalogSections(sections, HomeCategoryFilter.SERIES),
+        )
+    }
+
+    @Test
+    fun `filterHomeCatalogSections SERIES matches Shows and TV contentType catalogs and excludes MOVIES`() {
+        val showsSection = catalogSection(
+            key = "s_shows",
+            title = "Top Shows",
+            contentType = "Shows",
+            catalogId = "aio.shows",
+        )
+        val tvSection = catalogSection(
+            key = "s_tv",
+            title = "Prime TV",
+            contentType = "TV",
+            catalogId = "aio.tv",
+        )
+        val moviesSection = catalogSection(
+            key = "m_movies",
+            title = "Top Movies",
+            contentType = "Movies",
+            catalogId = "aio.movies",
+        )
+
+        val sections = listOf(showsSection, tvSection, moviesSection)
+
+        assertEquals(
+            listOf(showsSection, tvSection),
+            filterHomeCatalogSections(sections, HomeCategoryFilter.SERIES),
+        )
+        assertEquals(
+            listOf(moviesSection),
+            filterHomeCatalogSections(sections, HomeCategoryFilter.MOVIES),
+        )
+    }
+
+    @Test
+    fun `filterHomeCatalogSections filters mixed and generic catalogs at item level and respects clear titles`() {
+        val movieA = metaItem(id = "tmdb:550", type = "Movies", name = "Fight Club")
+        val movieB = metaItem(id = "tt0111161", type = "movie", name = "Shawshank")
+        val seriesA = metaItem(id = "tt0903747", type = "series", name = "Breaking Bad")
+        val showB = metaItem(id = "tmdb:1399", type = "Shows", name = "Game of Thrones")
+        val animeMovie = metaItem(id = "tt888", type = "Movies", name = "Spirited Away", genres = listOf("Animation"))
+
+        val mixedOther = catalogSection(
+            key = "mix_other",
+            title = "Trending Now",
+            contentType = "other",
+            catalogId = "trending.other",
+            items = listOf(movieA, seriesA, animeMovie, showB),
+        )
+        val mixedAllTitle = catalogSection(
+            key = "mix_all",
+            title = "Movies & Series",
+            contentType = "all",
+            catalogId = "trending.all",
+            items = listOf(movieB, seriesA),
+        )
+        val clearTitleMovies = catalogSection(
+            key = "clear_movies",
+            title = "أفلام الأسبوع",
+            contentType = "catalog",
+            catalogId = "custom.week",
+            items = listOf(metaItem(id = "tt10", type = "unknown", name = "Custom Item")),
+        )
+
+        val moviesResult = filterHomeCatalogSections(
+            sections = listOf(mixedOther, mixedAllTitle, clearTitleMovies),
+            filter = HomeCategoryFilter.MOVIES,
+        )
+        assertEquals(3, moviesResult.size)
+        assertEquals("mix_other", moviesResult[0].key)
+        assertEquals(listOf(movieA), moviesResult[0].items)
+        assertEquals("mix_all", moviesResult[1].key)
+        assertEquals(listOf(movieB), moviesResult[1].items)
+        assertEquals("clear_movies", moviesResult[2].key)
+        assertEquals(clearTitleMovies.items, moviesResult[2].items)
+
+        val seriesResult = filterHomeCatalogSections(
+            sections = listOf(mixedOther, mixedAllTitle, clearTitleMovies),
+            filter = HomeCategoryFilter.SERIES,
+        )
+        assertEquals(2, seriesResult.size)
+        assertEquals("mix_other", seriesResult[0].key)
+        assertEquals(listOf(seriesA, showB), seriesResult[0].items)
+        assertEquals("mix_all", seriesResult[1].key)
+        assertEquals(listOf(seriesA), seriesResult[1].items)
+    }
+
+    @Test
+    fun `filterHomeCatalogSections ANIME still finds anime items inside plural Movies and Series catalogs`() {
+        val animeMovie = metaItem(id = "tt888", type = "Movies", name = "Your Name", genres = listOf("Anime"))
+        val normalMovie = metaItem(id = "tt550", type = "Movies", name = "Fight Club", genres = listOf("Drama"))
+        val moviesCatalog = catalogSection(
+            key = "plural_movies",
+            title = "Popular",
+            contentType = "Movies",
+            catalogId = "popular.movies",
+            items = listOf(normalMovie, animeMovie),
+        )
+
+        val result = filterHomeCatalogSections(listOf(moviesCatalog), HomeCategoryFilter.ANIME)
+        assertEquals(1, result.size)
+        assertEquals(listOf(animeMovie), result[0].items)
+    }
+
+    @Test
+    fun `filterContinueWatchingItems supports plural Movies and shows parentMetaType`() {
+        val pluralMovie = cwItem(id = "tmdb:550", type = "Movies", title = "Fight Club")
+        val pluralShows = cwItem(id = "tmdb:1396", type = "shows", title = "Breaking Bad")
+        val animePlural = cwItem(id = "kitsu:456", type = "Movies", title = "Akira")
+
+        val items = listOf(pluralMovie, pluralShows, animePlural)
+
+        assertEquals(listOf(pluralMovie), filterContinueWatchingItems(items, HomeCategoryFilter.MOVIES))
+        assertEquals(listOf(pluralShows), filterContinueWatchingItems(items, HomeCategoryFilter.SERIES))
+        assertEquals(listOf(animePlural), filterContinueWatchingItems(items, HomeCategoryFilter.ANIME))
+    }
+
     private fun catalogSection(
         key: String,
         title: String,

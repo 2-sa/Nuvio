@@ -1045,12 +1045,14 @@ internal fun SearchRecentRow(
 }
 
 @Composable
-private fun String.displayMediaTypeLabel(): String =
-    when (lowercase()) {
-        "movie" -> stringResource(Res.string.media_movies)
-        "series" -> stringResource(Res.string.media_series)
+private fun String.displayMediaTypeLabel(): String {
+    val trimmed = trim()
+    return when (trimmed.lowercase()) {
+        "movie", "movies", "film", "films" -> stringResource(Res.string.media_movies)
+        "series", "show", "shows", "tvshow", "tvshows", "tv series", "tv-series" -> stringResource(Res.string.media_series)
         "anime" -> stringResource(Res.string.media_anime)
-        "channel" -> stringResource(Res.string.media_channels)
+        "channel", "channels" -> stringResource(Res.string.media_channels)
         "tv" -> stringResource(Res.string.media_tv)
-        else -> replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        else -> trimmed.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
+}

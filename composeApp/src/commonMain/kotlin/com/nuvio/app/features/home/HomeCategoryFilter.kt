@@ -68,6 +68,79 @@ private val AnimeGenreTokens = listOf(
     "رسوم متحركة",
 )
 
+private val MovieTypeTokens = setOf(
+    "movie",
+    "movies",
+    "film",
+    "films",
+    "فيلم",
+    "أفلام",
+    "افلام",
+)
+
+private val SeriesTypeTokens = setOf(
+    "series",
+    "tv",
+    "show",
+    "shows",
+    "tvshow",
+    "tvshows",
+    "tv series",
+    "tv-series",
+    "مسلسل",
+    "مسلسلات",
+)
+
+private val MovieTitleTokens = setOf(
+    "movie",
+    "movies",
+    "film",
+    "films",
+    "أفلام",
+    "افلام",
+)
+
+private val SeriesTitleTokens = setOf(
+    "series",
+    "shows",
+    "tv",
+    "مسلسلات",
+)
+
+internal fun isMovieType(type: String): Boolean =
+    type.trim().lowercase() in MovieTypeTokens
+
+internal fun isSeriesType(type: String): Boolean =
+    type.trim().lowercase() in SeriesTypeTokens
+
+private fun tokenizeTitleWords(title: String): Set<String> {
+    if (title.isBlank()) return emptySet()
+    val words = HashSet<String>()
+    var start = -1
+    for (index in title.indices) {
+        if (title[index].isLetterOrDigit()) {
+            if (start < 0) start = index
+        } else if (start >= 0) {
+            words += title.substring(start, index).lowercase()
+            start = -1
+        }
+    }
+    if (start >= 0) {
+        words += title.substring(start).lowercase()
+    }
+    return words
+}
+
+private fun String.isClearMovieTitle(): Boolean {
+    val words = tokenizeTitleWords(this)
+    return words.any { it in MovieTitleTokens } && words.none { it in SeriesTitleTokens }
+}
+
+private fun String.isClearSeriesTitle(): Boolean {
+    val words = tokenizeTitleWords(this)
+    return words.any { it in SeriesTitleTokens } && words.none { it in MovieTitleTokens }
+}
+
 internal fun isAnimeSignal(
     type: String,
     catalogId: String = "",
@@ -111,13 +184,41 @@ internal fun filterHomeCatalogSections(
     filter: HomeCategoryFilter,
 ): List<HomeCatalogSection> = when (filter) {
     HomeCategoryFilter.ALL -> sections
-    HomeCategoryFilter.MOVIES -> sections.filter { section ->
-        section.target.contentType.trim().equals("movie", ignoreCase = true) && !section.isCatalogAnime()
+    HomeCategoryFilter.MOVIES -> sections.mapNotNull { section ->
+        when {
+            section.isCatalogAnime() -> null
+            isMovieType(section.target.contentType) -> section
+            isSeriesType(section.target.contentType) -> null
+            section.title.isClearMovieTitle() -> section
+            else -> {
+                val matchingItems = section.items.filter { item ->
+                    isMovieType(item.type) && !isAnimeSignal(
+                        type = item.type,
+                        itemId = item.id,
+                        genres = item.genres,
+                    )
+                }
+                if (matchingItems.isEmpty()) null else section.copy(items = matchingItems)
+            }
+        }
     }
-    HomeCategoryFilter.SERIES -> sections.filter { section ->
-        val normalizedType = section.target.contentType.trim()
-        (normalizedType.equals("series", ignoreCase = true) || normalizedType.equals("tv", ignoreCase = true)) &&
-            !section.isCatalogAnime()
+    HomeCategoryFilter.SERIES -> sections.mapNotNull { section ->
+        when {
+            section.isCatalogAnime() -> null
+            isSeriesType(section.target.contentType) -> section
+            isMovieType(section.target.contentType) -> null
+            section.title.isClearSeriesTitle() -> section
+            else -> {
+                val matchingItems = section.items.filter { item ->
+                    isSeriesType(item.type) && !isAnimeSignal(
+                        type = item.type,
+                        itemId = item.id,
+                        genres = item.genres,
+                    )
+                }
+                if (matchingItems.isEmpty()) null else section.copy(items = matchingItems)
+            }
+        }
     }
     HomeCategoryFilter.ANIME -> sections.mapNotNull { section ->
         if (section.isCatalogAnime()) {
@@ -146,13 +247,12 @@ internal fun filterContinueWatchingItems(
     HomeCategoryFilter.ALL -> items
     HomeCategoryFilter.MOVIES -> items.filter { item ->
         val effectiveId = item.parentMetaId.ifBlank { item.videoId }
-        item.parentMetaType.trim().equals("movie", ignoreCase = true) &&
+        isMovieType(item.parentMetaType) &&
             !isAnimeSignal(type = item.parentMetaType, itemId = effectiveId)
     }
     HomeCategoryFilter.SERIES -> items.filter { item ->
-        val normalizedType = item.parentMetaType.trim()
         val effectiveId = item.parentMetaId.ifBlank { item.videoId }
-        (normalizedType.equals("series", ignoreCase = true) || normalizedType.equals("tv", ignoreCase = true)) &&
+        isSeriesType(item.parentMetaType) &&
             !isAnimeSignal(type = item.parentMetaType, itemId = effectiveId)
     }
     HomeCategoryFilter.ANIME -> items.filter { item ->

@@ -4,6 +4,34 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import kotlin.jvm.JvmName
 
+private val CustomPosterMovieTypes = setOf(
+    "movie",
+    "movies",
+    "film",
+    "films",
+)
+
+private val CustomPosterSeriesTypes = setOf(
+    "series",
+    "tv",
+    "show",
+    "shows",
+    "tvshow",
+    "tvshows",
+    "tv series",
+    "tv-series",
+    "anime",
+)
+
+internal fun normalizeCustomPosterContentType(
+    type: String,
+    fallback: String = "series",
+): String = when (type.trim().lowercase()) {
+    in CustomPosterMovieTypes -> "movie"
+    in CustomPosterSeriesTypes -> "series"
+    else -> fallback
+}
+
 /**
  * Applies a custom poster URL pattern to a [MetaPreview].
  * The original poster is preserved in [MetaPreview.rawPosterUrl] for fallback on load error.
@@ -12,7 +40,7 @@ fun MetaPreview.withCustomPosterUrl(pattern: String): MetaPreview {
     if (pattern.isBlank()) return this
 
     val ids = CustomPosterUrlResolver.extractIds(id)
-    val contentType = if (type.equals("movie", ignoreCase = true)) "movie" else "series"
+    val contentType = normalizeCustomPosterContentType(type, fallback = "series")
     val supportsShape = "{shape}" in pattern
 
     if (!supportsShape && posterShape != PosterShape.Poster) return this
@@ -77,7 +105,10 @@ fun com.nuvio.app.features.library.LibraryItem.withCustomPosterUrl(
     if (pattern.isBlank()) return this
 
     val ids = CustomPosterUrlResolver.extractIds(id, explicitImdbId = imdbId)
-    val contentType = if (type.equals("tv", ignoreCase = true) || type.equals("series", ignoreCase = true)) "series" else type
+    val contentType = normalizeCustomPosterContentType(
+        type = type,
+        fallback = type.trim().lowercase().ifBlank { "series" },
+    )
     val supportsShape = "{shape}" in pattern
 
     val resolvedPoster = CustomPosterUrlResolver.resolve(
@@ -119,7 +150,7 @@ fun com.nuvio.app.features.watchprogress.ContinueWatchingItem.withCustomPosterUr
     if (pattern.isBlank()) return this
 
     val ids = CustomPosterUrlResolver.extractIds(parentMetaId)
-    val contentType = if (parentMetaType.equals("movie", ignoreCase = true)) "movie" else "series"
+    val contentType = normalizeCustomPosterContentType(parentMetaType, fallback = "series")
     val supportsShape = "{shape}" in pattern
 
     val resolvedPoster = CustomPosterUrlResolver.resolve(

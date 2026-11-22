@@ -2,6 +2,8 @@ package com.nuvio.app.core.poster
 
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.library.LibraryItem
+import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -158,5 +160,108 @@ class CustomPosterOverlayTest {
         )
         val result = items.withCustomPosterUrls("")
         assertEquals(items, result)
+    }
+
+    // -- Content type normalization --
+
+    @Test
+    fun normalizeCustomPosterContentType_maps_plural_and_variant_types_to_canonical_values() {
+        assertEquals("movie", normalizeCustomPosterContentType("Movies"))
+        assertEquals("movie", normalizeCustomPosterContentType(" films "))
+        assertEquals("series", normalizeCustomPosterContentType("series"))
+        assertEquals("series", normalizeCustomPosterContentType("tv"))
+        assertEquals("series", normalizeCustomPosterContentType("Shows"))
+        assertEquals("series", normalizeCustomPosterContentType("TV-Series"))
+        assertEquals("series", normalizeCustomPosterContentType("anime"))
+        assertEquals("custom", normalizeCustomPosterContentType("custom", fallback = "custom"))
+    }
+
+    @Test
+    fun metaPreview_withCustomPosterUrl_plural_Movies_tmdb_resolves_movie_typed_id() {
+        val item = MetaPreview(
+            id = "tmdb:550",
+            type = "Movies",
+            name = "Fight Club",
+            poster = "https://original.com/poster.jpg",
+        )
+        val result = item.withCustomPosterUrl(
+            "https://api.ratingposterdb.com/key/tmdb/poster-default/{typed_id}.jpg",
+        )
+        assertEquals(
+            "https://api.ratingposterdb.com/key/tmdb/poster-default/movie-550.jpg",
+            result.poster,
+        )
+        assertEquals("https://original.com/poster.jpg", result.rawPosterUrl)
+    }
+
+    @Test
+    fun metaPreview_withCustomPosterUrl_plural_Movies_imdb_resolves_movie_type_placeholder() {
+        val item = MetaPreview(
+            id = "tt0137523",
+            type = "Movies",
+            name = "Fight Club",
+            poster = "https://original.com/poster.jpg",
+        )
+        val result = item.withCustomPosterUrl("https://example.com/{type}/{imdb_id}.jpg")
+        assertEquals("https://example.com/movie/tt0137523.jpg", result.poster)
+        assertEquals("https://original.com/poster.jpg", result.rawPosterUrl)
+    }
+
+    @Test
+    fun continueWatchingItem_withCustomPosterUrl_plural_Movies_tmdb_resolves_movie_typed_id() {
+        val item = ContinueWatchingItem(
+            parentMetaId = "tmdb:550",
+            parentMetaType = "Movies",
+            videoId = "tmdb:550",
+            title = "Fight Club",
+            subtitle = "Movie",
+            imageUrl = "https://original.com/poster.jpg",
+            poster = "https://original.com/poster.jpg",
+            resumePositionMs = 10_000L,
+            durationMs = 100_000L,
+            progressFraction = 0.1f,
+        )
+        val result = item.withCustomPosterUrl(
+            "https://api.ratingposterdb.com/key/tmdb/poster-default/{typed_id}.jpg",
+        )
+        assertEquals(
+            "https://api.ratingposterdb.com/key/tmdb/poster-default/movie-550.jpg",
+            result.poster,
+        )
+        assertEquals("https://original.com/poster.jpg", result.rawPosterUrl)
+    }
+
+    @Test
+    fun libraryItem_withCustomPosterUrl_plural_Movies_tmdb_resolves_movie_typed_id() {
+        val item = LibraryItem(
+            id = "tmdb:550",
+            type = "Movies",
+            name = "Fight Club",
+            poster = "https://original.com/poster.jpg",
+            savedAtEpochMs = 1_000L,
+        )
+        val result = item.withCustomPosterUrl(
+            "https://api.ratingposterdb.com/key/tmdb/poster-default/{typed_id}.jpg",
+        )
+        assertEquals(
+            "https://api.ratingposterdb.com/key/tmdb/poster-default/movie-550.jpg",
+            result.poster,
+        )
+        assertEquals("https://original.com/poster.jpg", result.rawPosterUrl)
+    }
+
+    @Test
+    fun withCustomPosterUrl_series_tv_and_Shows_variants_resolve_as_series() {
+        val pattern = "https://example.com/{type}/{typed_id}.jpg"
+        listOf("series", "tv", "Shows").forEach { variant ->
+            val preview = MetaPreview(
+                id = "tmdb:1396",
+                type = variant,
+                name = "Breaking Bad",
+                poster = "https://original.com/poster.jpg",
+            )
+            val result = preview.withCustomPosterUrl(pattern)
+            assertEquals("https://example.com/series/series-1396.jpg", result.poster)
+        }
     }
 }
