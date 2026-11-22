@@ -12,14 +12,17 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -1120,6 +1123,224 @@ internal fun DesktopSettingsPageHeader(
             thickness = tokens.borders.hairline,
             color = tokens.colors.borderSubtle,
         )
+    }
+}
+
+internal data class SettingsBentoItem(
+    val id: String,
+    val title: String,
+    val description: String,
+    val icon: ImageVector,
+    val badge: String? = null,
+    val iconPainter: Painter? = null,
+    val onClick: () -> Unit,
+)
+
+@Composable
+internal fun SettingsBentoGrid(
+    items: List<SettingsBentoItem>,
+    modifier: Modifier = Modifier,
+    isTablet: Boolean = isDesktop,
+) {
+    if (items.isEmpty()) return
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        if (isDesktop && maxWidth >= 640.dp) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+            ) {
+                items.chunked(2).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+                    ) {
+                        rowItems.forEach { item ->
+                            SettingsBentoTile(
+                                item = item,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                        }
+                        if (rowItems.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else {
+            SettingsGroup(isTablet = isTablet) {
+                items.forEachIndexed { index, item ->
+                    if (index > 0) SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = item.title,
+                        description = item.description,
+                        icon = if (item.iconPainter == null) item.icon else null,
+                        iconPainter = item.iconPainter,
+                        isTablet = isTablet,
+                        onClick = item.onClick,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SettingsBentoTile(
+    item: SettingsBentoItem,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val tileShape = RoundedCornerShape(NuvioTokens.Radius.xl)
+    val containerColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.surfaceElevated
+        } else {
+            tokens.colors.surfaceCard
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "bentoTileBg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.65f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "bentoTileBorder",
+    )
+    val chevronTint by animateColorAsState(
+        targetValue = if (isDesktop && isHovered) {
+            tokens.colors.accent
+        } else {
+            tokens.colors.textMuted
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "bentoTileChevron",
+    )
+
+    Surface(
+        modifier = modifier
+            .clip(tileShape)
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .nuvioFocusBorder(tileShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = item.onClick,
+            ),
+        color = containerColor,
+        shape = tileShape,
+        border = BorderStroke(tokens.borders.thin, borderColor),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(NuvioTokens.Space.s16),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Surface(
+                    modifier = Modifier.size(NuvioTokens.Space.s40),
+                    color = tokens.colors.focusBackground,
+                    shape = RoundedCornerShape(11.dp),
+                    border = BorderStroke(
+                        width = tokens.borders.thin,
+                        color = tokens.colors.accent.copy(alpha = 0.28f),
+                    ),
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (item.iconPainter != null) {
+                            androidx.compose.foundation.Image(
+                                painter = item.iconPainter,
+                                contentDescription = null,
+                                modifier = Modifier.size(NuvioTokens.Space.s24),
+                                contentScale = ContentScale.Fit,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = null,
+                                tint = tokens.colors.accent,
+                                modifier = Modifier.size(tokens.icons.md),
+                            )
+                        }
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                ) {
+                    if (!item.badge.isNullOrBlank()) {
+                        Surface(
+                            color = tokens.colors.surfaceElevated,
+                            shape = RoundedCornerShape(NuvioTokens.Radius.full),
+                            border = BorderStroke(tokens.borders.thin, tokens.colors.borderSubtle),
+                        ) {
+                            Text(
+                                text = item.badge,
+                                style = MaterialTheme.nuvioTypeScale.labelXs,
+                                color = tokens.colors.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(
+                                    horizontal = NuvioTokens.Space.s8,
+                                    vertical = NuvioTokens.Space.s3,
+                                ),
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = chevronTint,
+                        modifier = Modifier.size(tokens.icons.md),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = tokens.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 19.sp),
+                    color = tokens.colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 

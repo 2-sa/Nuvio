@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.isDesktop
 import com.nuvio.app.isIos
 import org.jetbrains.compose.resources.stringResource
 
@@ -22,15 +23,30 @@ internal fun LazyListScope.playbackSettingsContent(
         when (page) {
             SettingsPage.Playback -> {
                 val sections = visiblePlaybackSections(isIos, settings.androidPlaybackEngine, P2pSettingsRepository.isVisible)
-                SettingsGroup(isTablet = isTablet) {
-                    sections.forEachIndexed { index, section ->
-                        if (index > 0) SettingsGroupDivider(isTablet = isTablet)
-                        SettingsNavigationRow(
-                            title = stringResource(section.page.titleRes),
-                            description = stringResource(section.descriptionRes),
-                            isTablet = isTablet,
-                            onClick = { onPageChange(section.page) },
-                        )
+                if (isDesktop) {
+                    SettingsBentoGrid(
+                        items = sections.map { section ->
+                            SettingsBentoItem(
+                                id = section.name,
+                                title = stringResource(section.page.titleRes),
+                                description = stringResource(section.descriptionRes),
+                                icon = section.page.icon,
+                                onClick = { onPageChange(section.page) },
+                            )
+                        },
+                        isTablet = isTablet,
+                    )
+                } else {
+                    SettingsGroup(isTablet = isTablet) {
+                        sections.forEachIndexed { index, section ->
+                            if (index > 0) SettingsGroupDivider(isTablet = isTablet)
+                            SettingsNavigationRow(
+                                title = stringResource(section.page.titleRes),
+                                description = stringResource(section.descriptionRes),
+                                isTablet = isTablet,
+                                onClick = { onPageChange(section.page) },
+                            )
+                        }
                     }
                 }
             }

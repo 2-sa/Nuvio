@@ -1,17 +1,29 @@
 package com.nuvio.app.features.settings
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.People
@@ -22,18 +34,26 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.nuvioFocusBorder
+import com.nuvio.app.core.ui.nuvioTypeScale
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.isDesktop
@@ -1108,6 +1128,18 @@ internal fun LazyListScope.settingsSearchRootContent(
         )
         if (results.isEmpty()) {
             SettingsSearchEmptyState(isTablet = isTablet)
+        } else if (isDesktop) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+            ) {
+                results.forEach { entry ->
+                    DesktopSettingsSearchResultCard(
+                        entry = entry,
+                        onClick = { onTargetClick(entry.target) },
+                    )
+                }
+            }
         } else {
             SettingsSection(
                 title = stringResource(Res.string.settings_search_results_section),
@@ -1214,8 +1246,187 @@ private fun SettingsSearchField(
 }
 
 @Composable
+private fun DesktopSettingsSearchResultCard(
+    entry: SettingsSearchEntry,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val cardShape = RoundedCornerShape(14.dp)
+    val containerColor by animateColorAsState(
+        targetValue = if (isHovered) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "searchResultCardBg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isHovered) {
+            tokens.colors.accent.copy(alpha = 0.60f)
+        } else {
+            tokens.colors.borderSubtle
+        },
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "searchResultCardBorder",
+    )
+    val chevronTint by animateColorAsState(
+        targetValue = if (isHovered) tokens.colors.accent else tokens.colors.textMuted,
+        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
+        label = "searchResultCardChevron",
+    )
+    val badgeText = entry.desktopContextBadge()
+    val secondaryText = when {
+        entry.description.isNotBlank() -> entry.description
+        entry.category.isNotBlank() && badgeText != entry.category -> entry.category
+        else -> ""
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .nuvioFocusBorder(cardShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        color = containerColor,
+        shape = cardShape,
+        border = BorderStroke(tokens.borders.thin, borderColor),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = NuvioTokens.Space.s16, vertical = NuvioTokens.Space.s14),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
+        ) {
+            Surface(
+                modifier = Modifier.size(NuvioTokens.Space.s40),
+                color = tokens.colors.focusBackground,
+                shape = RoundedCornerShape(11.dp),
+                border = BorderStroke(
+                    width = tokens.borders.thin,
+                    color = tokens.colors.accent.copy(alpha = 0.28f),
+                ),
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = entry.icon,
+                        contentDescription = null,
+                        tint = tokens.colors.accent,
+                        modifier = Modifier.size(tokens.icons.md),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                ) {
+                    Text(
+                        text = entry.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = tokens.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (badgeText.isNotBlank()) {
+                        Surface(
+                            color = tokens.colors.surfaceElevated,
+                            shape = RoundedCornerShape(NuvioTokens.Radius.full),
+                            border = BorderStroke(tokens.borders.thin, tokens.colors.borderSubtle),
+                        ) {
+                            Text(
+                                text = badgeText,
+                                style = MaterialTheme.nuvioTypeScale.labelXs,
+                                color = tokens.colors.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(
+                                    horizontal = NuvioTokens.Space.s8,
+                                    vertical = NuvioTokens.Space.s2,
+                                ),
+                            )
+                        }
+                    }
+                }
+                if (secondaryText.isNotBlank()) {
+                    Text(
+                        text = secondaryText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = tokens.colors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = chevronTint,
+                modifier = Modifier.size(tokens.icons.md),
+            )
+        }
+    }
+}
+
+@Composable
 private fun SettingsSearchEmptyState(isTablet: Boolean) {
     val tokens = MaterialTheme.nuvio
+    if (isDesktop) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = tokens.colors.surfaceCard,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(tokens.borders.thin, tokens.colors.borderSubtle),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = NuvioTokens.Space.s20, vertical = NuvioTokens.Space.s18),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
+            ) {
+                Surface(
+                    modifier = Modifier.size(NuvioTokens.Space.s40),
+                    color = tokens.colors.surfaceElevated,
+                    shape = RoundedCornerShape(11.dp),
+                    border = BorderStroke(tokens.borders.thin, tokens.colors.borderSubtle),
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Search,
+                            contentDescription = null,
+                            tint = tokens.colors.textMuted,
+                            modifier = Modifier.size(tokens.icons.md),
+                        )
+                    }
+                }
+                Text(
+                    text = stringResource(Res.string.settings_search_empty),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = tokens.colors.textPrimary,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+        return
+    }
     SettingsSection(
         title = stringResource(Res.string.settings_search_results_section),
         isTablet = isTablet,
@@ -1251,6 +1462,15 @@ private fun settingsSearchResults(
 
     return entries.filter { entry ->
         terms.all { term -> entry.searchableText.contains(term) }
+    }
+}
+
+private fun SettingsSearchEntry.desktopContextBadge(): String {
+    val context = contextLabel
+    return when {
+        context.isNotBlank() && context != title -> context
+        category.isNotBlank() -> category
+        else -> page
     }
 }
 
