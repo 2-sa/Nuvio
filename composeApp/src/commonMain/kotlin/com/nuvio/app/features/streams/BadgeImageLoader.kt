@@ -2,12 +2,15 @@ package com.nuvio.app.features.streams
 
 import coil3.ImageLoader
 import coil3.PlatformContext
+import coil3.memory.MemoryCache
 import coil3.request.CachePolicy
 import coil3.request.crossfade
 import com.nuvio.app.core.ui.addPlatformDecoders
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+
+private const val BadgeMemoryCacheBytes = 8L * 1024 * 1024
 
 /**
  * Separate ImageLoader for badge images without CacheControlCacheStrategy.
@@ -27,6 +30,11 @@ internal object BadgeImageLoader {
             val loader = ImageLoader.Builder(context)
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .diskCachePolicy(CachePolicy.ENABLED)
+                .memoryCache {
+                    MemoryCache.Builder()
+                        .maxSizeBytes(BadgeMemoryCacheBytes)
+                        .build()
+                }
                 .crossfade(false)
                 .components { addPlatformDecoders() }
                 .build()
@@ -34,4 +42,10 @@ internal object BadgeImageLoader {
             return loader
         }
     }
+
+    fun clearMemoryCache() {
+        instance?.memoryCache?.clear()
+    }
+
+    fun memoryCacheSizeBytes(): Long = instance?.memoryCache?.size ?: 0L
 }

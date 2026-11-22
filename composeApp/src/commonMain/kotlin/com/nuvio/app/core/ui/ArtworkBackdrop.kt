@@ -44,7 +44,14 @@ internal fun backdropControlColor(default: Color): Color =
         default
     }
 
+private const val MaxArtworkBackdropCacheEntries = 4
 private val backdropCache = linkedMapOf<String, ImageBitmap>()
+
+internal fun clearArtworkBackdropCache() {
+    backdropCache.clear()
+}
+
+internal fun artworkBackdropCacheSize(): Int = backdropCache.size
 private val backdropScrim = Brush.verticalGradient(
     0f to Color.Black.copy(alpha = 0.34f),
     0.55f to Color.Black.copy(alpha = 0.48f),
@@ -69,7 +76,9 @@ internal fun rememberArtworkBackdrop(imageUrl: String?, enabled: Boolean = true)
             runCatching { prepareArtworkBackdrop(result.image) }.getOrNull()
         } ?: return@LaunchedEffect
         backdropCache[imageUrl] = blurred
-        if (backdropCache.size > 8) backdropCache.remove(backdropCache.keys.first())
+        if (backdropCache.size > MaxArtworkBackdropCacheEntries) {
+            backdropCache.remove(backdropCache.keys.first())
+        }
         image = blurred
     }
 

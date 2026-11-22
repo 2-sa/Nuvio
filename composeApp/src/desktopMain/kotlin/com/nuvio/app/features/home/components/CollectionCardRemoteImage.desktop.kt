@@ -126,14 +126,20 @@ private class GifCodecHolder(
     val needsScale: Boolean,
 )
 
-// LRU Cache holding raw GIF Codecs (max 15 items in memory, tiny compressed bytes ~10-20MB total)
-private val gifCodecCache = object : LinkedHashMap<String, GifCodecHolder?>(16, 0.75f, true) {
+// LRU Cache holding raw GIF Codecs (max 8 items in memory)
+private val gifCodecCache = object : LinkedHashMap<String, GifCodecHolder?>(12, 0.75f, true) {
     override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, GifCodecHolder?>?): Boolean {
         // A visible/hovered card can retain this holder after cache eviction.
         // Codec is a Skia Managed object: let its cleaner release native memory
         // after the last user drops it. Explicit close here invalidates a live
         // card's codec and makes its next readPixels call crash in native code.
-        return size > 15
+        return size > 8
+    }
+}
+
+internal fun clearIdleGifCodecCache() {
+    synchronized(gifCodecCache) {
+        gifCodecCache.clear()
     }
 }
 
