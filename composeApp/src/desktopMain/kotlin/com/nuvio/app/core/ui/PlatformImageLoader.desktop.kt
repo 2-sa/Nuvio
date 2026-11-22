@@ -13,7 +13,7 @@ import okio.Path.Companion.toOkioPath
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
-private const val ImageMemoryCacheBytes = 256L * 1024 * 1024
+private const val ImageMemoryCacheBytes = 96L * 1024 * 1024
 private const val ImageDiskCacheBytes = 300L * 1024 * 1024
 
 internal actual val platformProvidesImageLoader: Boolean = false
@@ -23,11 +23,11 @@ internal actual fun createPlatformImageHttpClient(): HttpClient? = HttpClient(Ok
         config {
             dispatcher(
                 Dispatcher().apply {
-                    maxRequests = 64
-                    maxRequestsPerHost = 16
+                    maxRequests = 48
+                    maxRequestsPerHost = 12
                 },
             )
-            connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
+            connectionPool(ConnectionPool(12, 2, TimeUnit.MINUTES))
             connectTimeout(10, TimeUnit.SECONDS)
             readTimeout(15, TimeUnit.SECONDS)
             callTimeout(20, TimeUnit.SECONDS)

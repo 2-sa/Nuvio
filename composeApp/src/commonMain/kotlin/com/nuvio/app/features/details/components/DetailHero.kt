@@ -152,7 +152,7 @@ fun DetailHero(
                                 },
                             alignment = if (isTablet) Alignment.TopCenter else Alignment.Center,
                             contentScale = ContentScale.Crop,
-                            desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+                            desktopImageScaling = NuvioDesktopImageScaling.Backdrop,
                             onSuccess = { state ->
                                 onBackdropLoaded(
                                     state.painter,

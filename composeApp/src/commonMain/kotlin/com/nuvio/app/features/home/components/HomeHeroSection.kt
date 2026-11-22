@@ -346,7 +346,7 @@ private fun HeroBackgroundLayers(
                 else -> Alignment.Center
             },
             contentScale = ContentScale.Crop,
-            desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+            desktopImageScaling = NuvioDesktopImageScaling.Backdrop,
         )
     }
 }

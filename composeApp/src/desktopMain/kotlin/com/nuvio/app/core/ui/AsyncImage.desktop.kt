@@ -42,6 +42,7 @@ import kotlin.math.roundToInt
 private const val MinCustomDownscaleRatio = 1.08f
 private const val MaxDesktopSourceSizePx = 1536
 private const val MaxDesktopPosterSourceSizePx = 640
+private const val MaxDesktopBackdropSourceSizePx = 1920
 private const val MaxScaledBitmapPixels = 1_250_000L
 
 private val IsWindowsDesktop: Boolean =
@@ -88,14 +89,13 @@ internal actual fun NuvioAsyncImage(
     val animated = desktopAnimation != NuvioDesktopAnimation.Off
 
     val context = LocalPlatformContext.current
-    val effectiveDesktopImageScaling = remember(desktopImageScaling) {
-        if (IsWindowsDesktop) desktopImageScaling else NuvioDesktopImageScaling.Disabled
-    }
-    val maxSourceSizePx = when (effectiveDesktopImageScaling) {
+    val maxSourceSizePx = when (desktopImageScaling) {
         NuvioDesktopImageScaling.Auto -> MaxDesktopSourceSizePx
         NuvioDesktopImageScaling.Poster -> MaxDesktopPosterSourceSizePx
+        NuvioDesktopImageScaling.Backdrop -> MaxDesktopBackdropSourceSizePx
         NuvioDesktopImageScaling.Disabled -> null
     }
+    val useCpuDownscalePainter = IsWindowsDesktop && desktopImageScaling == NuvioDesktopImageScaling.Auto
     val requestModel = remember(context, model, maxSourceSizePx, animated) {
         model.withDesktopImageOptions(
             context = context,
@@ -107,7 +107,7 @@ internal actual fun NuvioAsyncImage(
         placeholder,
         error,
         fallback,
-        effectiveDesktopImageScaling,
+        useCpuDownscalePainter,
         playing,
     ) {
         transform@{ state ->
@@ -120,7 +120,10 @@ internal actual fun NuvioAsyncImage(
                     if (image is AnimatedSkiaImage) {
                         return@transform state.copy(painter = image.painter(playing))
                     }
-                    image.toScaledBitmapPainter(effectiveDesktopImageScaling)
+                    if (!useCpuDownscalePainter) {
+                        return@transform state
+                    }
+                    image.toScaledBitmapPainter()
                         ?.let { state.copy(painter = it) }
                         ?: state
                 }
@@ -194,9 +197,7 @@ private fun Any?.withDesktopImageOptions(
     return builder.build()
 }
 
-private fun Image.toScaledBitmapPainter(desktopImageScaling: NuvioDesktopImageScaling): Painter? {
-    if (desktopImageScaling == NuvioDesktopImageScaling.Disabled) return null
-
+private fun Image.toScaledBitmapPainter(): Painter? {
     return (this as? BitmapImage)
         ?.bitmap
         ?.asComposeImageBitmap()

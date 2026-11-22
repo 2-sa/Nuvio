@@ -1279,6 +1279,13 @@ compose.desktop {
         val smokePlayerUrl = providers.gradleProperty("nuvio.desktop.smokePlayerUrl").orNull
             ?: System.getenv("NUVIO_DESKTOP_SMOKE_PLAYER_URL")
         jvmArgs += listOfNotNull(
+            // Cap JVM heap and instruct G1GC (JEP 346) to uncommit idle heap pages back to the OS.
+            "-Xmx640m",
+            "-XX:+UseG1GC",
+            "-XX:MaxHeapFreeRatio=35",
+            "-XX:MinHeapFreeRatio=15",
+            "-XX:G1PeriodicGCInterval=30000",
+            "-XX:SoftRefLRUPolicyMSPerMB=50",
             "-Dapple.awt.application.appearance=NSAppearanceNameDarkAqua",
             // Keep AWT from loading its own GTK (Swing L&F/file dialogs): the
             // bridge owns the process's GTK via initGtkEarly (skoruppa's fix).

@@ -183,11 +183,7 @@ fun HomePosterCard(
                     fallbackImageUrl = fallbackImageUrl,
                     title = item.name,
                     cardShape = cardShape,
-                    desktopImageScaling = if (isLandscapeMode) {
-                        NuvioDesktopImageScaling.Auto
-                    } else {
-                        NuvioDesktopImageScaling.Poster
-                    },
+                    desktopImageScaling = NuvioDesktopImageScaling.Poster,
                     desktopAnimation = posterCardStyle.animatedArtworkMode.toDesktopAnimation(),
                 )
 

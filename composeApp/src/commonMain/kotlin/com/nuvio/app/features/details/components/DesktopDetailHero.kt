@@ -199,7 +199,7 @@ fun DesktopDetailBackdrop(
                 modifier = artworkModifier,
                 alignment = BiasAlignment(0f, DesktopBackdropVerticalBias),
                 contentScale = if (useWideArtworkFrame && !cropSideBackdrop) ContentScale.Fit else ContentScale.Crop,
-                desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+                desktopImageScaling = NuvioDesktopImageScaling.Backdrop,
                 onSuccess = { state -> onBackdropLoaded(state.painter) },
             )
         } else {
