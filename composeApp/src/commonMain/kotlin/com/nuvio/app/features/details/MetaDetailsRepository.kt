@@ -1,6 +1,7 @@
 package com.nuvio.app.features.details
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.cache.BoundedLruCache
 import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
@@ -53,7 +54,16 @@ object MetaDetailsRepository {
     private val _uiState = MutableStateFlow(MetaDetailsUiState())
     val uiState: StateFlow<MetaDetailsUiState> = _uiState.asStateFlow()
     private var activeRequestKey: String? = null
-    private val cachedMetaByRequestKey = mutableMapOf<String, CachedMetaEntry>()
+    private val cachedMetaByRequestKey = BoundedLruCache<String, CachedMetaEntry>(maxEntries = 24)
+
+    internal fun cacheEntryCount(): Int = cachedMetaByRequestKey.size
+
+    internal fun trimMemoryCache(aggressive: Boolean) {
+        cachedMetaByRequestKey.trimToSize(
+            targetSize = if (aggressive) 1 else 10,
+            preserveKey = activeRequestKey,
+        )
+    }
 
     fun load(type: String, id: String) {
         log.d { "load() called — type=$type id=$id" }

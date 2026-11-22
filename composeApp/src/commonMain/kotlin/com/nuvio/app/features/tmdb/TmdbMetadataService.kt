@@ -3,6 +3,7 @@ package com.nuvio.app.features.tmdb
 import com.nuvio.app.isDesktop
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.cache.BoundedLruCache
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.details.MetaCompany
 import com.nuvio.app.features.details.MetaDetails
@@ -13,8 +14,6 @@ import com.nuvio.app.features.details.MoreLikeThisSource
 import com.nuvio.app.features.details.PersonDetail
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
-import kotlinx.atomicfu.locks.SynchronizedObject
-import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -38,24 +37,56 @@ object TmdbMetadataService {
     fun cachedOriginalTitle(tmdbId: String, type: String): String? {
         val mediaType = TmdbService.normalizeMediaType(type)
         val prefix = "$tmdbId:$mediaType:"
-        return synchronized(enrichmentCacheLock) {
-            enrichmentCache.entries.firstOrNull { it.key.startsWith(prefix) }?.value?.originalTitle
-        }
+        return enrichmentCache.firstValueOrNull { key, _ -> key.startsWith(prefix) }?.originalTitle
     }
 
-    private val enrichmentCache = mutableMapOf<String, TmdbEnrichment>()
-    private val enrichmentCacheLock = SynchronizedObject()
-    private val episodeCache = mutableMapOf<String, Map<Pair<Int, Int>, TmdbEpisodeEnrichment>>()
-    private val moreLikeThisCache = mutableMapOf<String, List<MetaPreview>>()
-    private val collectionCache = mutableMapOf<String, Pair<String?, List<MetaPreview>>>()
-    private val trailerCache = mutableMapOf<String, List<MetaTrailer>>()
-    private val personCache = mutableMapOf<String, PersonDetail>()
-    private val entityBrowseCache = mutableMapOf<String, TmdbEntityBrowseData>()
-    private val entityHeaderCache = mutableMapOf<String, TmdbEntityHeader>()
-    private val entityRailCache = mutableMapOf<String, List<MetaPreview>>()
+    private val enrichmentCache = BoundedLruCache<String, TmdbEnrichment>(maxEntries = 96)
+    private val episodeCache = BoundedLruCache<String, Map<Pair<Int, Int>, TmdbEpisodeEnrichment>>(maxEntries = 24)
+    private val moreLikeThisCache = BoundedLruCache<String, List<MetaPreview>>(maxEntries = 32)
+    private val collectionCache = BoundedLruCache<String, Pair<String?, List<MetaPreview>>>(maxEntries = 24)
+    private val trailerCache = BoundedLruCache<String, List<MetaTrailer>>(maxEntries = 48)
+    private val personCache = BoundedLruCache<String, PersonDetail>(maxEntries = 32)
+    private val entityBrowseCache = BoundedLruCache<String, TmdbEntityBrowseData>(maxEntries = 16)
+    private val entityHeaderCache = BoundedLruCache<String, TmdbEntityHeader>(maxEntries = 32)
+    private val entityRailCache = BoundedLruCache<String, List<MetaPreview>>(maxEntries = 24)
     private val backdropCache = linkedMapOf<String, String?>()
     private val backdropCacheMutex = Mutex()
     private val backdropRequests = Semaphore(4)
+
+    internal fun cacheEntryCount(): Int =
+        enrichmentCache.size +
+            episodeCache.size +
+            moreLikeThisCache.size +
+            collectionCache.size +
+            trailerCache.size +
+            personCache.size +
+            entityBrowseCache.size +
+            entityHeaderCache.size +
+            entityRailCache.size
+
+    internal fun trimMemoryCaches(aggressive: Boolean) {
+        if (aggressive) {
+            enrichmentCache.trimToSize(16)
+            episodeCache.clear()
+            moreLikeThisCache.clear()
+            collectionCache.clear()
+            trailerCache.trimToSize(8)
+            personCache.clear()
+            entityBrowseCache.clear()
+            entityHeaderCache.clear()
+            entityRailCache.clear()
+        } else {
+            enrichmentCache.trimToSize(48)
+            episodeCache.trimToSize(12)
+            moreLikeThisCache.trimToSize(16)
+            collectionCache.trimToSize(12)
+            trailerCache.trimToSize(24)
+            personCache.trimToSize(16)
+            entityBrowseCache.trimToSize(8)
+            entityHeaderCache.trimToSize(16)
+            entityRailCache.trimToSize(12)
+        }
+    }
 
     suspend fun fetchLocalizedBackdrop(id: String, type: String, language: String): String? =
         withContext(Dispatchers.Default) {
@@ -937,7 +968,7 @@ object TmdbMetadataService {
     ): TmdbEnrichment? = withContext(Dispatchers.Default) {
         val normalizedLanguage = normalizeTmdbLanguage(language)
         val cacheKey = "$tmdbId:$mediaType:$normalizedLanguage"
-        synchronized(enrichmentCacheLock) { enrichmentCache[cacheKey] }?.let { return@withContext it }
+        enrichmentCache[cacheKey]?.let { return@withContext it }
 
         val numericId = tmdbId.toIntOrNull() ?: return@withContext null
         val includeImageLanguage = tmdbImageLanguages(normalizedLanguage)
@@ -1087,7 +1118,7 @@ object TmdbMetadataService {
         )
 
         if (!enrichment.hasContent()) return@withContext null
-        synchronized(enrichmentCacheLock) { enrichmentCache[cacheKey] = enrichment }
+        enrichmentCache[cacheKey] = enrichment
         enrichment
     }
 
