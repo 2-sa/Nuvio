@@ -1,7 +1,5 @@
 package com.nuvio.app.features.home.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -139,15 +137,11 @@ fun HomePosterCard(
     ) { hoverModifier ->
         val cardInteractionSource = remember { MutableInteractionSource() }
         val isHovered by cardInteractionSource.collectIsHoveredAsState()
-        val borderColor by animateColorAsState(
-            targetValue = if (isDesktop && isHovered) {
-                tokens.colors.accent.copy(alpha = 0.70f)
-            } else {
-                tokens.colors.borderSubtle
-            },
-            animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
-            label = "home_poster_card_border",
-        )
+        val borderColor = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.70f)
+        } else {
+            tokens.colors.borderSubtle
+        }
 
         Column(
             modifier = Modifier
@@ -293,6 +287,16 @@ internal fun BoxScope.PosterCardImage(
     if (!imageUrl.isNullOrBlank()) {
         var loadState by remember(imageUrl) { mutableStateOf(PosterLoadState.Loading) }
         var retryAttempt by remember(imageUrl) { mutableStateOf(0) }
+        var showShimmer by remember(imageUrl) { mutableStateOf(false) }
+
+        LaunchedEffect(imageUrl, loadState) {
+            if (loadState == PosterLoadState.Loading) {
+                delay(120L)
+                showShimmer = true
+            } else {
+                showShimmer = false
+            }
+        }
 
         LaunchedEffect(imageUrl, loadState, retryAttempt) {
             if (loadState == PosterLoadState.Error && retryAttempt < 1) {
@@ -328,7 +332,7 @@ internal fun BoxScope.PosterCardImage(
             }
         }
 
-        if (loadState == PosterLoadState.Loading) {
+        if (loadState == PosterLoadState.Loading && showShimmer) {
             Box(
                 modifier = Modifier
                     .matchParentSize()

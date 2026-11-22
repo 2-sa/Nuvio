@@ -1,7 +1,5 @@
 package com.nuvio.app.features.home.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -164,15 +162,11 @@ private fun PosterGridTile(
     ) { hoverModifier ->
         val cardInteractionSource = remember { MutableInteractionSource() }
         val isHovered by cardInteractionSource.collectIsHoveredAsState()
-        val borderColor by animateColorAsState(
-            targetValue = if (isDesktop && isHovered) {
-                tokens.colors.accent.copy(alpha = 0.70f)
-            } else {
-                tokens.colors.borderSubtle
-            },
-            animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
-            label = "poster_grid_tile_border",
-        )
+        val borderColor = if (isDesktop && isHovered) {
+            tokens.colors.accent.copy(alpha = 0.70f)
+        } else {
+            tokens.colors.borderSubtle
+        }
 
         Column(
             modifier = Modifier

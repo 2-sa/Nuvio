@@ -34,6 +34,7 @@ import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 
 @Stable
 private class SkeletonAnimation {
@@ -89,8 +90,14 @@ internal fun Modifier.skeleton(
 
     return clip(shape)
         .onGloballyPositioned { coordinates ->
-            rootWidth = coordinates.findRootCoordinates().size.width.toFloat()
-            offsetX = coordinates.positionInRoot().x
+            val newRootWidth = coordinates.findRootCoordinates().size.width.toFloat()
+            val newOffsetX = coordinates.positionInRoot().x
+            if (abs(rootWidth - newRootWidth) > 0.5f) {
+                rootWidth = newRootWidth
+            }
+            if (abs(offsetX - newOffsetX) > 0.5f) {
+                offsetX = newOffsetX
+            }
         }
         .drawWithCache {
             val width = rootWidth.takeIf { it > 0f } ?: size.width

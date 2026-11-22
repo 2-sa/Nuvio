@@ -2,7 +2,6 @@ package com.nuvio.app.features.home.components
 
 import com.nuvio.app.core.ui.rememberAnimatedArtworkAnimation
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -45,7 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -708,15 +707,11 @@ private fun ContinueWatchingCard(
     val cardShape = RoundedCornerShape(cardMetrics.cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val borderColor by animateColorAsState(
-        targetValue = if (isDesktop && isHovered) {
-            tokens.colors.accent.copy(alpha = 0.65f)
-        } else {
-            tokens.colors.borderSubtle
-        },
-        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
-        label = "continue_watching_card_border",
-    )
+    val borderColor = if (isDesktop && isHovered) {
+        tokens.colors.accent.copy(alpha = 0.65f)
+    } else {
+        tokens.colors.borderSubtle
+    }
     val todayIsoDate = CurrentDateProvider.todayIsoDate()
     val airDateText = if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
         computeAirDateBadgeText(item.released, todayIsoDate)
@@ -786,9 +781,7 @@ private fun ContinueWatchingCard(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier)
-                    .drawWithContent {
-                        drawContent()
-
+                    .drawWithCache {
                         val startY = size.height * 0.38f
                         val gradient = Brush.verticalGradient(
                             colorStops = arrayOf(
@@ -799,12 +792,16 @@ private fun ContinueWatchingCard(
                             startY = startY,
                             endY = size.height,
                         )
-
-                        drawRect(
-                            brush = gradient,
-                            topLeft = Offset(-2f, startY),
-                            size = Size(size.width + 4f, (size.height - startY) + 4f),
-                        )
+                        val scrimTopLeft = Offset(-2f, startY)
+                        val scrimSize = Size(size.width + 4f, (size.height - startY) + 4f)
+                        onDrawWithContent {
+                            drawContent()
+                            drawRect(
+                                brush = gradient,
+                                topLeft = scrimTopLeft,
+                                size = scrimSize,
+                            )
+                        }
                     },
                 contentScale = ContentScale.Crop,
                 desktopImageScaling = NuvioDesktopImageScaling.Poster,
@@ -981,15 +978,11 @@ private fun ContinueWatchingWideCard(
     val cardShape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val borderColor by animateColorAsState(
-        targetValue = if (isDesktop && isHovered) {
-            tokens.colors.accent.copy(alpha = 0.65f)
-        } else {
-            tokens.colors.borderSubtle
-        },
-        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
-        label = "continue_watching_wide_border",
-    )
+    val borderColor = if (isDesktop && isHovered) {
+        tokens.colors.accent.copy(alpha = 0.65f)
+    } else {
+        tokens.colors.borderSubtle
+    }
     Row(
         modifier = Modifier
             .nuvioFocusBorder(cardShape)
@@ -1126,15 +1119,11 @@ private fun ContinueWatchingPosterCard(
     val cardShape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val borderColor by animateColorAsState(
-        targetValue = if (isDesktop && isHovered) {
-            tokens.colors.accent.copy(alpha = 0.65f)
-        } else {
-            tokens.colors.borderSubtle
-        },
-        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
-        label = "continue_watching_poster_border",
-    )
+    val borderColor = if (isDesktop && isHovered) {
+        tokens.colors.accent.copy(alpha = 0.65f)
+    } else {
+        tokens.colors.borderSubtle
+    }
     val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
     Column(
         modifier = Modifier

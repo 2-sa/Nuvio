@@ -1,7 +1,5 @@
 package com.nuvio.app.features.home.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -140,15 +138,11 @@ private fun CollectionFolderCard(
     val shapeCorner = RoundedCornerShape(resolvedPosterCornerRadius(posterCardStyle.cornerRadiusDp))
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val borderColor by animateColorAsState(
-        targetValue = if (isDesktop && isHovered) {
-            tokens.colors.accent.copy(alpha = 0.70f)
-        } else {
-            tokens.colors.borderSubtle
-        },
-        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
-        label = "collection_folder_card_border",
-    )
+    val borderColor = if (isDesktop && isHovered) {
+        tokens.colors.accent.copy(alpha = 0.70f)
+    } else {
+        tokens.colors.borderSubtle
+    }
 
     Column(
         modifier = Modifier

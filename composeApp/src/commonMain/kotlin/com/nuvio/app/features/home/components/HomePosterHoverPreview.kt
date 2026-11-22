@@ -112,7 +112,6 @@ private const val HoverPreviewExitDurationMillis = 90
 private const val HoverTrailerExtractionDebounceMillis = 1_000L
 private val HoverPreviewWidth = 420.dp
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun HomePosterHoverPreview(
     item: MetaPreview,
@@ -141,8 +140,44 @@ internal fun HomePosterHoverPreview(
     }
 
     val anchorInteractionSource = remember { MutableInteractionSource() }
-    val previewInteractionSource = remember { MutableInteractionSource() }
     val anchorHovered by anchorInteractionSource.collectIsHoveredAsState()
+    var overlayActive by remember(item.type, item.id) { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        content(Modifier.hoverable(anchorInteractionSource))
+
+        if (anchorHovered || overlayActive) {
+            HomePosterHoverPreviewOverlay(
+                item = item,
+                isWatched = isWatched,
+                anchorHovered = anchorHovered,
+                hoverPreviewOpenDelayMillis = posterCardStyle.hoverPreviewOpenDelayMillis,
+                trailerPlaybackEnabled = trailerPlaybackEnabled,
+                trailerSoundEnabled = posterCardStyle.hoverPreviewTrailerSoundEnabled,
+                trailerStartSeconds = posterCardStyle.hoverPreviewTrailerStartSeconds,
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onActiveChanged = { overlayActive = it },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun HomePosterHoverPreviewOverlay(
+    item: MetaPreview,
+    isWatched: Boolean,
+    anchorHovered: Boolean,
+    hoverPreviewOpenDelayMillis: Int,
+    trailerPlaybackEnabled: Boolean,
+    trailerSoundEnabled: Boolean,
+    trailerStartSeconds: Int,
+    onClick: (() -> Unit)?,
+    onLongClick: (() -> Unit)?,
+    onActiveChanged: (Boolean) -> Unit,
+) {
+    val previewInteractionSource = remember { MutableInteractionSource() }
     val previewHovered by previewInteractionSource.collectIsHoveredAsState()
     var previewVisible by remember(item.type, item.id) { mutableStateOf(false) }
     var popupMounted by remember(item.type, item.id) { mutableStateOf(false) }
@@ -167,10 +202,14 @@ internal fun HomePosterHoverPreview(
         )
     }
 
+    LaunchedEffect(popupMounted, pendingTrackingRemoval) {
+        onActiveChanged(popupMounted || pendingTrackingRemoval != null)
+    }
+
     LaunchedEffect(
         anchorHovered,
         previewHovered,
-        posterCardStyle.hoverPreviewOpenDelayMillis,
+        hoverPreviewOpenDelayMillis,
         previewDismissedByScroll,
     ) {
         if (previewDismissedByScroll) {
@@ -181,7 +220,8 @@ internal fun HomePosterHoverPreview(
         }
         if (anchorHovered || previewHovered) {
             if (!popupMounted) {
-                delay(posterCardStyle.hoverPreviewOpenDelayMillis.toLong())
+                delay(hoverPreviewOpenDelayMillis.toLong())
+                onActiveChanged(true)
                 popupMounted = true
                 withFrameNanos { }
             }
@@ -191,6 +231,9 @@ internal fun HomePosterHoverPreview(
             previewVisible = false
             delay(HoverPreviewExitDurationMillis.toLong())
             popupMounted = false
+            if (pendingTrackingRemoval == null) {
+                onActiveChanged(false)
+            }
         }
     }
 
@@ -263,6 +306,7 @@ internal fun HomePosterHoverPreview(
                     operation = { toggleMembership(emptySet()) },
                     onSuccess = { result ->
                         if (result.requiresRemovalConfirmation) {
+                            onActiveChanged(true)
                             pendingTrackingRemoval = PendingTrackingMembershipRemoval(
                                 itemTitle = libraryItem.name,
                                 confirmations = result.requiredRemovalConfirmations,
@@ -281,45 +325,44 @@ internal fun HomePosterHoverPreview(
         }
     }
 
-    Box(modifier = modifier) {
-        content(Modifier.hoverable(anchorInteractionSource))
-
-        if (popupMounted) {
-            Popup(
-                popupPositionProvider = positionProvider,
-                properties = PopupProperties(focusable = false),
+    if (popupMounted) {
+        Popup(
+            popupPositionProvider = positionProvider,
+            properties = PopupProperties(focusable = false),
+        ) {
+            AnimatedVisibility(
+                visible = previewVisible,
+                enter = fadeIn(
+                    animationSpec = tween(durationMillis = HoverPreviewEnterDurationMillis),
+                ),
+                exit = fadeOut(
+                    animationSpec = tween(durationMillis = HoverPreviewExitDurationMillis),
+                ),
             ) {
-                AnimatedVisibility(
-                    visible = previewVisible,
-                    enter = fadeIn(
-                        animationSpec = tween(durationMillis = HoverPreviewEnterDurationMillis),
-                    ),
-                    exit = fadeOut(
-                        animationSpec = tween(durationMillis = HoverPreviewExitDurationMillis),
-                    ),
-                ) {
-                    HomePosterPreviewCard(
-                        item = item,
-                        isWatched = isWatched,
-                        isSaved = previewIsSaved,
-                        trailerEnabled = trailerPlaybackEnabled,
-                        trailerSoundEnabled = posterCardStyle.hoverPreviewTrailerSoundEnabled,
-                        trailerStartSeconds = posterCardStyle.hoverPreviewTrailerStartSeconds,
-                        trailerPlaybackSource = trailerPlaybackSource,
-                        modifier = Modifier
-                            .platformTouchScroll()
-                            .hoverable(previewInteractionSource)
-                            .onPointerEvent(PointerEventType.Scroll) {
-                                previewDismissedByScroll = true
-                                previewVisible = false
-                                popupMounted = false
-                            },
-                        onClick = onClick,
-                        onLongClick = onLongClick,
-                        onWatchedClick = onWatchedClick,
-                        onSaveClick = onSaveClick,
-                    )
-                }
+                HomePosterPreviewCard(
+                    item = item,
+                    isWatched = isWatched,
+                    isSaved = previewIsSaved,
+                    trailerEnabled = trailerPlaybackEnabled,
+                    trailerSoundEnabled = trailerSoundEnabled,
+                    trailerStartSeconds = trailerStartSeconds,
+                    trailerPlaybackSource = trailerPlaybackSource,
+                    modifier = Modifier
+                        .platformTouchScroll()
+                        .hoverable(previewInteractionSource)
+                        .onPointerEvent(PointerEventType.Scroll) {
+                            previewDismissedByScroll = true
+                            previewVisible = false
+                            popupMounted = false
+                            if (pendingTrackingRemoval == null) {
+                                onActiveChanged(false)
+                            }
+                        },
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    onWatchedClick = onWatchedClick,
+                    onSaveClick = onSaveClick,
+                )
             }
         }
     }
@@ -327,7 +370,12 @@ internal fun HomePosterHoverPreview(
     pendingTrackingRemoval?.let { pending ->
         TrackingMembershipRemovalConfirmationHost(
             pending = pending,
-            onPendingChange = { pendingTrackingRemoval = it },
+            onPendingChange = { next ->
+                pendingTrackingRemoval = next
+                if (next == null && !popupMounted) {
+                    onActiveChanged(false)
+                }
+            },
         )
     }
 }
