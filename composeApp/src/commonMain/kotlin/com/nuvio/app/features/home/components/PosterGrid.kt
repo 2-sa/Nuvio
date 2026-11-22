@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,19 +25,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import coil3.compose.LocalPlatformContext
-import coil3.request.ImageRequest
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
-import com.nuvio.app.core.poster.CustomPosterFallbackInterceptor
-import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.NuvioDesktopAnimation
+import com.nuvio.app.core.ui.NuvioDesktopImageScaling
 import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.desktopPosterHoverScale
@@ -205,39 +200,20 @@ private fun PosterGridTile(
                         zoomCornerRadius = resolvedCornerRadius,
                         hoverScaleEnabled = false,
                     ),
+                contentAlignment = Alignment.Center,
             ) {
-                if (item.poster != null) {
-                    val platformContext = LocalPlatformContext.current
-                    val hasFallback = !item.rawPosterUrl.isNullOrBlank() && item.rawPosterUrl != item.poster
-                    val imageModel = remember(item.poster, item.rawPosterUrl, platformContext) {
-                        if (hasFallback) {
-                            ImageRequest.Builder(platformContext)
-                                .data(item.poster)
-                                .memoryCacheKeyExtras(
-                                    mapOf(CustomPosterFallbackInterceptor.FALLBACK_URL_KEY to item.rawPosterUrl!!)
-                                )
-                                .build()
-                        } else {
-                            item.poster
-                        }
-                    }
-                    if (isDesktop) {
-                        NuvioAsyncImage(
-                            model = imageModel,
-                            contentDescription = item.name,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            desktopAnimation = rememberAnimatedArtworkAnimation(),
-                        )
+                PosterCardImage(
+                    imageUrl = item.poster,
+                    fallbackImageUrl = item.rawPosterUrl,
+                    title = item.name,
+                    cardShape = cardShape,
+                    desktopImageScaling = NuvioDesktopImageScaling.Poster,
+                    desktopAnimation = if (isDesktop) {
+                        rememberAnimatedArtworkAnimation()
                     } else {
-                        AsyncImage(
-                            model = imageModel,
-                            contentDescription = item.name,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                        )
-                    }
-                }
+                        NuvioDesktopAnimation.Off
+                    },
+                )
                 if (ratingText != null) {
                     HomePosterRatingPill(rating = ratingText)
                 }

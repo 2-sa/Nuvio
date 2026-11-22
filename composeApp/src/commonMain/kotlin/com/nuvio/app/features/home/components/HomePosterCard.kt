@@ -26,14 +26,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,12 +46,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.LocalPlatformContext
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.poster.CustomPosterFallbackInterceptor
 import com.nuvio.app.core.ui.DefaultPosterCardCornerRadiusDp
 import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.NuvioDesktopAnimation
+import com.nuvio.app.core.ui.NuvioDesktopImageScaling
 import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
@@ -58,10 +65,12 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.core.ui.skeleton
 import com.nuvio.app.core.ui.toDesktopAnimation
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.isDesktop
+import kotlinx.coroutines.delay
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.poster_logo_content_description
 import org.jetbrains.compose.resources.stringResource
@@ -169,42 +178,18 @@ fun HomePosterCard(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (imageUrl != null) {
-                    val platformContext = LocalPlatformContext.current
-                    val hasFallback = !fallbackImageUrl.isNullOrBlank() && fallbackImageUrl != imageUrl
-                    val imageModel = remember(imageUrl, fallbackImageUrl, platformContext) {
-                        if (hasFallback) {
-                            ImageRequest.Builder(platformContext)
-                                .data(imageUrl)
-                                .memoryCacheKeyExtras(
-                                    mapOf(CustomPosterFallbackInterceptor.FALLBACK_URL_KEY to fallbackImageUrl!!)
-                                )
-                                .build()
-                        } else {
-                            imageUrl
-                        }
-                    }
-                    NuvioAsyncImage(
-                        model = imageModel,
-                        contentDescription = item.name,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop,
-                        desktopAnimation = posterCardStyle.animatedArtworkMode.toDesktopAnimation(),
-                    )
-                } else {
-                    Text(
-                        text = item.name,
-                        modifier = Modifier.padding(horizontal = NuvioTokens.Space.s14),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            letterSpacing = 0.sp,
-                            lineHeight = 22.sp,
-                        ),
-                        color = tokens.colors.textMuted,
-                        textAlign = TextAlign.Center,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                PosterCardImage(
+                    imageUrl = imageUrl,
+                    fallbackImageUrl = fallbackImageUrl,
+                    title = item.name,
+                    cardShape = cardShape,
+                    desktopImageScaling = if (isLandscapeMode) {
+                        NuvioDesktopImageScaling.Auto
+                    } else {
+                        NuvioDesktopImageScaling.Poster
+                    },
+                    desktopAnimation = posterCardStyle.animatedArtworkMode.toDesktopAnimation(),
+                )
 
                 if (!bottomLeftLogoUrl.isNullOrBlank() || !bottomLeftText.isNullOrBlank()) {
                     val scrimBase = tokens.colors.background
@@ -291,6 +276,112 @@ fun HomePosterCard(
             }
         }
     }
+}
+
+private enum class PosterLoadState {
+    Loading,
+    Success,
+    Error,
+}
+
+@Composable
+internal fun BoxScope.PosterCardImage(
+    imageUrl: String?,
+    fallbackImageUrl: String?,
+    title: String,
+    cardShape: Shape,
+    desktopImageScaling: NuvioDesktopImageScaling,
+    desktopAnimation: NuvioDesktopAnimation,
+    modifier: Modifier = Modifier,
+) {
+    if (imageUrl != null) {
+        var loadState by remember(imageUrl) { mutableStateOf(PosterLoadState.Loading) }
+        var retryAttempt by remember(imageUrl) { mutableStateOf(0) }
+
+        LaunchedEffect(imageUrl, loadState, retryAttempt) {
+            if (loadState == PosterLoadState.Error && retryAttempt < 1) {
+                delay(2_200L)
+                loadState = PosterLoadState.Loading
+                retryAttempt += 1
+            }
+        }
+
+        val platformContext = LocalPlatformContext.current
+        val hasFallback = !fallbackImageUrl.isNullOrBlank() && fallbackImageUrl != imageUrl
+        val imageModel = remember(imageUrl, fallbackImageUrl, platformContext, retryAttempt) {
+            if (!hasFallback && retryAttempt == 0) {
+                imageUrl
+            } else {
+                val extras = buildMap {
+                    if (hasFallback) {
+                        put(CustomPosterFallbackInterceptor.FALLBACK_URL_KEY, fallbackImageUrl!!)
+                    }
+                    if (retryAttempt > 0) {
+                        put("nuvio_poster_retry", retryAttempt.toString())
+                    }
+                }
+                ImageRequest.Builder(platformContext)
+                    .data(imageUrl)
+                    .memoryCacheKeyExtras(extras)
+                    .apply {
+                        if (retryAttempt > 0) {
+                            memoryCachePolicy(CachePolicy.WRITE_ONLY)
+                        }
+                    }
+                    .build()
+            }
+        }
+
+        if (loadState == PosterLoadState.Loading) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .skeleton(shape = cardShape),
+            )
+        }
+        NuvioAsyncImage(
+            model = imageModel,
+            contentDescription = title,
+            modifier = modifier.matchParentSize(),
+            contentScale = ContentScale.Crop,
+            onLoading = { loadState = PosterLoadState.Loading },
+            onSuccess = { loadState = PosterLoadState.Success },
+            onError = { loadState = PosterLoadState.Error },
+            desktopImageScaling = desktopImageScaling,
+            desktopAnimation = desktopAnimation,
+        )
+        if (loadState == PosterLoadState.Error && retryAttempt >= 1) {
+            PosterTitleFallback(
+                title = title,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+    } else {
+        PosterTitleFallback(
+            title = title,
+            modifier = Modifier.align(Alignment.Center),
+        )
+    }
+}
+
+@Composable
+private fun PosterTitleFallback(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    Text(
+        text = title,
+        modifier = modifier.padding(horizontal = NuvioTokens.Space.s14),
+        style = MaterialTheme.typography.titleMedium.copy(
+            letterSpacing = 0.sp,
+            lineHeight = 22.sp,
+        ),
+        color = tokens.colors.textMuted,
+        textAlign = TextAlign.Center,
+        maxLines = 3,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

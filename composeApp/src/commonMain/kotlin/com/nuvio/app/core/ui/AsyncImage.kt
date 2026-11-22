@@ -13,6 +13,7 @@ import coil3.compose.AsyncImagePainter
 
 internal enum class NuvioDesktopImageScaling {
     Auto,
+    Poster,
     Disabled,
 }
 

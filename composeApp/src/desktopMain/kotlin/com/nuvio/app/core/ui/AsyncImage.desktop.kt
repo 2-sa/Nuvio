@@ -41,6 +41,7 @@ import kotlin.math.roundToInt
 
 private const val MinCustomDownscaleRatio = 1.08f
 private const val MaxDesktopSourceSizePx = 1536
+private const val MaxDesktopPosterSourceSizePx = 640
 private const val MaxScaledBitmapPixels = 1_250_000L
 
 private val IsWindowsDesktop: Boolean =
@@ -90,10 +91,15 @@ internal actual fun NuvioAsyncImage(
     val effectiveDesktopImageScaling = remember(desktopImageScaling) {
         if (IsWindowsDesktop) desktopImageScaling else NuvioDesktopImageScaling.Disabled
     }
-    val requestModel = remember(context, model, effectiveDesktopImageScaling, animated) {
+    val maxSourceSizePx = when (effectiveDesktopImageScaling) {
+        NuvioDesktopImageScaling.Auto -> MaxDesktopSourceSizePx
+        NuvioDesktopImageScaling.Poster -> MaxDesktopPosterSourceSizePx
+        NuvioDesktopImageScaling.Disabled -> null
+    }
+    val requestModel = remember(context, model, maxSourceSizePx, animated) {
         model.withDesktopImageOptions(
             context = context,
-            highQualitySize = effectiveDesktopImageScaling != NuvioDesktopImageScaling.Disabled,
+            maxSourceSizePx = maxSourceSizePx,
             animated = animated,
         )
     }
@@ -167,11 +173,11 @@ internal actual fun NuvioAsyncImage(
  */
 private fun Any?.withDesktopImageOptions(
     context: PlatformContext,
-    highQualitySize: Boolean,
+    maxSourceSizePx: Int?,
     animated: Boolean,
 ): Any? {
     if (this == null) return null
-    if (!highQualitySize && !animated) return this
+    if (maxSourceSizePx == null && !animated) return this
 
     val builder = if (this is ImageRequest) {
         newBuilder()
@@ -179,7 +185,7 @@ private fun Any?.withDesktopImageOptions(
         ImageRequest.Builder(context).data(this)
     }
     builder.apply {
-        if (highQualitySize) size(MaxDesktopSourceSizePx)
+        if (maxSourceSizePx != null) size(maxSourceSizePx)
         if (animated) {
             extras[NuvioAnimatedImageKey] = true
             memoryCacheKeyExtra("nuvio.animated", "true")
