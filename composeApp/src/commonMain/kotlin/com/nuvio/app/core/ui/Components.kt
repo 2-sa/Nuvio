@@ -126,6 +126,7 @@ fun NuvioScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .desktopSmoothWheelScroll(listState)
                 .then(scrollViewportModifier),
             contentPadding = PaddingValues(
                 start = horizontalPadding,

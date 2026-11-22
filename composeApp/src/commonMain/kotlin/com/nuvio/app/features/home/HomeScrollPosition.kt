@@ -31,8 +31,12 @@ internal fun MaintainHomeScrollPosition(
     }
 
     LaunchedEffect(profileId, listState) {
-        snapshotFlow { listState.isScrollInProgress }.collect { isScrolling ->
-            if (isScrolling) hasScrolled = true
+        snapshotFlow {
+            listState.isScrollInProgress ||
+                listState.firstVisibleItemIndex > 0 ||
+                listState.firstVisibleItemScrollOffset > 0
+        }.collect { scrolled ->
+            if (scrolled) hasScrolled = true
         }
     }
 }
