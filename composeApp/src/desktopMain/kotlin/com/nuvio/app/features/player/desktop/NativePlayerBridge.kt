@@ -150,26 +150,24 @@ internal object NativePlayerBridge {
 
     fun preloadAsync() {
         if (!preloadStarted.compareAndSet(false, true)) return
+        val shouldWarmupWebView = shouldWarmupWebViewOnStartup(DesktopHostOs.current)
         Thread {
             val controlsPage = runCatching { controlsPageAssets }
                 .getOrNull()
                 ?: return@Thread
             // Linux warms the WebKitGTK engine through the same entry point
             // (the bridge maps warmupWebView2 to a hidden WebKitGTK view).
-            if (DesktopHostOs.current == DesktopHostOs.WINDOWS ||
-                DesktopHostOs.current == DesktopHostOs.LINUX
-            ) {
+            // Windows skips startup WebView2 warmup so Chromium/msedgewebview2 does not
+            // launch and consume ~80-150 MB at idle; startWebView() initializes on playback.
+            if (shouldWarmupWebView) {
                 runCatching { warmupWebView2(controlsPage.url) }
-            }
-            if (DesktopHostOs.current == DesktopHostOs.WINDOWS) {
-                runCatching { shutdownWebView2Warmup() }
             }
         }.apply {
             name = "nuvio-native-player-preload"
             isDaemon = true
             start()
         }
-        if (DesktopHostOs.current == DesktopHostOs.LINUX) {
+        if (shouldWarmupWebView) {
             Runtime.getRuntime().addShutdownHook(
                 Thread {
                     runCatching { shutdownWebView2Warmup() }
@@ -373,6 +371,9 @@ internal object NativePlayerBridge {
         val url: String,
     )
 }
+
+internal fun shouldWarmupWebViewOnStartup(os: DesktopHostOs): Boolean =
+    os == DesktopHostOs.LINUX
 
 internal fun preloadNativePlayerBridgeAsync() {
     if (DesktopHostOs.current == DesktopHostOs.MACOS ||
