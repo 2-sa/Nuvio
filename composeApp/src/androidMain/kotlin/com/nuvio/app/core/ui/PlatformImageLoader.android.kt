@@ -5,6 +5,7 @@ import coil3.ComponentRegistry
 import coil3.ImageLoader
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
+import io.ktor.client.HttpClient
 
 internal actual fun ImageLoader.Builder.configurePlatformImageLoader(): ImageLoader.Builder =
     components {
@@ -16,5 +17,7 @@ internal actual fun ImageLoader.Builder.configurePlatformImageLoader(): ImageLoa
     }
 
 internal actual fun ComponentRegistry.Builder.addPlatformDecoders() = Unit
+
+internal actual fun createPlatformImageHttpClient(): HttpClient? = null
 
 internal actual val platformProvidesImageLoader: Boolean = true

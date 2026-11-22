@@ -11,6 +11,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.compose.setSingletonImageLoaderFactory
+import coil3.network.cachecontrol.CacheControlCacheStrategy
+import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.CachePolicy
 import coil3.request.crossfade
 import coil3.svg.SvgDecoder
@@ -19,8 +21,10 @@ import com.nuvio.app.core.ui.NativeProfileSwitcherController
 import com.nuvio.app.core.ui.NuvioTheme
 import com.nuvio.app.core.ui.nuvioTrackFocusPresence
 import com.nuvio.app.core.ui.PlatformKeyboardNavigationHost
+import com.nuvio.app.core.ui.TransientImageRetryInterceptor
 import com.nuvio.app.core.ui.addPlatformDecoders
 import com.nuvio.app.core.ui.configurePlatformImageLoader
+import com.nuvio.app.core.ui.createPlatformImageHttpClient
 import com.nuvio.app.core.ui.desktopUiScaleForWindow
 import com.nuvio.app.core.ui.platformProvidesImageLoader
 import com.nuvio.app.features.servers.plex.PlexArtworkInterceptor
@@ -28,6 +32,7 @@ import com.nuvio.app.features.servers.silo.SiloArtworkInterceptor
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import com.nuvio.app.navigation.AppRoute
 import com.nuvio.app.navigation.TabsRoute
+import io.ktor.client.HttpClient
 
 fun disposeRoute(route: AppRoute) {
     disposeRouteResources(route)
@@ -87,13 +92,15 @@ internal fun AppEnvironment(content: @Composable () -> Unit) {
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .components {
                     add(CustomPosterFallbackInterceptor())
+                    add(TransientImageRetryInterceptor())
                     add(PlexArtworkInterceptor())
                     add(SiloArtworkInterceptor())
                     addPlatformDecoders()
                     add(SvgDecoder.Factory())
                     add(
-                        coil3.network.ktor3.KtorNetworkFetcherFactory(
-                            cacheStrategy = { coil3.network.cachecontrol.CacheControlCacheStrategy() },
+                        KtorNetworkFetcherFactory(
+                            httpClient = { createPlatformImageHttpClient() ?: HttpClient() },
+                            cacheStrategy = { CacheControlCacheStrategy() },
                         ),
                     )
                 }
