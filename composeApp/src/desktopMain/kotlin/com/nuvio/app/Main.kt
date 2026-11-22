@@ -11,7 +11,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.painterResource
@@ -21,6 +23,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.deeplink.handleAppUrl
+import com.nuvio.app.core.diagnostics.DesktopMemoryManager
+import com.nuvio.app.core.diagnostics.MemoryTrimLevel
 import com.nuvio.app.core.diagnostics.SentryInitializer
 import com.nuvio.app.core.ui.NuvioTheme
 import com.nuvio.app.core.ui.ProvideDesktopWindowInsets
@@ -48,12 +52,17 @@ import com.nuvio.app.features.settings.applyDesktopRendererPreference
 import com.nuvio.app.features.settings.transparentPreviewResource
 import java.awt.Desktop
 import java.awt.Dimension
+import java.awt.event.WindowEvent
+import java.awt.event.WindowFocusListener
 import javax.imageio.ImageIO
 import java.awt.Color as AwtColor
 import javax.swing.JComponent
+import kotlinx.coroutines.delay
 
 private val NuvioDesktopNativeBackground = AwtColor(0x0D, 0x0D, 0x0D)
 private const val MacosDarkAquaAppearance = "NSAppearanceNameDarkAqua"
+private const val MinimizedMemoryTrimDelayMs = 3_000L
+private const val BackgroundMemoryTrimDelayMs = 45_000L
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
@@ -224,6 +233,35 @@ fun main(args: Array<String>) {
                     uninstallFullscreenShortcuts()
                     untrackMaximizedBounds()
                     unregisterFullscreenToggle()
+                }
+            }
+
+            var windowFocused by remember(window) { mutableStateOf(true) }
+            DisposableEffect(window) {
+                val focusListener = object : WindowFocusListener {
+                    override fun windowGainedFocus(e: WindowEvent?) {
+                        windowFocused = true
+                    }
+
+                    override fun windowLostFocus(e: WindowEvent?) {
+                        windowFocused = false
+                    }
+                }
+                window.addWindowFocusListener(focusListener)
+                onDispose {
+                    window.removeWindowFocusListener(focusListener)
+                }
+            }
+            LaunchedEffect(windowState.isMinimized) {
+                if (windowState.isMinimized) {
+                    delay(MinimizedMemoryTrimDelayMs)
+                    DesktopMemoryManager.trim(MemoryTrimLevel.Minimized)
+                }
+            }
+            LaunchedEffect(windowFocused, windowState.isMinimized) {
+                if (!windowFocused && !windowState.isMinimized) {
+                    delay(BackgroundMemoryTrimDelayMs)
+                    DesktopMemoryManager.trim(MemoryTrimLevel.Background)
                 }
             }
 

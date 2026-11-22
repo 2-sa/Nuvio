@@ -15,6 +15,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.diagnostics.MemoryTrimLevel
+import com.nuvio.app.core.diagnostics.capturePlatformMemoryDiagnostics
+import com.nuvio.app.core.diagnostics.requestPlatformMemoryTrim
 import com.nuvio.app.core.ui.DialogButton
 import com.nuvio.app.core.ui.DialogButtons
 import com.nuvio.app.core.ui.DialogButtonStyle
@@ -24,12 +27,14 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.settings_advanced_clear_cw_cache
 import nuvio.composeapp.generated.resources.settings_advanced_clear_cw_cache_done
 import nuvio.composeapp.generated.resources.settings_advanced_clear_cw_cache_subtitle
+import nuvio.composeapp.generated.resources.settings_advanced_trim_memory
 import nuvio.composeapp.generated.resources.settings_advanced_discord_rich_presence
 import nuvio.composeapp.generated.resources.settings_advanced_discord_rich_presence_description
 import nuvio.composeapp.generated.resources.settings_advanced_opengl_renderer
@@ -210,6 +215,23 @@ internal fun LazyListScope.advancedSettingsContent(
                         }
                     },
                 )
+                val initialMemorySnapshot = remember { capturePlatformMemoryDiagnostics() }
+                if (initialMemorySnapshot != null) {
+                    var memorySnapshot by remember { mutableStateOf(initialMemorySnapshot) }
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_advanced_trim_memory),
+                        description = memorySnapshot.formatSummary(),
+                        isTablet = isTablet,
+                        onClick = {
+                            requestPlatformMemoryTrim(MemoryTrimLevel.Minimized)
+                            scope.launch {
+                                delay(400L)
+                                capturePlatformMemoryDiagnostics()?.let { memorySnapshot = it }
+                            }
+                        },
+                    )
+                }
             }
         }
     }

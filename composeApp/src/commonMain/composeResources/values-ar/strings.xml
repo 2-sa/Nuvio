@@ -580,6 +580,7 @@
     <string name="settings_advanced_clear_cw_cache">مسح ذاكرة التخزين المؤقت لقائمة المتابعة</string>
     <string name="settings_advanced_clear_cw_cache_subtitle">إزالة بيانات متابعة المشاهدة المخزنة مؤقتًا وتحديث تقدم المشاهدة</string>
     <string name="settings_advanced_clear_cw_cache_done">مُسحت الذاكرة المؤقتة</string>
+    <string name="settings_advanced_trim_memory">تنظيف الذاكرة الآن</string>
     <string name="settings_licenses_attributions_section_app">ترخيص التطبيق</string>
     <string name="settings_licenses_attributions_section_data">البيانات والخدمات</string>
     <string name="settings_licenses_attributions_section_playback">ترخيص التشغيل</string>
