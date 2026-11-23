@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class ApiKeyValidationTest {
 
     @Test
-    fun detectsTmdbV4ReadAccessTokenAndGuidesUserToV3Key() = runBlocking {
+    fun detectsTmdbV4ReadAccessTokenAndGuidesUserToV3Key(): Unit = runBlocking {
         val jwt = "eyJhbGciOiJIUzI1NiJ9." + "a".repeat(60) + "." + "b".repeat(40)
         assertTrue(looksLikeTmdbV4ReadAccessToken(jwt))
         assertFalse(looksLikeTmdbV4ReadAccessToken("a8f3d91c7b2e4f80c12a6b9e0d341f77"))
@@ -24,7 +24,7 @@ class ApiKeyValidationTest {
     }
 
     @Test
-    fun validateTmdbApiKeySucceedsOn200WithImagesPayloadAndFallsBackToDefaultKey() = runBlocking {
+    fun validateTmdbApiKeySucceedsOn200WithImagesPayloadAndFallsBackToDefaultKey(): Unit = runBlocking {
         var requestedUrl = ""
         val result = validateTmdbApiKey(
             apiKey = "",
@@ -45,7 +45,7 @@ class ApiKeyValidationTest {
     }
 
     @Test
-    fun validateTmdbApiKeyMaps401And429Cleanly() = runBlocking {
+    fun validateTmdbApiKeyMaps401And429Cleanly(): Unit = runBlocking {
         val unauthorized = validateTmdbApiKey(apiKey = "badkey") { _, url ->
             RawHttpResponse(401, "Unauthorized", url, """{"status_code":7}""", emptyMap())
         }
@@ -58,7 +58,7 @@ class ApiKeyValidationTest {
     }
 
     @Test
-    fun validateMdbListApiKeyExtractsQuotaAndDetectsErrorPayload() = runBlocking {
+    fun validateMdbListApiKeyExtractsQuotaAndDetectsErrorPayload(): Unit = runBlocking {
         val valid = validateMdbListApiKey(apiKey = "mdb_live_key") { _, url ->
             RawHttpResponse(
                 status = 200,
@@ -84,7 +84,7 @@ class ApiKeyValidationTest {
     }
 
     @Test
-    fun validateCustomPosterUrlPatternChecksSchemeResolvesIdAndFallsBackFrom405HeadToGet() = runBlocking {
+    fun validateCustomPosterUrlPatternChecksSchemeResolvesIdAndFallsBackFrom405HeadToGet(): Unit = runBlocking {
         val badScheme = validateCustomPosterUrlPattern("ftp://example.com/{id}.jpg")
         assertEquals(ApiKeyTestError.InvalidUrlPattern, assertIs<ApiKeyTestResult.Failure>(badScheme).error)
 
