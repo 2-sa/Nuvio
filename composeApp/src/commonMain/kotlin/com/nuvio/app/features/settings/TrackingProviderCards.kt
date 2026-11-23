@@ -5,18 +5,31 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import com.nuvio.app.isDesktop
+import nuvio.composeapp.generated.resources.settings_tracking_status_connected
+import nuvio.composeapp.generated.resources.settings_tracking_status_disconnected
+import nuvio.composeapp.generated.resources.settings_tracking_status_pending
+import nuvio.composeapp.generated.resources.settings_tracking_status_unavailable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Sync
@@ -184,23 +197,108 @@ internal fun TrackingProviderCards(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(if (isTablet) 16.dp else 12.dp),
-    ) {
-        TraktProviderCard(
-            uiState = traktUiState,
+    if (isDesktop) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            when {
+                maxWidth >= 780.dp -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
+                    ) {
+                        TraktProviderCard(
+                            uiState = traktUiState,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                        SimklProviderCard(
+                            uiState = simklUiState,
+                            isSyncing = syncState.isLoading,
+                            syncErrorMessage = syncState.errorMessage,
+                            onSyncRequested = onSimklSyncRequested,
+                            onInfoRequested = { showSyncInfo = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                        MdbListProviderCard(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                    }
+                }
+                maxWidth >= 540.dp -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Max),
+                            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+                        ) {
+                            TraktProviderCard(
+                                uiState = traktUiState,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                            SimklProviderCard(
+                                uiState = simklUiState,
+                                isSyncing = syncState.isLoading,
+                                syncErrorMessage = syncState.errorMessage,
+                                onSyncRequested = onSimklSyncRequested,
+                                onInfoRequested = { showSyncInfo = true },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                        }
+                        MdbListProviderCard(Modifier.fillMaxWidth())
+                    }
+                }
+                else -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+                    ) {
+                        TraktProviderCard(uiState = traktUiState, modifier = Modifier.fillMaxWidth())
+                        SimklProviderCard(
+                            uiState = simklUiState,
+                            isSyncing = syncState.isLoading,
+                            syncErrorMessage = syncState.errorMessage,
+                            onSyncRequested = onSimklSyncRequested,
+                            onInfoRequested = { showSyncInfo = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        MdbListProviderCard(Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        }
+    } else {
+        Column(
             modifier = Modifier.fillMaxWidth(),
-        )
-        SimklProviderCard(
-            uiState = simklUiState,
-            isSyncing = syncState.isLoading,
-            syncErrorMessage = syncState.errorMessage,
-            onSyncRequested = onSimklSyncRequested,
-            onInfoRequested = { showSyncInfo = true },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        MdbListProviderCard(Modifier.fillMaxWidth())
+            verticalArrangement = Arrangement.spacedBy(if (isTablet) 16.dp else 12.dp),
+        ) {
+            TraktProviderCard(
+                uiState = traktUiState,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            SimklProviderCard(
+                uiState = simklUiState,
+                isSyncing = syncState.isLoading,
+                syncErrorMessage = syncState.errorMessage,
+                onSyncRequested = onSimklSyncRequested,
+                onInfoRequested = { showSyncInfo = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            MdbListProviderCard(Modifier.fillMaxWidth())
+        }
     }
 
     if (showSyncInfo) {
@@ -383,6 +481,298 @@ internal fun TrackingProviderCard(
         browserError = false
         runCatching { uriHandler.openUri(url) }
             .onFailure { browserError = true }
+    }
+
+    if (isDesktop) {
+        val cardInteraction = remember { MutableInteractionSource() }
+        val isHovered by cardInteraction.collectIsHoveredAsState()
+        val cardShape = RoundedCornerShape(14.dp)
+        val brandAccent = brand.desktopAccentColor()
+        val statusPair = when {
+            mode == TrackingConnectionCardMode.CONNECTED ->
+                stringResource(Res.string.settings_tracking_status_connected) to SettingsStatusTone.Success
+            mode == TrackingConnectionCardMode.AWAITING_APPROVAL ->
+                stringResource(Res.string.settings_tracking_status_pending) to SettingsStatusTone.Warning
+            !credentialsConfigured ->
+                stringResource(Res.string.settings_tracking_status_unavailable) to SettingsStatusTone.Neutral
+            else ->
+                stringResource(Res.string.settings_tracking_status_disconnected) to SettingsStatusTone.Neutral
+        }
+
+        val hasWebsiteAction = !websiteLabel.isNullOrBlank() && !websiteUrl.isNullOrBlank()
+        val hasDisconnectAction = mode == TrackingConnectionCardMode.CONNECTED
+        val hasInfoAction = mode == TrackingConnectionCardMode.CONNECTED &&
+            infoLabel != null && onInfoRequested != null
+
+        Column(
+            modifier = modifier
+                .clip(cardShape)
+                .background(
+                    if (isHovered) tokens.colors.surfacePopover else tokens.colors.surfaceCard,
+                    cardShape,
+                )
+                .border(
+                    width = tokens.borders.thin,
+                    color = when {
+                        isHovered -> brandAccent.copy(alpha = 0.50f)
+                        mode == TrackingConnectionCardMode.CONNECTED -> brandAccent.copy(alpha = 0.32f)
+                        else -> tokens.colors.borderSubtle
+                    },
+                    shape = cardShape,
+                )
+                .hoverable(cardInteraction),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(brand.desktopTopBarBrush()),
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 16.dp,
+                            bottom = if (hasWebsiteAction || hasDisconnectAction || hasInfoAction) 8.dp else 16.dp,
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TrackingBrandWordmark(
+                            brand = brand,
+                            contentDescription = brand.displayName,
+                            compact = true,
+                        )
+                        SettingsStatusPill(
+                            label = statusPair.first,
+                            tone = statusPair.second,
+                        )
+                    }
+
+                    when (mode) {
+                        TrackingConnectionCardMode.CONNECTED -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = connectedLabel,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = tokens.colors.textPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = connectedDescription,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tokens.colors.textSecondary,
+                                )
+                            }
+                            if (syncLabel != null && onSyncRequested != null) {
+                                OutlinedButton(
+                                    onClick = onSyncRequested,
+                                    enabled = !isLoading && !isSyncing,
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(tokens.borders.thin, brandAccent.copy(alpha = 0.45f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = brandAccent.copy(alpha = 0.12f),
+                                        contentColor = tokens.colors.textPrimary,
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier
+                                        .heightIn(min = 38.dp)
+                                        .pointerHoverIcon(PointerIcon.Hand),
+                                ) {
+                                    if (isSyncing) {
+                                        NuvioLoadingIndicator(
+                                            color = tokens.colors.textPrimary,
+                                            modifier = Modifier.size(15.dp),
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Sync,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(syncLabel, style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+
+                        TrackingConnectionCardMode.AWAITING_APPROVAL -> {
+                            Text(
+                                text = finishSignInLabel,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = tokens.colors.textPrimary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = approvalDescription,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = tokens.colors.textSecondary,
+                            )
+                            displayedApprovalCode?.takeIf(String::isNotBlank)?.let { code ->
+                                TrackingApprovalCode(
+                                    code = code,
+                                    url = approvalUrl,
+                                    onCopy = {
+                                        clipboardManager.setText(AnnotatedString(code))
+                                        localStatusMessage = approvalCodeCopiedMessage
+                                    },
+                                )
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Button(
+                                    onClick = { actionScope.launch { openUrl(onResumeAuthorization()) } },
+                                    enabled = !isLoading,
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = tokens.colors.accent,
+                                        contentColor = tokens.colors.onAccent,
+                                    ),
+                                    modifier = Modifier
+                                        .heightIn(min = 38.dp)
+                                        .pointerHoverIcon(PointerIcon.Hand),
+                                ) {
+                                    Text(openLoginLabel, style = MaterialTheme.typography.labelLarge)
+                                }
+                                TextButton(
+                                    onClick = onCancelAuthorization,
+                                    enabled = !isLoading,
+                                    modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+                                ) {
+                                    Text(stringResource(Res.string.action_cancel))
+                                }
+                            }
+                        }
+
+                        TrackingConnectionCardMode.DISCONNECTED -> {
+                            Text(
+                                text = if (credentialsConfigured) signInDescription else missingCredentialsMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = tokens.colors.textSecondary,
+                            )
+                            if (credentialsConfigured) {
+                                Button(
+                                    onClick = { actionScope.launch { openUrl(onConnectRequested()) } },
+                                    enabled = !isLoading,
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = brandAccent,
+                                        contentColor = Color.White,
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                    modifier = Modifier
+                                        .heightIn(min = 38.dp)
+                                        .pointerHoverIcon(PointerIcon.Hand),
+                                ) {
+                                    if (isLoading) {
+                                        NuvioLoadingIndicator(
+                                            color = Color.White,
+                                            modifier = Modifier.size(15.dp),
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Text(connectLabel, style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+                    }
+
+                    (localStatusMessage ?: statusMessage)?.takeIf(String::isNotBlank)?.let { message ->
+                        TrackingBrandMessage(text = message, isError = false)
+                    }
+                    errorMessage?.takeIf(String::isNotBlank)?.let { message ->
+                        TrackingBrandMessage(text = message, isError = true)
+                    }
+                    if (browserError) {
+                        TrackingBrandMessage(text = failedOpenBrowserMessage, isError = true)
+                    }
+                }
+            }
+
+            if (hasWebsiteAction || hasDisconnectAction || hasInfoAction) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (hasWebsiteAction) {
+                        TextButton(
+                            onClick = { openUrl(websiteUrl) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.textButtonColors(contentColor = tokens.colors.accent),
+                            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+                        ) {
+                            Text(
+                                text = websiteLabel.orEmpty(),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (hasInfoAction) {
+                        TextButton(
+                            onClick = { onInfoRequested?.invoke() },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.textButtonColors(contentColor = tokens.colors.textSecondary),
+                            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+                        ) {
+                            Text(
+                                text = infoLabel.orEmpty(),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (hasDisconnectAction) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = { showDisconnectDialog = true },
+                            enabled = !isLoading && !isSyncing,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = Color(0xFFF87171),
+                                disabledContentColor = tokens.colors.textMuted,
+                            ),
+                            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+                        ) {
+                            Text(
+                                text = disconnectLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showDisconnectDialog) {
+            TrackingDisconnectDialog(
+                brand = brand,
+                onConfirm = {
+                    showDisconnectDialog = false
+                    onDisconnect()
+                },
+                onDismiss = { showDisconnectDialog = false },
+            )
+        }
+        return
     }
 
     Box(
@@ -795,6 +1185,7 @@ internal fun TrackingBrandGlyph(
 private fun TrackingBrandWordmark(
     brand: TrackingBrand,
     contentDescription: String,
+    compact: Boolean = false,
 ) {
     val painter: Painter = when (brand) {
         TrackingBrand.TRAKT -> traktBrandPainter(TraktBrandAsset.Wordmark)
@@ -809,12 +1200,14 @@ private fun TrackingBrandWordmark(
         contentDescription = contentDescription,
         modifier = when (brand) {
             TrackingBrand.TRAKT -> Modifier
-                .width(86.dp)
-                .height(38.dp)
+                .width(if (compact) 68.dp else 86.dp)
+                .height(if (compact) 28.dp else 38.dp)
             TrackingBrand.SIMKL -> Modifier
-                .width(124.dp)
-                .height(30.dp)
-            TrackingBrand.MDBLIST -> Modifier.width(130.dp).height(32.dp)
+                .width(if (compact) 94.dp else 124.dp)
+                .height(if (compact) 24.dp else 30.dp)
+            TrackingBrand.MDBLIST -> Modifier
+                .width(if (compact) 104.dp else 130.dp)
+                .height(if (compact) 26.dp else 32.dp)
             TrackingBrand.NUVIO,
             TrackingBrand.TMDB,
             -> Modifier
@@ -822,6 +1215,30 @@ private fun TrackingBrandWordmark(
         contentScale = ContentScale.Fit,
         alignment = Alignment.CenterStart,
     )
+}
+
+private fun TrackingBrand.desktopAccentColor(): Color = when (this) {
+    TrackingBrand.TRAKT -> Color(0xFFED1C24)
+    TrackingBrand.SIMKL -> Color(0xFF9CA3AF)
+    TrackingBrand.MDBLIST -> Color(0xFF3B82F6)
+    TrackingBrand.NUVIO,
+    TrackingBrand.TMDB,
+    -> Color(0xFF60A5FA)
+}
+
+private fun TrackingBrand.desktopTopBarBrush(): Brush = when (this) {
+    TrackingBrand.TRAKT -> Brush.horizontalGradient(
+        colors = listOf(Color(0xFFED1C24), Color(0xFF9F42C6)),
+    )
+    TrackingBrand.SIMKL -> Brush.horizontalGradient(
+        colors = listOf(Color(0xFF737373), Color(0xFF404040)),
+    )
+    TrackingBrand.MDBLIST -> Brush.horizontalGradient(
+        colors = listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8)),
+    )
+    TrackingBrand.NUVIO,
+    TrackingBrand.TMDB,
+    -> Brush.horizontalGradient(colors = listOf(Color(0xFF60A5FA), Color(0xFF3B82F6)))
 }
 
 private fun TrackingBrand.cardBrush(): Brush = when (this) {

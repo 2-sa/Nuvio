@@ -72,55 +72,63 @@ import org.jetbrains.compose.resources.stringResource
 internal fun LazyListScope.advancedSettingsContent(
     isTablet: Boolean,
     rememberLastProfileEnabled: Boolean,
+    desktopTab: DesktopSettingsWorkspaceTab? = null,
 ) {
-    item {
-        SettingsSection(
-            title = stringResource(Res.string.settings_advanced_section_startup),
-            isTablet = isTablet,
-        ) {
-            SettingsGroup(isTablet = isTablet) {
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_advanced_remember_last_profile),
-                    description = stringResource(Res.string.settings_advanced_remember_last_profile_description),
-                    checked = rememberLastProfileEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = ProfileRepository::setRememberLastProfileEnabled,
-                )
-            }
-        }
-    }
-    if (DesktopRendererSettings.isSupported) {
-        item {
-            val externallyControlled = remember { DesktopRendererSettings.isExternallyControlled }
-            var useOpenGl by remember { mutableStateOf(DesktopRendererSettings.useOpenGl) }
+    val showPerformanceAndGraphics =
+        desktopTab == null || desktopTab == DesktopSettingsWorkspaceTab.PerformanceAndGraphics
+    val showPrivacyAndDiagnostics =
+        desktopTab == null || desktopTab == DesktopSettingsWorkspaceTab.PrivacyAndDiagnostics
 
+    if (showPerformanceAndGraphics) {
+        item {
             SettingsSection(
-                title = stringResource(Res.string.settings_advanced_section_windows_graphics),
+                title = stringResource(Res.string.settings_advanced_section_startup),
                 isTablet = isTablet,
             ) {
                 SettingsGroup(isTablet = isTablet) {
                     SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_advanced_opengl_renderer),
-                        description = stringResource(
-                            if (externallyControlled) {
-                                Res.string.settings_advanced_opengl_renderer_external_description
-                            } else {
-                                Res.string.settings_advanced_opengl_renderer_description
-                            },
-                        ),
-                        checked = useOpenGl,
-                        enabled = !externallyControlled,
+                        title = stringResource(Res.string.settings_advanced_remember_last_profile),
+                        description = stringResource(Res.string.settings_advanced_remember_last_profile_description),
+                        checked = rememberLastProfileEnabled,
                         isTablet = isTablet,
-                        onCheckedChange = { enabled ->
-                            DesktopRendererSettings.setUseOpenGl(enabled)
-                            useOpenGl = enabled
-                        },
+                        onCheckedChange = ProfileRepository::setRememberLastProfileEnabled,
                     )
                 }
             }
         }
+        if (DesktopRendererSettings.isSupported) {
+            item {
+                val externallyControlled = remember { DesktopRendererSettings.isExternallyControlled }
+                var useOpenGl by remember { mutableStateOf(DesktopRendererSettings.useOpenGl) }
+
+                SettingsSection(
+                    title = stringResource(Res.string.settings_advanced_section_windows_graphics),
+                    isTablet = isTablet,
+                ) {
+                    SettingsGroup(isTablet = isTablet) {
+                        SettingsSwitchRow(
+                            title = stringResource(Res.string.settings_advanced_opengl_renderer),
+                            description = stringResource(
+                                if (externallyControlled) {
+                                    Res.string.settings_advanced_opengl_renderer_external_description
+                                } else {
+                                    Res.string.settings_advanced_opengl_renderer_description
+                                },
+                            ),
+                            checked = useOpenGl,
+                            enabled = !externallyControlled,
+                            isTablet = isTablet,
+                            onCheckedChange = { enabled ->
+                                DesktopRendererSettings.setUseOpenGl(enabled)
+                                useOpenGl = enabled
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
-    if (SentrySettingsRepository.isSupported) {
+    if (showPrivacyAndDiagnostics && SentrySettingsRepository.isSupported) {
         item {
             val sentryEnabledFlow = remember {
                 SentrySettingsRepository.ensureLoaded()
@@ -163,7 +171,7 @@ internal fun LazyListScope.advancedSettingsContent(
             }
         }
     }
-    if (DiscordRichPresenceRepository.isSupported) {
+    if (showPerformanceAndGraphics && DiscordRichPresenceRepository.isSupported) {
         item {
             val discordEnabledFlow = remember {
                 DiscordRichPresenceRepository.ensureLoaded()
@@ -187,50 +195,52 @@ internal fun LazyListScope.advancedSettingsContent(
             }
         }
     }
-    item {
-        SettingsSection(
-            title = stringResource(Res.string.settings_advanced_section_cache),
-            isTablet = isTablet,
-        ) {
-            SettingsGroup(isTablet = isTablet) {
-                val scope = rememberCoroutineScope()
-                var cleared by rememberSaveable { mutableStateOf(false) }
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_advanced_clear_cw_cache),
-                    description = if (cleared) {
-                        stringResource(Res.string.settings_advanced_clear_cw_cache_done)
-                    } else {
-                        stringResource(Res.string.settings_advanced_clear_cw_cache_subtitle)
-                    },
-                    isTablet = isTablet,
-                    onClick = {
-                        if (!cleared) {
-                            ContinueWatchingEnrichmentCache.clearAll(ProfileRepository.activeProfileId)
-                            cleared = true
-                            scope.launch {
-                                WatchProgressRepository.clearLocalAndForceSnapshotRefreshFromServer(
-                                    ProfileRepository.activeProfileId,
-                                )
-                            }
-                        }
-                    },
-                )
-                val initialMemorySnapshot = remember { capturePlatformMemoryDiagnostics() }
-                if (initialMemorySnapshot != null) {
-                    var memorySnapshot by remember { mutableStateOf(initialMemorySnapshot) }
-                    SettingsGroupDivider(isTablet = isTablet)
+    if (showPerformanceAndGraphics) {
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.settings_advanced_section_cache),
+                isTablet = isTablet,
+            ) {
+                SettingsGroup(isTablet = isTablet) {
+                    val scope = rememberCoroutineScope()
+                    var cleared by rememberSaveable { mutableStateOf(false) }
                     SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_advanced_trim_memory),
-                        description = memorySnapshot.formatSummary(),
+                        title = stringResource(Res.string.settings_advanced_clear_cw_cache),
+                        description = if (cleared) {
+                            stringResource(Res.string.settings_advanced_clear_cw_cache_done)
+                        } else {
+                            stringResource(Res.string.settings_advanced_clear_cw_cache_subtitle)
+                        },
                         isTablet = isTablet,
                         onClick = {
-                            requestPlatformMemoryTrim(MemoryTrimLevel.Minimized)
-                            scope.launch {
-                                delay(400L)
-                                capturePlatformMemoryDiagnostics()?.let { memorySnapshot = it }
+                            if (!cleared) {
+                                ContinueWatchingEnrichmentCache.clearAll(ProfileRepository.activeProfileId)
+                                cleared = true
+                                scope.launch {
+                                    WatchProgressRepository.clearLocalAndForceSnapshotRefreshFromServer(
+                                        ProfileRepository.activeProfileId,
+                                    )
+                                }
                             }
                         },
                     )
+                    val initialMemorySnapshot = remember { capturePlatformMemoryDiagnostics() }
+                    if (initialMemorySnapshot != null) {
+                        var memorySnapshot by remember { mutableStateOf(initialMemorySnapshot) }
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_advanced_trim_memory),
+                            description = memorySnapshot.formatSummary(),
+                            isTablet = isTablet,
+                            onClick = {
+                                requestPlatformMemoryTrim(MemoryTrimLevel.Minimized)
+                                scope.launch {
+                                    delay(400L)
+                                    capturePlatformMemoryDiagnostics()?.let { memorySnapshot = it }
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }

@@ -2,120 +2,33 @@ package com.nuvio.app.features.settings
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DesktopSettingsNavigationTest {
-    @Test
-    fun sectionsAppearInExactOrderWithExpectedDestinations() {
-        val sections = buildDesktopSettingsNavSections(
-            showPlugins = true,
-            showNotifications = true,
-            showSwitchProfile = true,
-            showWatchParty = true,
-        )
-
-        assertEquals(
-            listOf(
-                SettingsCategory.You,
-                SettingsCategory.Look,
-                SettingsCategory.Watch,
-                SettingsCategory.Services,
-                SettingsCategory.System,
-            ),
-            sections.map { it.category },
-        )
-
-        val allIds = sections.flatMap { section -> section.items.map { it.id } }
-        assertEquals(allIds.size, allIds.distinct().size)
-
-        assertEquals(
-            listOf(
-                DesktopSettingsDestination.Page(SettingsPage.Account),
-                DesktopSettingsDestination.SwitchProfile,
-                DesktopSettingsDestination.WatchParty,
-            ),
-            sections[0].items.map { it.destination },
-        )
-        assertEquals(
-            listOf(
-                DesktopSettingsDestination.Page(SettingsPage.Appearance),
-                DesktopSettingsDestination.Page(SettingsPage.Homescreen),
-                DesktopSettingsDestination.Page(SettingsPage.Layout),
-                DesktopSettingsDestination.Page(SettingsPage.PosterCustomization),
-                DesktopSettingsDestination.Page(SettingsPage.MetaScreen),
-                DesktopSettingsDestination.Page(SettingsPage.ContinueWatching),
-                DesktopSettingsDestination.Page(SettingsPage.HoverPreview),
-            ),
-            sections[1].items.map { it.destination },
-        )
-        assertEquals(
-            listOf(
-                DesktopSettingsDestination.Page(SettingsPage.Playback),
-                DesktopSettingsDestination.Page(SettingsPage.Streams),
-                DesktopSettingsDestination.Page(SettingsPage.Addons),
-                DesktopSettingsDestination.Page(SettingsPage.Plugins),
-                DesktopSettingsDestination.Page(SettingsPage.MediaServers),
-                DesktopSettingsDestination.Collections,
-            ),
-            sections[2].items.map { it.destination },
-        )
-        assertEquals(
-            listOf(
-                DesktopSettingsDestination.Page(SettingsPage.TraktAuthentication),
-                DesktopSettingsDestination.Page(SettingsPage.TmdbEnrichment),
-                DesktopSettingsDestination.Page(SettingsPage.MdbListRatings),
-                DesktopSettingsDestination.Page(SettingsPage.Debrid),
-            ),
-            sections[3].items.map { it.destination },
-        )
-        assertEquals(
-            listOf(
-                DesktopSettingsDestination.Page(SettingsPage.Notifications),
-                DesktopSettingsDestination.Page(SettingsPage.Advanced),
-                DesktopSettingsDestination.Page(SettingsPage.About),
-            ),
-            sections[4].items.map { it.destination },
-        )
-    }
 
     @Test
-    fun featureFlagsIncludeAndExcludeOptionalItemsAccurately() {
-        val minimal = buildDesktopSettingsNavSections(
-            showPlugins = false,
-            showNotifications = false,
-            showSwitchProfile = false,
-            showWatchParty = false,
+    fun consolidatedSidebarHasFourGroupsAndElevenUniqueWorkspaces() {
+        val sections = buildDesktopSettingsNavSections()
+
+        assertEquals(
+            listOf(
+                DesktopSettingsGroup.Look,
+                DesktopSettingsGroup.Playback,
+                DesktopSettingsGroup.Services,
+                DesktopSettingsGroup.AccountSystem,
+            ),
+            sections.map { it.group },
         )
-        val minimalDestinations = minimal.flatMap { section -> section.items.map { it.destination } }.toSet()
 
-        assertFalse(DesktopSettingsDestination.SwitchProfile in minimalDestinations)
-        assertFalse(DesktopSettingsDestination.WatchParty in minimalDestinations)
-        assertFalse(DesktopSettingsDestination.Page(SettingsPage.Plugins) in minimalDestinations)
-        assertFalse(DesktopSettingsDestination.Page(SettingsPage.Notifications) in minimalDestinations)
-        assertTrue(DesktopSettingsDestination.Page(SettingsPage.Account) in minimalDestinations)
-        assertTrue(DesktopSettingsDestination.Collections in minimalDestinations)
-        assertTrue(DesktopSettingsDestination.Page(SettingsPage.About) in minimalDestinations)
-
-        val withPluginsOnly = buildDesktopSettingsNavSections(
-            showPlugins = true,
-            showNotifications = false,
-            showSwitchProfile = false,
-            showWatchParty = false,
-        ).flatMap { it.items }.map { it.destination }.toSet()
-        assertTrue(DesktopSettingsDestination.Page(SettingsPage.Plugins) in withPluginsOnly)
-        assertFalse(DesktopSettingsDestination.Page(SettingsPage.Notifications) in withPluginsOnly)
-
-        val withNotificationsOnly = buildDesktopSettingsNavSections(
-            showPlugins = false,
-            showNotifications = true,
-            showSwitchProfile = false,
-            showWatchParty = false,
-        ).flatMap { it.items }.map { it.destination }.toSet()
-        assertTrue(DesktopSettingsDestination.Page(SettingsPage.Notifications) in withNotificationsOnly)
-        assertFalse(DesktopSettingsDestination.Page(SettingsPage.Plugins) in withNotificationsOnly)
+        val allItems = sections.flatMap { it.items }
+        assertEquals(11, allItems.size)
+        assertEquals(allItems.size, allItems.map { it.id }.distinct().size)
+        assertEquals(
+            DesktopSettingsWorkspace.entries,
+            allItems.map { it.workspace },
+        )
     }
 
     @Test
@@ -129,39 +42,90 @@ class DesktopSettingsNavigationTest {
     }
 
     @Test
-    fun resolveDesktopSidebarSelectedPageMapsEveryEntryToExistingSidebarItem() {
-        val sidebarPages = buildDesktopSettingsNavSections(
-            showPlugins = true,
-            showNotifications = true,
-            showSwitchProfile = true,
-            showWatchParty = true,
-        )
+    fun resolveDesktopWorkspaceRouteCoversEverySettingsPageWithValidSidebarDestination() {
+        val sidebarPages = buildDesktopSettingsNavSections()
             .flatMap { it.items }
             .mapNotNull { (it.destination as? DesktopSettingsDestination.Page)?.page }
             .toSet()
 
         SettingsPage.entries.forEach { page ->
-            val resolved = resolveDesktopSidebarSelectedPage(page)
+            val route = resolveDesktopWorkspaceRoute(page)
+            val resolvedPrimary = resolveDesktopSidebarSelectedPage(page)
+            assertEquals(route.workspace.primaryPage, resolvedPrimary)
             assertTrue(
-                resolved in sidebarPages,
-                "Expected $page -> $resolved to exist in desktop sidebar pages",
+                resolvedPrimary in sidebarPages,
+                "Expected $page -> $resolvedPrimary to exist in desktop sidebar pages",
             )
+            val tabs = desktopWorkspaceTabs(
+                workspace = route.workspace,
+                showPlugins = true,
+                showNotifications = true,
+                showSentry = true,
+            )
+            if (route.selectedTab != null) {
+                assertTrue(
+                    route.selectedTab in tabs,
+                    "Expected $page tab ${route.selectedTab} to belong to ${route.workspace}",
+                )
+            }
         }
-
-        assertEquals(SettingsPage.Appearance, resolveDesktopSidebarSelectedPage(SettingsPage.Root))
-        assertEquals(SettingsPage.Playback, resolveDesktopSidebarSelectedPage(SettingsPage.PlaybackAudio))
-        assertEquals(SettingsPage.Playback, resolveDesktopSidebarSelectedPage(SettingsPage.PlaybackSubtitles))
-        assertEquals(SettingsPage.MediaServers, resolveDesktopSidebarSelectedPage(SettingsPage.MediaServer))
-        assertEquals(SettingsPage.Addons, resolveDesktopSidebarSelectedPage(SettingsPage.ContentDiscovery))
-        assertEquals(SettingsPage.TmdbEnrichment, resolveDesktopSidebarSelectedPage(SettingsPage.Integrations))
-        assertEquals(SettingsPage.About, resolveDesktopSidebarSelectedPage(SettingsPage.SupportersContributors))
-        assertEquals(SettingsPage.About, resolveDesktopSidebarSelectedPage(SettingsPage.LicensesAttributions))
     }
 
     @Test
-    fun resolveDesktopParentPageOnlyReturnsParentForSubChildPages() {
-        assertEquals(SettingsPage.Playback, resolveDesktopParentPage(SettingsPage.PlaybackAudio))
-        assertEquals(SettingsPage.Playback, resolveDesktopParentPage(SettingsPage.PlaybackPlayer))
+    fun mergedPagesRouteToExpectedConsolidatedWorkspaceAndTab() {
+        // Layout merges into Appearance & Nav
+        assertEquals(
+            DesktopSettingsWorkspace.AppearanceAndNav,
+            resolveDesktopWorkspaceRoute(SettingsPage.Layout).workspace,
+        )
+
+        // HoverPreview + PosterCustomization merge into Posters & Preview tab of Home & Cards
+        val hoverRoute = resolveDesktopWorkspaceRoute(SettingsPage.HoverPreview)
+        assertEquals(DesktopSettingsWorkspace.HomeAndCards, hoverRoute.workspace)
+        assertEquals(DesktopSettingsWorkspaceTab.PostersAndPreview, hoverRoute.selectedTab)
+
+        // Streams merges into Playback & Streams -> Streams & Badges tab
+        val streamsRoute = resolveDesktopWorkspaceRoute(SettingsPage.Streams)
+        assertEquals(DesktopSettingsWorkspace.PlaybackAndStreams, streamsRoute.workspace)
+        assertEquals(DesktopSettingsWorkspaceTab.StreamsAndBadges, streamsRoute.selectedTab)
+
+        // MDBList Ratings merges into Metadata & Ratings -> MDBList tab
+        val mdbRoute = resolveDesktopWorkspaceRoute(SettingsPage.MdbListRatings)
+        assertEquals(DesktopSettingsWorkspace.MetadataAndRatings, mdbRoute.workspace)
+        assertEquals(DesktopSettingsWorkspaceTab.MdbList, mdbRoute.selectedTab)
+
+        // Plugins merges into Addons & Plugins -> Plugins tab
+        val pluginsRoute = resolveDesktopWorkspaceRoute(SettingsPage.Plugins)
+        assertEquals(DesktopSettingsWorkspace.AddonsAndPlugins, pluginsRoute.workspace)
+        assertEquals(DesktopSettingsWorkspaceTab.Plugins, pluginsRoute.selectedTab)
+
+        // Notifications merges into System & Performance -> Notifications tab
+        val notificationsRoute = resolveDesktopWorkspaceRoute(SettingsPage.Notifications)
+        assertEquals(DesktopSettingsWorkspace.SystemAndPerformance, notificationsRoute.workspace)
+        assertEquals(DesktopSettingsWorkspaceTab.Notifications, notificationsRoute.selectedTab)
+    }
+
+    @Test
+    fun desktopWorkspaceTabsRespectFeatureFlags() {
+        val addonsNoPlugins = desktopWorkspaceTabs(
+            workspace = DesktopSettingsWorkspace.AddonsAndPlugins,
+            showPlugins = false,
+            showNotifications = false,
+            showSentry = false,
+        )
+        assertEquals(listOf(DesktopSettingsWorkspaceTab.Addons), addonsNoPlugins)
+
+        val systemMinimal = desktopWorkspaceTabs(
+            workspace = DesktopSettingsWorkspace.SystemAndPerformance,
+            showPlugins = false,
+            showNotifications = false,
+            showSentry = false,
+        )
+        assertEquals(listOf(DesktopSettingsWorkspaceTab.PerformanceAndGraphics), systemMinimal)
+    }
+
+    @Test
+    fun resolveDesktopParentPageOnlyReturnsParentForStandaloneSubDetails() {
         assertEquals(SettingsPage.MediaServers, resolveDesktopParentPage(SettingsPage.MediaServer))
         assertEquals(SettingsPage.About, resolveDesktopParentPage(SettingsPage.SupportersContributors))
         assertEquals(SettingsPage.About, resolveDesktopParentPage(SettingsPage.LicensesAttributions))
@@ -169,13 +133,14 @@ class DesktopSettingsNavigationTest {
         listOf(
             SettingsPage.Appearance,
             SettingsPage.Homescreen,
-            SettingsPage.Layout,
             SettingsPage.Playback,
+            SettingsPage.PlaybackAudio,
             SettingsPage.Addons,
             SettingsPage.TmdbEnrichment,
+            SettingsPage.MdbListRatings,
             SettingsPage.About,
-        ).forEach { directPage ->
-            assertNull(resolveDesktopParentPage(directPage))
+        ).forEach { tabbedOrRootPage ->
+            assertNull(resolveDesktopParentPage(tabbedOrRootPage))
         }
     }
 

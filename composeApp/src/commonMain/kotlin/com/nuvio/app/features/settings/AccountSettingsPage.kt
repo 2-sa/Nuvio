@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -33,28 +36,77 @@ import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
-import nuvio.composeapp.generated.resources.compose_settings_page_account
 import nuvio.composeapp.generated.resources.auth_account_deletion_failed
+import nuvio.composeapp.generated.resources.compose_settings_page_account
+import nuvio.composeapp.generated.resources.compose_settings_root_switch_profile_title
+import nuvio.composeapp.generated.resources.party_title
 import nuvio.composeapp.generated.resources.settings_account_delete_account
 import nuvio.composeapp.generated.resources.settings_account_delete_account_description
 import nuvio.composeapp.generated.resources.settings_account_delete_confirm_message
 import nuvio.composeapp.generated.resources.settings_account_delete_confirm_title
 import nuvio.composeapp.generated.resources.settings_account_email
 import nuvio.composeapp.generated.resources.settings_account_not_signed_in
+import nuvio.composeapp.generated.resources.settings_account_quick_actions
 import nuvio.composeapp.generated.resources.settings_account_sign_out
 import nuvio.composeapp.generated.resources.settings_account_sign_out_confirm_message
 import nuvio.composeapp.generated.resources.settings_account_sign_out_confirm_title
 import nuvio.composeapp.generated.resources.settings_account_status
 import nuvio.composeapp.generated.resources.settings_account_status_anonymous
 import nuvio.composeapp.generated.resources.settings_account_status_signed_in
+import nuvio.composeapp.generated.resources.settings_account_switch_profile_desc
+import nuvio.composeapp.generated.resources.settings_account_watch_party_desc
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.accountSettingsContent(
     isTablet: Boolean,
+    onSwitchProfile: (() -> Unit)? = null,
+    onWatchPartyClick: (() -> Unit)? = null,
 ) {
+    if (isDesktop && (onSwitchProfile != null || onWatchPartyClick != null)) {
+        item(key = "desktop-account-quick-actions") {
+            val switchProfileTitle = stringResource(Res.string.compose_settings_root_switch_profile_title)
+            val switchProfileDesc = stringResource(Res.string.settings_account_switch_profile_desc)
+            val watchPartyTitle = stringResource(Res.string.party_title)
+            val watchPartyDesc = stringResource(Res.string.settings_account_watch_party_desc)
+            val quickActions = buildList {
+                if (onSwitchProfile != null) {
+                    add(
+                        SettingsBentoItem(
+                            id = "switch-profile",
+                            title = switchProfileTitle,
+                            description = switchProfileDesc,
+                            icon = Icons.Default.People,
+                            onClick = onSwitchProfile,
+                        ),
+                    )
+                }
+                if (onWatchPartyClick != null) {
+                    add(
+                        SettingsBentoItem(
+                            id = "watch-party",
+                            title = watchPartyTitle,
+                            description = watchPartyDesc,
+                            icon = Icons.Rounded.Groups,
+                            onClick = onWatchPartyClick,
+                        ),
+                    )
+                }
+            }
+            SettingsSection(
+                title = stringResource(Res.string.settings_account_quick_actions),
+                isTablet = isTablet,
+            ) {
+                SettingsBentoGrid(
+                    items = quickActions,
+                    isTablet = isTablet,
+                )
+            }
+        }
+    }
     item {
         AccountSettingsBody(isTablet = isTablet)
     }

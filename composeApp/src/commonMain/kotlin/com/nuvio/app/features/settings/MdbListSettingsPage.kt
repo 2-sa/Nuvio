@@ -1,39 +1,36 @@
 package com.nuvio.app.features.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.features.mdblist.MdbListMetadataService
 import com.nuvio.app.features.mdblist.MdbListSettings
 import com.nuvio.app.features.mdblist.MdbListSettingsRepository
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
-import nuvio.composeapp.generated.resources.action_save
-import nuvio.composeapp.generated.resources.settings_mdb_ratings_credentials_required
-import nuvio.composeapp.generated.resources.settings_mdb_ratings_key_override_description
-import nuvio.composeapp.generated.resources.settings_mdb_ratings_connected_account
+import nuvio.composeapp.generated.resources.settings_api_key_status_account
+import nuvio.composeapp.generated.resources.settings_api_key_status_not_set
+import nuvio.composeapp.generated.resources.settings_api_key_status_personal
 import nuvio.composeapp.generated.resources.settings_mdb_api_key_label
 import nuvio.composeapp.generated.resources.settings_mdb_api_key_title
 import nuvio.composeapp.generated.resources.settings_mdb_enable_ratings
 import nuvio.composeapp.generated.resources.settings_mdb_enable_ratings_description
+import nuvio.composeapp.generated.resources.settings_mdb_ratings_connected_account
+import nuvio.composeapp.generated.resources.settings_mdb_ratings_credentials_required
+import nuvio.composeapp.generated.resources.settings_mdb_ratings_key_override_description
 import nuvio.composeapp.generated.resources.settings_mdb_section_api_key
 import nuvio.composeapp.generated.resources.settings_mdb_section_rating_providers
 import nuvio.composeapp.generated.resources.settings_mdb_section_title
 import nuvio.composeapp.generated.resources.settings_mdb_show_on_hero
 import nuvio.composeapp.generated.resources.settings_mdb_show_on_hero_description
+import nuvio.composeapp.generated.resources.settings_modules_disable_all
+import nuvio.composeapp.generated.resources.settings_modules_enable_all
 import nuvio.composeapp.generated.resources.source_audience_score
 import nuvio.composeapp.generated.resources.source_imdb
 import nuvio.composeapp.generated.resources.source_letterboxd
@@ -42,7 +39,6 @@ import nuvio.composeapp.generated.resources.source_metacritic
 import nuvio.composeapp.generated.resources.source_rotten_tomatoes
 import nuvio.composeapp.generated.resources.source_tmdb
 import nuvio.composeapp.generated.resources.source_trakt
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.mdbListSettingsContent(
@@ -52,10 +48,7 @@ internal fun LazyListScope.mdbListSettingsContent(
     val providerControlsEnabled = settings.enabled
 
     item {
-        SettingsSection(
-            title = stringResource(Res.string.settings_mdb_section_title),
-            isTablet = isTablet,
-        ) {
+        val controlsContent: @Composable () -> Unit = {
             SettingsGroup(isTablet = isTablet) {
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_mdb_enable_ratings),
@@ -82,132 +75,106 @@ internal fun LazyListScope.mdbListSettingsContent(
                 }
             }
         }
+        if (isDesktop) {
+            controlsContent()
+        } else {
+            SettingsSection(
+                title = stringResource(Res.string.settings_mdb_section_title),
+                isTablet = isTablet,
+            ) {
+                controlsContent()
+            }
+        }
     }
 
     item {
+        val usingConnectedAccount = settings.accountScope != null && !settings.hasApiKey
+        val statusLabelRes = when {
+            settings.hasApiKey -> Res.string.settings_api_key_status_personal
+            usingConnectedAccount -> Res.string.settings_api_key_status_account
+            else -> Res.string.settings_api_key_status_not_set
+        }
+        val statusTone = when {
+            settings.hasApiKey || usingConnectedAccount -> SettingsStatusTone.Success
+            else -> SettingsStatusTone.Warning
+        }
+
         SettingsSection(
             title = stringResource(Res.string.settings_mdb_section_api_key),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                MdbListApiKeyRow(
+                SettingsApiKeyCard(
+                    title = stringResource(Res.string.settings_mdb_api_key_title),
+                    description = stringResource(Res.string.settings_mdb_ratings_key_override_description),
+                    placeholder = stringResource(Res.string.settings_mdb_api_key_label),
+                    savedValue = settings.apiKey,
+                    statusLabel = stringResource(statusLabelRes),
+                    statusTone = statusTone,
                     isTablet = isTablet,
-                    value = settings.apiKey,
-                    usingConnectedAccount = settings.accountScope != null && !settings.hasApiKey,
-                    onApiKeyCommitted = MdbListSettingsRepository::setApiKey,
+                    supportsDefaultFallback = false,
+                    supportingNote = if (usingConnectedAccount) {
+                        stringResource(Res.string.settings_mdb_ratings_connected_account)
+                    } else {
+                        null
+                    },
+                    onSave = MdbListSettingsRepository::setApiKey,
+                    onTestKey = { candidate -> validateMdbListApiKey(candidate) },
                 )
             }
         }
     }
 
     item {
+        val providers = listOf(
+            MdbListMetadataService.PROVIDER_IMDB to Res.string.source_imdb,
+            MdbListMetadataService.PROVIDER_TMDB to Res.string.source_tmdb,
+            MdbListMetadataService.PROVIDER_TOMATOES to Res.string.source_rotten_tomatoes,
+            MdbListMetadataService.PROVIDER_METACRITIC to Res.string.source_metacritic,
+            MdbListMetadataService.PROVIDER_TRAKT to Res.string.source_trakt,
+            MdbListMetadataService.PROVIDER_LETTERBOXD to Res.string.source_letterboxd,
+            MdbListMetadataService.PROVIDER_AUDIENCE to Res.string.source_audience_score,
+            MdbListMetadataService.PROVIDER_MAL to Res.string.source_mal,
+        )
+        val allProvidersEnabled = providers.all { (id, _) -> settings.isProviderEnabled(id) }
+
         SettingsSection(
             title = stringResource(Res.string.settings_mdb_section_rating_providers),
             isTablet = isTablet,
+            actions = {
+                if (providerControlsEnabled) {
+                    NuvioActionLabel(
+                        text = stringResource(
+                            if (allProvidersEnabled) {
+                                Res.string.settings_modules_disable_all
+                            } else {
+                                Res.string.settings_modules_enable_all
+                            },
+                        ),
+                        onClick = {
+                            val target = !allProvidersEnabled
+                            providers.forEach { (id, _) ->
+                                MdbListSettingsRepository.setProviderEnabled(id, target)
+                            }
+                        },
+                    )
+                }
+            },
         ) {
-            SettingsGroup(isTablet = isTablet) {
-                ProviderRows(
-                    isTablet = isTablet,
-                    settings = settings,
-                    controlsEnabled = providerControlsEnabled,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProviderRows(
-    isTablet: Boolean,
-    settings: MdbListSettings,
-    controlsEnabled: Boolean,
-) {
-    val providers = listOf(
-        MdbListMetadataService.PROVIDER_IMDB to Res.string.source_imdb,
-        MdbListMetadataService.PROVIDER_TMDB to Res.string.source_tmdb,
-        MdbListMetadataService.PROVIDER_TOMATOES to Res.string.source_rotten_tomatoes,
-        MdbListMetadataService.PROVIDER_METACRITIC to Res.string.source_metacritic,
-        MdbListMetadataService.PROVIDER_TRAKT to Res.string.source_trakt,
-        MdbListMetadataService.PROVIDER_LETTERBOXD to Res.string.source_letterboxd,
-        MdbListMetadataService.PROVIDER_AUDIENCE to Res.string.source_audience_score,
-        MdbListMetadataService.PROVIDER_MAL to Res.string.source_mal,
-    )
-
-    providers.forEachIndexed { index, (providerId, providerLabelRes) ->
-        SettingsSwitchRow(
-            title = stringResource(providerLabelRes),
-            checked = settings.isProviderEnabled(providerId),
-            enabled = controlsEnabled,
-            isTablet = isTablet,
-            onCheckedChange = { checked ->
-                MdbListSettingsRepository.setProviderEnabled(providerId, checked)
-            },
-        )
-        if (index < providers.lastIndex) {
-            SettingsGroupDivider(isTablet = isTablet)
-        }
-    }
-}
-
-@Composable
-private fun MdbListApiKeyRow(
-    isTablet: Boolean,
-    value: String,
-    usingConnectedAccount: Boolean,
-    onApiKeyCommitted: (String) -> Unit,
-) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalPadding = if (isTablet) 16.dp else 14.dp
-    var draft by rememberSaveable(value) { mutableStateOf(value) }
-    val normalizedDraft = draft.trim()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = stringResource(Res.string.settings_mdb_api_key_title),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = stringResource(Res.string.settings_mdb_ratings_key_override_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (usingConnectedAccount) {
-            Text(
-                text = stringResource(Res.string.settings_mdb_ratings_connected_account),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-
-        SettingsSecretTextField(
-            value = draft,
-            onValueChange = {
-                draft = it
-            },
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(Res.string.settings_mdb_api_key_label),
-        )
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = {
-                    draft = normalizedDraft
-                    onApiKeyCommitted(normalizedDraft)
+            SettingsToggleGrid(
+                items = providers.map { (providerId, providerLabelRes) ->
+                    SettingsToggleGridItem(
+                        id = providerId,
+                        title = stringResource(providerLabelRes),
+                        checked = settings.isProviderEnabled(providerId),
+                        enabled = providerControlsEnabled,
+                        onCheckedChange = { checked ->
+                            MdbListSettingsRepository.setProviderEnabled(providerId, checked)
+                        },
+                    )
                 },
-                enabled = normalizedDraft != value,
-            ) {
-                Text(stringResource(Res.string.action_save))
-            }
+                isTablet = isTablet,
+            )
         }
     }
 }

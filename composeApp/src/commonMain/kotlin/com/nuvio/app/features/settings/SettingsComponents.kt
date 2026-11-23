@@ -771,9 +771,9 @@ internal fun DesktopSettingsSidebarSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester = remember { FocusRequester() },
 ) {
     val tokens = MaterialTheme.nuvio
-    val focusRequester = remember { FocusRequester() }
     val containerInteraction = remember { MutableInteractionSource() }
     val isHovered by containerInteraction.collectIsHoveredAsState()
     var isFocused by remember { mutableStateOf(false) }
@@ -873,6 +873,19 @@ internal fun DesktopSettingsSidebarSearchBar(
                     modifier = Modifier.size(NuvioTokens.Icon.xs),
                 )
             }
+        } else if (!isFocused) {
+            Surface(
+                color = tokens.colors.surfaceElevated,
+                shape = RoundedCornerShape(6.dp),
+                border = BorderStroke(tokens.borders.hairline, tokens.colors.borderSubtle),
+            ) {
+                Text(
+                    text = "Ctrl+K",
+                    style = MaterialTheme.nuvioTypeScale.labelXs.copy(fontSize = 10.sp),
+                    color = tokens.colors.textMuted,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
         }
     }
 }
@@ -888,16 +901,16 @@ internal fun DesktopSettingsSidebarSectionHeader(
         modifier = modifier
             .fillMaxWidth()
             .padding(
-                top = NuvioTokens.Space.s14,
-                bottom = NuvioTokens.Space.s6,
-                start = NuvioTokens.Space.s12,
-                end = NuvioTokens.Space.s12,
+                top = NuvioTokens.Space.s10,
+                bottom = NuvioTokens.Space.s4,
+                start = NuvioTokens.Space.s10,
+                end = NuvioTokens.Space.s10,
             ),
         style = MaterialTheme.nuvioTypeScale.labelXs.copy(
-            fontSize = 11.sp,
+            fontSize = 10.5.sp,
             fontWeight = FontWeight.SemiBold,
         ),
-        color = tokens.colors.textMuted,
+        color = tokens.colors.textMuted.copy(alpha = 0.85f),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -946,7 +959,7 @@ internal fun DesktopSettingsSidebarItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(38.dp)
+            .height(35.dp)
             .clip(itemShape)
             .background(background, itemShape)
             .border(tokens.borders.thin, borderColor, itemShape)
@@ -1344,4 +1357,281 @@ internal fun SettingsBentoTile(
         }
     }
 }
+
+internal enum class SettingsStatusTone {
+    Success,
+    Warning,
+    Error,
+    Neutral,
+}
+
+@Composable
+internal fun SettingsStatusPill(
+    label: String,
+    tone: SettingsStatusTone,
+    modifier: Modifier = Modifier,
+    showDot: Boolean = true,
+) {
+    val tokens = MaterialTheme.nuvio
+    val tint = when (tone) {
+        SettingsStatusTone.Success -> Color(0xFF34D399)
+        SettingsStatusTone.Warning -> Color(0xFFFBBF24)
+        SettingsStatusTone.Error -> Color(0xFFF87171)
+        SettingsStatusTone.Neutral -> tokens.colors.textSecondary
+    }
+    val container = when (tone) {
+        SettingsStatusTone.Neutral -> tokens.colors.surfaceElevated
+        else -> tint.copy(alpha = 0.13f)
+    }
+    val border = when (tone) {
+        SettingsStatusTone.Neutral -> tokens.colors.borderSubtle
+        else -> tint.copy(alpha = 0.34f)
+    }
+
+    Surface(
+        modifier = modifier,
+        color = container,
+        shape = RoundedCornerShape(NuvioTokens.Radius.full),
+        border = BorderStroke(tokens.borders.thin, border),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (showDot) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(tint),
+                )
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.nuvioTypeScale.labelXs.copy(
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = tint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun DesktopSettingsTabBar(
+    tabs: List<DesktopSettingsWorkspaceTab>,
+    selectedTab: DesktopSettingsWorkspaceTab?,
+    onTabSelected: (DesktopSettingsWorkspaceTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (tabs.size <= 1) return
+    val tokens = MaterialTheme.nuvio
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+    ) {
+        tabs.forEach { tab ->
+            val isSelected = tab == selectedTab
+            val interactionSource = remember { MutableInteractionSource() }
+            val isHovered by interactionSource.collectIsHoveredAsState()
+            val shape = RoundedCornerShape(NuvioTokens.Radius.full)
+            val background = when {
+                isSelected -> tokens.colors.accent
+                isHovered -> tokens.colors.surfacePopover
+                else -> tokens.colors.surfaceCard
+            }
+            val borderColor = when {
+                isSelected -> tokens.colors.accent
+                isHovered -> tokens.colors.accent.copy(alpha = 0.42f)
+                else -> tokens.colors.borderSubtle
+            }
+            val textColor = when {
+                isSelected -> tokens.colors.onAccent
+                isHovered -> tokens.colors.textPrimary
+                else -> tokens.colors.textSecondary
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(shape)
+                    .background(background, shape)
+                    .border(tokens.borders.thin, borderColor, shape)
+                    .hoverable(interactionSource)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .nuvioFocusBorder(shape)
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        role = Role.Tab,
+                        onClick = { onTabSelected(tab) },
+                    )
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+            ) {
+                Text(
+                    text = stringResource(tab.labelRes),
+                    style = MaterialTheme.nuvioTypeScale.labelSm.copy(
+                        fontSize = 12.5.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    ),
+                    color = textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+internal data class SettingsToggleGridItem(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val checked: Boolean,
+    val enabled: Boolean = true,
+    val onCheckedChange: (Boolean) -> Unit,
+)
+
+@Composable
+internal fun SettingsToggleGrid(
+    items: List<SettingsToggleGridItem>,
+    isTablet: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (items.isEmpty()) return
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        if (isDesktop && maxWidth >= 640.dp) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+            ) {
+                items.chunked(2).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
+                    ) {
+                        rowItems.forEach { item ->
+                            SettingsToggleCardTile(
+                                item = item,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                        }
+                        if (rowItems.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else {
+            SettingsGroup(isTablet = isTablet) {
+                items.forEachIndexed { index, item ->
+                    if (index > 0) SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = item.title,
+                        description = item.description,
+                        checked = item.checked,
+                        enabled = item.enabled,
+                        isTablet = isTablet,
+                        onCheckedChange = item.onCheckedChange,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleCardTile(
+    item: SettingsToggleGridItem,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val tileShape = RoundedCornerShape(12.dp)
+    val borderColor = when {
+        item.enabled && isHovered -> tokens.colors.accent.copy(alpha = 0.45f)
+        item.enabled && item.checked -> tokens.colors.accent.copy(alpha = 0.22f)
+        else -> tokens.colors.borderSubtle
+    }
+    val containerColor = if (item.enabled && isHovered) {
+        tokens.colors.surfacePopover
+    } else {
+        tokens.colors.surfaceCard
+    }
+
+    Row(
+        modifier = modifier
+            .clip(tileShape)
+            .background(containerColor, tileShape)
+            .border(tokens.borders.thin, borderColor, tileShape)
+            .then(
+                if (item.enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .nuvioFocusBorder(tileShape)
+            .clickable(
+                enabled = item.enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = { item.onCheckedChange(!item.checked) },
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .alpha(if (item.enabled) 1f else tokens.opacity.medium),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s3),
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = tokens.colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!item.description.isNullOrBlank()) {
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 17.sp),
+                    color = tokens.colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Switch(
+            checked = item.checked,
+            onCheckedChange = item.onCheckedChange,
+            enabled = item.enabled,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = tokens.colors.onAccent,
+                checkedTrackColor = tokens.colors.accent,
+                uncheckedThumbColor = tokens.colors.textMuted,
+                uncheckedTrackColor = tokens.colors.surfaceElevated,
+                uncheckedBorderColor = tokens.colors.borderSubtle,
+            ),
+        )
+    }
+}
+
 

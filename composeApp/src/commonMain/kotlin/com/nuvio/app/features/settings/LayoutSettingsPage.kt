@@ -222,7 +222,7 @@ internal fun LazyListScope.layoutSettingsContent(
 }
 
 @Composable
-private fun LayoutNavigationBarSection(
+internal fun LayoutNavigationBarSection(
     isTablet: Boolean,
     liquidGlassNativeTabBarSupported: Boolean,
 ) {

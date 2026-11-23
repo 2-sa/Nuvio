@@ -51,6 +51,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -72,6 +79,7 @@ import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.ScreenActivityEffect
+import com.nuvio.app.core.ui.desktopSmoothWheelScroll
 import com.nuvio.app.core.ui.isLiquidGlassNativeTabBarSupported
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioContentEntry
@@ -1309,32 +1317,56 @@ private fun DesktopSettingsScreen(
         NuvioTokens.Space.s28
     }
 
-    val selectedSidebarPage = resolveDesktopSidebarSelectedPage(page)
+    val route = resolveDesktopWorkspaceRoute(page)
+    val selectedSidebarPage = route.workspace.primaryPage
     val parentPage = resolveDesktopParentPage(page)
     var settingsSearchQuery by rememberSaveable { mutableStateOf("") }
+    var systemTabOverride by remember { mutableStateOf<DesktopSettingsWorkspaceTab?>(null) }
     val watchPartyRowClick = watchPartyRow(onWatchPartyClick)
-    val navSections = remember(onSwitchProfile != null, watchPartyRowClick != null) {
-        buildDesktopSettingsNavSections(
-            showPlugins = AppFeaturePolicy.pluginsEnabled,
-            showNotifications = AppFeaturePolicy.notificationsEnabled,
-            showSwitchProfile = onSwitchProfile != null,
-            showWatchParty = watchPartyRowClick != null,
-        )
-    }
+    val navSections = remember { buildDesktopSettingsNavSections() }
     val allSidebarItems = remember(navSections) { navSections.flatMap { it.items } }
     val firstSidebarItemId = allSidebarItems.firstOrNull()?.id
     val lastSidebarItemId = allSidebarItems.lastOrNull()?.id
     val sidebarEntryRequester = remember { FocusRequester() }
+    val searchFocusRequester = remember { FocusRequester() }
     val sidebarListState = rememberLazyListState()
     val saveableStateHolder = rememberSaveableStateHolder()
     val bottomOverlayPadding = LocalNuvioBottomNavigationOverlayPadding.current
 
+    val workspaceTabs = remember(
+        route.workspace,
+        AppFeaturePolicy.pluginsEnabled,
+        AppFeaturePolicy.notificationsEnabled,
+        SentrySettingsRepository.isSupported,
+    ) {
+        desktopWorkspaceTabs(
+            workspace = route.workspace,
+            showPlugins = AppFeaturePolicy.pluginsEnabled,
+            showNotifications = AppFeaturePolicy.notificationsEnabled,
+            showSentry = SentrySettingsRepository.isSupported,
+        )
+    }
+    val activeTab = if (
+        route.workspace == DesktopSettingsWorkspace.SystemAndPerformance &&
+        page == SettingsPage.Advanced &&
+        systemTabOverride != null &&
+        systemTabOverride in workspaceTabs
+    ) {
+        systemTabOverride
+    } else {
+        route.selectedTab?.takeIf { it in workspaceTabs } ?: workspaceTabs.firstOrNull()
+    }
+
     LaunchedEffect(page) {
         settingsSearchQuery = ""
+        if (route.workspace != DesktopSettingsWorkspace.SystemAndPerformance || page != SettingsPage.Advanced) {
+            systemTabOverride = null
+        }
     }
 
     fun handleSearchTarget(target: SettingsSearchTarget) {
         settingsSearchQuery = ""
+        systemTabOverride = null
         when (target) {
             is SettingsSearchTarget.Page -> {
                 if (target.page.isEnabledByPolicy()) {
@@ -1350,11 +1382,22 @@ private fun DesktopSettingsScreen(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(tokens.colors.background),
+            .background(tokens.colors.background)
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    keyEvent.key == Key.K &&
+                    (keyEvent.isCtrlPressed || keyEvent.isMetaPressed)
+                ) {
+                    searchFocusRequester.requestFocus()
+                    true
+                } else {
+                    false
+                }
+            },
     ) {
         Surface(
             modifier = Modifier
-                .width(296.dp)
+                .width(264.dp)
                 .fillMaxHeight(),
             color = tokens.colors.surfaceElevated,
         ) {
@@ -1366,16 +1409,16 @@ private fun DesktopSettingsScreen(
                         .fillMaxWidth()
                         .padding(
                             top = desktopSidebarTopOffset,
-                            start = NuvioTokens.Space.s16,
-                            end = NuvioTokens.Space.s16,
-                            bottom = NuvioTokens.Space.s12,
+                            start = NuvioTokens.Space.s14,
+                            end = NuvioTokens.Space.s14,
+                            bottom = NuvioTokens.Space.s10,
                         ),
-                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
                 ) {
                     Text(
                         text = stringResource(Res.string.compose_settings_page_root),
                         style = MaterialTheme.nuvioTypeScale.titleMd.copy(
-                            fontSize = 22.sp,
+                            fontSize = 21.sp,
                             fontWeight = FontWeight.Bold,
                         ),
                         color = tokens.colors.textPrimary,
@@ -1383,6 +1426,7 @@ private fun DesktopSettingsScreen(
                     DesktopSettingsSidebarSearchBar(
                         query = settingsSearchQuery,
                         onQueryChange = { settingsSearchQuery = it },
+                        focusRequester = searchFocusRequester,
                     )
                 }
 
@@ -1398,19 +1442,21 @@ private fun DesktopSettingsScreen(
                 ) {
                     LazyColumn(
                         state = sidebarListState,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .desktopSmoothWheelScroll(sidebarListState),
                         contentPadding = PaddingValues(
                             start = NuvioTokens.Space.s10,
                             end = NuvioTokens.Space.s10,
-                            top = NuvioTokens.Space.s4,
-                            bottom = NuvioTokens.Space.s12,
+                            top = NuvioTokens.Space.s2,
+                            bottom = NuvioTokens.Space.s10,
                         ),
                         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s2),
                     ) {
                         navSections.forEach { section ->
-                            item(key = "header-${section.category.name}") {
+                            item(key = "header-${section.group.name}") {
                                 DesktopSettingsSidebarSectionHeader(
-                                    title = stringResource(section.category.labelRes),
+                                    title = stringResource(section.group.labelRes),
                                 )
                             }
                             items(
@@ -1421,6 +1467,7 @@ private fun DesktopSettingsScreen(
                                     item.destination == DesktopSettingsDestination.Page(selectedSidebarPage)
                                 val onItemClick: () -> Unit = {
                                     settingsSearchQuery = ""
+                                    systemTabOverride = null
                                     when (val dest = item.destination) {
                                         is DesktopSettingsDestination.Page -> onPageChange(dest.page)
                                         DesktopSettingsDestination.SwitchProfile -> onSwitchProfile?.invoke()
@@ -1472,12 +1519,13 @@ private fun DesktopSettingsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s12),
+                        .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s10),
                 ) {
                     DesktopSettingsSidebarVersionCard(
                         onCheckForUpdatesClick = onCheckForUpdatesClick,
                         onOpenAboutClick = {
                             settingsSearchQuery = ""
+                            systemTabOverride = null
                             onPageChange(SettingsPage.About)
                         },
                     )
@@ -1493,7 +1541,12 @@ private fun DesktopSettingsScreen(
         )
 
         val isSearchActive = settingsSearchQuery.isNotBlank()
-        val detailStateKey = if (isSearchActive) "desktop-search" else page.name
+        val detailStateKey = when {
+            isSearchActive -> "desktop-search"
+            route.subDetailPage != null -> route.subDetailPage.name
+            activeTab != null -> "${route.workspace.name}:${activeTab.id}"
+            else -> route.workspace.name
+        }
         saveableStateHolder.SaveableStateProvider(detailStateKey) {
             val detailListState = rememberLazyListState()
             ScreenActivityEffect(detailListState) { screenActive ->
@@ -1526,8 +1579,8 @@ private fun DesktopSettingsScreen(
                             ),
                         ),
                 )
-                val baseHorizontalPadding = NuvioTokens.Space.s40
-                val maxContentWidth = 960.dp
+                val baseHorizontalPadding = NuvioTokens.Space.s36
+                val maxContentWidth = 1040.dp
                 val contentHorizontalPadding = if (maxWidth > maxContentWidth + baseHorizontalPadding * 2) {
                     (maxWidth - maxContentWidth) / 2
                 } else {
@@ -1535,7 +1588,9 @@ private fun DesktopSettingsScreen(
                 }
                 LazyColumn(
                     state = detailListState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .desktopSmoothWheelScroll(detailListState),
                     contentPadding = PaddingValues(
                         start = contentHorizontalPadding,
                         top = detailTopOffset,
@@ -1581,20 +1636,54 @@ private fun DesktopSettingsScreen(
                     } else {
                         if (showInternalHeader) {
                             item(key = "desktop-page-header") {
-                                val onParentClick: (() -> Unit)? = parentPage?.let { targetParent ->
-                                    { onPageChange(targetParent) }
+                                val subDetail = route.subDetailPage
+                                if (subDetail != null) {
+                                    val onParentClick: (() -> Unit)? = parentPage?.let { targetParent ->
+                                        { onPageChange(targetParent) }
+                                    }
+                                    DesktopSettingsPageHeader(
+                                        title = stringResource(subDetail.titleRes),
+                                        subtitle = desktopSettingsSubtitleRes(subDetail)?.let { stringResource(it) },
+                                        icon = subDetail.icon,
+                                        parentTitle = parentPage?.let {
+                                            stringResource(resolveDesktopWorkspaceRoute(it).workspace.titleRes)
+                                        },
+                                        onParentClick = onParentClick,
+                                    )
+                                } else {
+                                    DesktopSettingsPageHeader(
+                                        title = stringResource(route.workspace.titleRes),
+                                        subtitle = stringResource(route.workspace.subtitleRes),
+                                        icon = route.workspace.icon,
+                                    )
                                 }
-                                DesktopSettingsPageHeader(
-                                    title = stringResource(page.titleRes),
-                                    subtitle = desktopSettingsSubtitleRes(page)?.let { stringResource(it) },
-                                    icon = page.icon,
-                                    parentTitle = parentPage?.let { stringResource(it.titleRes) },
-                                    onParentClick = onParentClick,
+                            }
+                        }
+                        if (route.subDetailPage == null && workspaceTabs.size > 1) {
+                            item(key = "desktop-workspace-tabs") {
+                                val onTabSelected: (DesktopSettingsWorkspaceTab) -> Unit = { tab ->
+                                    if (route.workspace == DesktopSettingsWorkspace.SystemAndPerformance &&
+                                        tab.targetPage == SettingsPage.Advanced
+                                    ) {
+                                        systemTabOverride = tab
+                                        if (page != SettingsPage.Advanced) {
+                                            onPageChange(SettingsPage.Advanced)
+                                        }
+                                    } else {
+                                        systemTabOverride = null
+                                        onPageChange(tab.targetPage)
+                                    }
+                                }
+                                DesktopSettingsTabBar(
+                                    tabs = workspaceTabs,
+                                    selectedTab = activeTab,
+                                    onTabSelected = onTabSelected,
                                 )
                             }
                         }
-                        settingsDetailPageContent(
-                            page = page,
+                        desktopSettingsWorkspaceContent(
+                            route = route,
+                            activeTab = activeTab,
                             onPageChange = onPageChange,
                             onNavigateBack = onNavigateBack,
                             rememberLastProfileEnabled = rememberLastProfileEnabled,
@@ -1626,6 +1715,8 @@ private fun DesktopSettingsScreen(
                             metaScreenSettingsUiState = metaScreenSettingsUiState,
                             continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
                             posterCardStyleUiState = posterCardStyleUiState,
+                            onSwitchProfile = onSwitchProfile,
+                            onWatchPartyClick = watchPartyRowClick,
                             onCheckForUpdatesClick = onCheckForUpdatesClick,
                             onTestUpdateBannerClick = onTestUpdateBannerClick,
                             onCollectionsClick = onCollectionsClick,
@@ -1640,6 +1731,187 @@ private fun DesktopSettingsScreen(
                         .padding(top = detailTopOffset, bottom = 8.dp, end = 4.dp),
                 )
             }
+        }
+    }
+}
+
+private fun LazyListScope.desktopSettingsWorkspaceContent(
+    route: DesktopSettingsWorkspaceRoute,
+    activeTab: DesktopSettingsWorkspaceTab?,
+    onPageChange: (SettingsPage) -> Unit,
+    onNavigateBack: () -> Unit,
+    rememberLastProfileEnabled: Boolean,
+    selectedTheme: AppTheme,
+    onThemeSelected: (AppTheme) -> Unit,
+    amoledEnabled: Boolean,
+    onAmoledToggle: (Boolean) -> Unit,
+    liquidGlassNativeTabBarSupported: Boolean,
+    appIconState: AppIconSettingsState,
+    onAppIconSelected: (AppIconOption) -> Unit,
+    onAppIconFailureDismissed: () -> Unit,
+    selectedAppLanguage: AppLanguage,
+    onAppLanguageSelected: (AppLanguage) -> Unit,
+    episodeReleaseNotificationsUiState: EpisodeReleaseNotificationsUiState,
+    tmdbSettings: TmdbSettings,
+    mdbListSettings: MdbListSettings,
+    debridSettings: DebridSettings,
+    traktAuthUiState: TraktAuthUiState,
+    simklAuthUiState: SimklAuthUiState,
+    traktCommentsEnabled: Boolean,
+    mdbListConnected: Boolean,
+    trackingSettingsUiState: TrackingSettingsUiState,
+    homescreenHeroEnabled: Boolean,
+    homescreenShowCatalogType: Boolean,
+    homescreenHideUnreleasedContent: Boolean,
+    homescreenItems: List<HomeCatalogSettingsItem>,
+    homescreenCatalogLoading: Boolean,
+    homescreenCatalogErrorMessage: String?,
+    metaScreenSettingsUiState: MetaScreenSettingsUiState,
+    continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
+    posterCardStyleUiState: PosterCardStyleUiState,
+    onSwitchProfile: (() -> Unit)?,
+    onWatchPartyClick: (() -> Unit)?,
+    onCheckForUpdatesClick: (() -> Unit)?,
+    onTestUpdateBannerClick: (() -> Unit)?,
+    onCollectionsClick: () -> Unit,
+) {
+    when (route.workspace) {
+        DesktopSettingsWorkspace.AppearanceAndNav -> {
+            appearanceSettingsContent(
+                isTablet = true,
+                selectedTheme = selectedTheme,
+                onThemeSelected = onThemeSelected,
+                amoledEnabled = amoledEnabled,
+                onAmoledToggle = onAmoledToggle,
+                appIconState = appIconState,
+                onAppIconSelected = onAppIconSelected,
+                onAppIconFailureDismissed = onAppIconFailureDismissed,
+                selectedAppLanguage = selectedAppLanguage,
+                onAppLanguageSelected = onAppLanguageSelected,
+            )
+            item(key = "desktop-appearance-navigation") {
+                LayoutNavigationBarSection(
+                    isTablet = true,
+                    liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
+                )
+            }
+        }
+        DesktopSettingsWorkspace.HomeAndCards -> when (activeTab) {
+            DesktopSettingsWorkspaceTab.ContinueWatching -> continueWatchingSettingsContent(
+                isTablet = true,
+                isVisible = continueWatchingPreferencesUiState.isVisible,
+                style = continueWatchingPreferencesUiState.style,
+                upNextFromFurthestEpisode = continueWatchingPreferencesUiState.upNextFromFurthestEpisode,
+                useEpisodeThumbnails = continueWatchingPreferencesUiState.useEpisodeThumbnails,
+                showUnairedNextUp = continueWatchingPreferencesUiState.showUnairedNextUp,
+                blurNextUp = continueWatchingPreferencesUiState.blurNextUp,
+                showResumePromptOnLaunch = continueWatchingPreferencesUiState.showResumePromptOnLaunch,
+                sortMode = continueWatchingPreferencesUiState.sortMode,
+                clickAction = continueWatchingPreferencesUiState.clickAction,
+            )
+            DesktopSettingsWorkspaceTab.PostersAndPreview -> {
+                posterCustomizationSettingsContent(
+                    isTablet = true,
+                    uiState = posterCardStyleUiState,
+                )
+                hoverPreviewSettingsContent(
+                    isTablet = true,
+                    uiState = posterCardStyleUiState,
+                )
+            }
+            DesktopSettingsWorkspaceTab.DetailsPage -> metaScreenSettingsContent(
+                isTablet = true,
+                uiState = metaScreenSettingsUiState,
+            )
+            else -> homescreenSettingsContent(
+                isTablet = true,
+                heroEnabled = homescreenHeroEnabled,
+                showCatalogType = homescreenShowCatalogType,
+                hideUnreleasedContent = homescreenHideUnreleasedContent,
+                items = homescreenItems,
+                isCatalogLoading = homescreenCatalogLoading,
+                catalogErrorMessage = homescreenCatalogErrorMessage,
+            )
+        }
+        DesktopSettingsWorkspace.PlaybackAndStreams -> desktopPlaybackTabContent(
+            tab = activeTab ?: DesktopSettingsWorkspaceTab.PlayerAndVideo,
+            isTablet = true,
+        )
+        DesktopSettingsWorkspace.AddonsAndPlugins -> when (activeTab) {
+            DesktopSettingsWorkspaceTab.Plugins -> if (AppFeaturePolicy.pluginsEnabled) {
+                pluginsSettingsContent()
+            } else {
+                addonsSettingsContent()
+            }
+            else -> addonsSettingsContent()
+        }
+        DesktopSettingsWorkspace.ServersAndCollections -> when (route.subDetailPage) {
+            SettingsPage.MediaServer -> mediaServerSettingsContent(
+                isTablet = true,
+                onBack = onNavigateBack,
+            )
+            else -> mediaServersSettingsContent(
+                isTablet = true,
+                onServerClick = { onPageChange(SettingsPage.MediaServer) },
+                onCollectionsClick = onCollectionsClick,
+            )
+        }
+        DesktopSettingsWorkspace.TrackingAndSync -> trackingSettingsContent(
+            isTablet = true,
+            traktUiState = traktAuthUiState,
+            simklUiState = simklAuthUiState,
+            settingsUiState = trackingSettingsUiState,
+            commentsEnabled = traktCommentsEnabled,
+            mdbListConnected = mdbListConnected,
+            onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+        )
+        DesktopSettingsWorkspace.MetadataAndRatings -> when (activeTab) {
+            DesktopSettingsWorkspaceTab.MdbList -> mdbListSettingsContent(
+                isTablet = true,
+                settings = mdbListSettings,
+            )
+            else -> tmdbSettingsContent(
+                isTablet = true,
+                settings = tmdbSettings,
+            )
+        }
+        DesktopSettingsWorkspace.DebridServices -> debridSettingsContent(
+            isTablet = true,
+            settings = debridSettings,
+        )
+        DesktopSettingsWorkspace.AccountAndProfiles -> accountSettingsContent(
+            isTablet = true,
+            onSwitchProfile = onSwitchProfile,
+            onWatchPartyClick = onWatchPartyClick,
+        )
+        DesktopSettingsWorkspace.SystemAndPerformance -> when (activeTab) {
+            DesktopSettingsWorkspaceTab.Notifications -> notificationsSettingsContent(
+                isTablet = true,
+                uiState = episodeReleaseNotificationsUiState,
+            )
+            else -> advancedSettingsContent(
+                isTablet = true,
+                rememberLastProfileEnabled = rememberLastProfileEnabled,
+                desktopTab = activeTab,
+            )
+        }
+        DesktopSettingsWorkspace.AboutAndUpdates -> when (route.subDetailPage) {
+            SettingsPage.SupportersContributors -> {
+                if (AppFeaturePolicy.supportersContributorsPageEnabled) {
+                    supportersContributorsContent(isTablet = true)
+                }
+            }
+            SettingsPage.LicensesAttributions -> licensesAttributionsContent(
+                isTablet = true,
+            )
+            else -> aboutSettingsContent(
+                isTablet = true,
+                onSupportersContributorsClick = { onPageChange(SettingsPage.SupportersContributors) },
+                onLicensesAttributionsClick = { onPageChange(SettingsPage.LicensesAttributions) },
+                onCheckForUpdatesClick = onCheckForUpdatesClick,
+                onTestUpdateBannerClick = onTestUpdateBannerClick,
+                showSupportersContributorsPage = AppFeaturePolicy.supportersContributorsPageEnabled,
+            )
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +28,9 @@ import com.nuvio.app.features.servers.ServerProviders
 import com.nuvio.app.features.servers.ServerRepository
 import com.nuvio.app.features.servers.plex.PlexProvider
 import com.nuvio.app.features.servers.silo.SiloProvider
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.collections_header
 import nuvio.composeapp.generated.resources.emby_logo
 import nuvio.composeapp.generated.resources.jellyfin_logo
 import nuvio.composeapp.generated.resources.plex_add_description
@@ -36,6 +39,8 @@ import nuvio.composeapp.generated.resources.servers_add_description
 import nuvio.composeapp.generated.resources.servers_empty
 import nuvio.composeapp.generated.resources.servers_section_add
 import nuvio.composeapp.generated.resources.servers_section_connected
+import nuvio.composeapp.generated.resources.settings_content_discovery_collections_description
+import nuvio.composeapp.generated.resources.settings_servers_collections_open
 import nuvio.composeapp.generated.resources.silo_add_description
 import nuvio.composeapp.generated.resources.silo_logo
 import org.jetbrains.compose.resources.painterResource
@@ -44,7 +49,29 @@ import org.jetbrains.compose.resources.stringResource
 internal fun LazyListScope.mediaServersSettingsContent(
     isTablet: Boolean,
     onServerClick: () -> Unit,
+    onCollectionsClick: (() -> Unit)? = null,
 ) {
+    if (isDesktop && onCollectionsClick != null) {
+        item(key = "desktop-servers-collections") {
+            SettingsSection(
+                title = stringResource(Res.string.collections_header),
+                isTablet = isTablet,
+            ) {
+                SettingsBentoGrid(
+                    items = listOf(
+                        SettingsBentoItem(
+                            id = "collections",
+                            title = stringResource(Res.string.settings_servers_collections_open),
+                            description = stringResource(Res.string.settings_content_discovery_collections_description),
+                            icon = Icons.Default.CollectionsBookmark,
+                            onClick = onCollectionsClick,
+                        ),
+                    ),
+                    isTablet = isTablet,
+                )
+            }
+        }
+    }
     item {
         val uiState by remember {
             ServerRepository.ensureLoaded()

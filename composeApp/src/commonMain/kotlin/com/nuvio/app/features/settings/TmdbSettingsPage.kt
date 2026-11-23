@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -19,11 +21,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.NuvioActionLabel
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.tmdb.TmdbSettings
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.normalizeLanguage
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_save
+import nuvio.composeapp.generated.resources.settings_api_key_status_default
+import nuvio.composeapp.generated.resources.settings_api_key_status_personal
+import nuvio.composeapp.generated.resources.settings_modules_disable_all
+import nuvio.composeapp.generated.resources.settings_modules_enable_all
 import nuvio.composeapp.generated.resources.settings_tmdb_api_key_label
 import nuvio.composeapp.generated.resources.settings_tmdb_api_key_override_description
 import nuvio.composeapp.generated.resources.settings_tmdb_enable_enrichment
@@ -66,10 +76,7 @@ internal fun LazyListScope.tmdbSettingsContent(
     val enrichmentControlsEnabled = settings.enabled
 
     item {
-        SettingsSection(
-            title = stringResource(Res.string.settings_tmdb_section_title),
-            isTablet = isTablet,
-        ) {
+        val coreContent: @Composable () -> Unit = {
             SettingsGroup(isTablet = isTablet) {
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_tmdb_enable_enrichment),
@@ -79,11 +86,43 @@ internal fun LazyListScope.tmdbSettingsContent(
                     onCheckedChange = TmdbSettingsRepository::setEnabled,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
-                TmdbApiKeyRow(
+                SettingsApiKeyCard(
+                    title = stringResource(Res.string.settings_tmdb_personal_api_key),
+                    description = stringResource(Res.string.settings_tmdb_api_key_override_description),
+                    placeholder = stringResource(Res.string.settings_tmdb_api_key_label),
+                    savedValue = settings.apiKey,
+                    statusLabel = stringResource(
+                        if (settings.apiKey.isNotBlank()) {
+                            Res.string.settings_api_key_status_personal
+                        } else {
+                            Res.string.settings_api_key_status_default
+                        },
+                    ),
+                    statusTone = if (settings.apiKey.isNotBlank()) {
+                        SettingsStatusTone.Success
+                    } else {
+                        SettingsStatusTone.Neutral
+                    },
                     isTablet = isTablet,
-                    value = settings.apiKey,
-                    onApiKeyCommitted = TmdbSettingsRepository::setApiKey,
+                    supportsDefaultFallback = true,
+                    onSave = TmdbSettingsRepository::setApiKey,
+                    onTestKey = { candidate ->
+                        validateTmdbApiKey(
+                            apiKey = candidate,
+                            fallbackDefaultKey = TmdbSettingsRepository.effectiveApiKey(),
+                        )
+                    },
                 )
+            }
+        }
+        if (isDesktop) {
+            coreContent()
+        } else {
+            SettingsSection(
+                title = stringResource(Res.string.settings_tmdb_section_title),
+                isTablet = isTablet,
+            ) {
+                coreContent()
             }
         }
     }
@@ -105,156 +144,142 @@ internal fun LazyListScope.tmdbSettingsContent(
     }
 
     item {
+        val allModulesEnabled = settings.useTrailers &&
+            settings.useArtwork &&
+            settings.useBasicInfo &&
+            settings.useDetails &&
+            settings.useCredits &&
+            settings.useProductions &&
+            settings.useNetworks &&
+            settings.useEpisodes &&
+            settings.useSeasonPosters &&
+            settings.useMoreLikeThis &&
+            settings.useCollections
+        val setAllModules: (Boolean) -> Unit = { target ->
+            TmdbSettingsRepository.setUseTrailers(target)
+            TmdbSettingsRepository.setUseArtwork(target)
+            TmdbSettingsRepository.setUseBasicInfo(target)
+            TmdbSettingsRepository.setUseDetails(target)
+            TmdbSettingsRepository.setUseCredits(target)
+            TmdbSettingsRepository.setUseProductions(target)
+            TmdbSettingsRepository.setUseNetworks(target)
+            TmdbSettingsRepository.setUseEpisodes(target)
+            TmdbSettingsRepository.setUseSeasonPosters(target)
+            TmdbSettingsRepository.setUseMoreLikeThis(target)
+            TmdbSettingsRepository.setUseCollections(target)
+        }
+
         SettingsSection(
             title = stringResource(Res.string.settings_tmdb_section_modules),
             isTablet = isTablet,
-        ) {
-            SettingsGroup(isTablet = isTablet) {
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_trailers),
-                    description = stringResource(Res.string.settings_tmdb_module_trailers_description),
-                    checked = settings.useTrailers,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseTrailers,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_artwork),
-                    description = stringResource(Res.string.settings_tmdb_module_artwork_description),
-                    checked = settings.useArtwork,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseArtwork,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_basic_info),
-                    description = stringResource(Res.string.settings_tmdb_module_basic_info_description),
-                    checked = settings.useBasicInfo,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseBasicInfo,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_details),
-                    description = stringResource(Res.string.settings_tmdb_module_details_description),
-                    checked = settings.useDetails,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseDetails,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_credits),
-                    description = stringResource(Res.string.settings_tmdb_module_credits_description),
-                    checked = settings.useCredits,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseCredits,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_production_companies),
-                    description = stringResource(Res.string.settings_tmdb_module_production_companies_description),
-                    checked = settings.useProductions,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseProductions,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_networks),
-                    description = stringResource(Res.string.settings_tmdb_module_networks_description),
-                    checked = settings.useNetworks,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseNetworks,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_episodes),
-                    description = stringResource(Res.string.settings_tmdb_module_episodes_description),
-                    checked = settings.useEpisodes,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseEpisodes,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_season_posters),
-                    description = stringResource(Res.string.settings_tmdb_module_season_posters_description),
-                    checked = settings.useSeasonPosters,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseSeasonPosters,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_more_like_this),
-                    description = stringResource(Res.string.settings_tmdb_module_more_like_this_description),
-                    checked = settings.useMoreLikeThis,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseMoreLikeThis,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                TmdbToggleRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_tmdb_module_collections),
-                    description = stringResource(Res.string.settings_tmdb_module_collections_description),
-                    checked = settings.useCollections,
-                    enabled = enrichmentControlsEnabled,
-                    onCheckedChange = TmdbSettingsRepository::setUseCollections,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TmdbApiKeyRow(
-    isTablet: Boolean,
-    value: String,
-    onApiKeyCommitted: (String) -> Unit,
-) {
-    var draft by rememberSaveable(value) { mutableStateOf(value) }
-    val normalizedDraft = draft.trim()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = if (isTablet) 16.dp else 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = stringResource(Res.string.settings_tmdb_personal_api_key),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = stringResource(Res.string.settings_tmdb_api_key_override_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        SettingsSecretTextField(
-            value = draft,
-            onValueChange = { draft = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(Res.string.settings_tmdb_api_key_label),
-        )
-        Button(
-            onClick = {
-                draft = normalizedDraft
-                onApiKeyCommitted(normalizedDraft)
+            actions = {
+                if (enrichmentControlsEnabled) {
+                    NuvioActionLabel(
+                        text = stringResource(
+                            if (allModulesEnabled) {
+                                Res.string.settings_modules_disable_all
+                            } else {
+                                Res.string.settings_modules_enable_all
+                            },
+                        ),
+                        onClick = { setAllModules(!allModulesEnabled) },
+                    )
+                }
             },
-            enabled = normalizedDraft != value,
         ) {
-            Text(stringResource(Res.string.action_save))
+            SettingsToggleGrid(
+                items = listOf(
+                    SettingsToggleGridItem(
+                        id = "trailers",
+                        title = stringResource(Res.string.settings_tmdb_module_trailers),
+                        description = stringResource(Res.string.settings_tmdb_module_trailers_description),
+                        checked = settings.useTrailers,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseTrailers,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "artwork",
+                        title = stringResource(Res.string.settings_tmdb_module_artwork),
+                        description = stringResource(Res.string.settings_tmdb_module_artwork_description),
+                        checked = settings.useArtwork,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseArtwork,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "basic-info",
+                        title = stringResource(Res.string.settings_tmdb_module_basic_info),
+                        description = stringResource(Res.string.settings_tmdb_module_basic_info_description),
+                        checked = settings.useBasicInfo,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseBasicInfo,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "details",
+                        title = stringResource(Res.string.settings_tmdb_module_details),
+                        description = stringResource(Res.string.settings_tmdb_module_details_description),
+                        checked = settings.useDetails,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseDetails,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "credits",
+                        title = stringResource(Res.string.settings_tmdb_module_credits),
+                        description = stringResource(Res.string.settings_tmdb_module_credits_description),
+                        checked = settings.useCredits,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseCredits,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "productions",
+                        title = stringResource(Res.string.settings_tmdb_module_production_companies),
+                        description = stringResource(Res.string.settings_tmdb_module_production_companies_description),
+                        checked = settings.useProductions,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseProductions,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "networks",
+                        title = stringResource(Res.string.settings_tmdb_module_networks),
+                        description = stringResource(Res.string.settings_tmdb_module_networks_description),
+                        checked = settings.useNetworks,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseNetworks,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "episodes",
+                        title = stringResource(Res.string.settings_tmdb_module_episodes),
+                        description = stringResource(Res.string.settings_tmdb_module_episodes_description),
+                        checked = settings.useEpisodes,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseEpisodes,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "season-posters",
+                        title = stringResource(Res.string.settings_tmdb_module_season_posters),
+                        description = stringResource(Res.string.settings_tmdb_module_season_posters_description),
+                        checked = settings.useSeasonPosters,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseSeasonPosters,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "more-like-this",
+                        title = stringResource(Res.string.settings_tmdb_module_more_like_this),
+                        description = stringResource(Res.string.settings_tmdb_module_more_like_this_description),
+                        checked = settings.useMoreLikeThis,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseMoreLikeThis,
+                    ),
+                    SettingsToggleGridItem(
+                        id = "collections",
+                        title = stringResource(Res.string.settings_tmdb_module_collections),
+                        description = stringResource(Res.string.settings_tmdb_module_collections_description),
+                        checked = settings.useCollections,
+                        enabled = enrichmentControlsEnabled,
+                        onCheckedChange = TmdbSettingsRepository::setUseCollections,
+                    ),
+                ),
+                isTablet = isTablet,
+            )
         }
     }
 }
@@ -266,78 +291,67 @@ private fun TmdbLanguageRow(
     enabled: Boolean,
     onLanguageCommitted: (String) -> Unit,
 ) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalPadding = if (isTablet) 16.dp else 14.dp
+    val tokens = MaterialTheme.nuvio
     var draft by rememberSaveable(value) { mutableStateOf(value) }
     val normalizedDraft = normalizeLanguage(draft)
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            .padding(horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16, vertical = if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s14),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = stringResource(Res.string.settings_tmdb_preferred_language),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = tokens.colors.textPrimary,
                 fontWeight = FontWeight.Medium,
             )
             Text(
                 text = stringResource(Res.string.settings_tmdb_preferred_language_description),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textSecondary,
             )
         }
-
-        OutlinedTextField(
-            value = draft,
-            onValueChange = {
-                draft = it
-            },
-            enabled = enabled,
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(Res.string.settings_tmdb_language_code_label)) },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
-            ),
-        )
-
-        Row(modifier = Modifier.fillMaxWidth()) {
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                enabled = enabled,
+                singleLine = true,
+                shape = RoundedCornerShape(10.dp),
+                label = { Text(stringResource(Res.string.settings_tmdb_language_code_label)) },
+                modifier = Modifier.weight(1f),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = tokens.colors.accent.copy(alpha = 0.78f),
+                    unfocusedBorderColor = tokens.colors.borderSubtle,
+                    focusedContainerColor = tokens.colors.surfaceElevated,
+                    unfocusedContainerColor = tokens.colors.surfaceElevated,
+                    disabledContainerColor = tokens.colors.surfaceElevated,
+                    cursorColor = tokens.colors.accent,
+                ),
+            )
             Button(
                 onClick = {
                     draft = normalizedDraft
                     onLanguageCommitted(normalizedDraft)
                 },
                 enabled = enabled && normalizedDraft != value,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = tokens.colors.accent,
+                    contentColor = tokens.colors.onAccent,
+                    disabledContainerColor = tokens.colors.surfaceElevated,
+                    disabledContentColor = tokens.colors.textMuted,
+                ),
+                modifier = Modifier.padding(top = 6.dp),
             ) {
                 Text(stringResource(Res.string.action_save))
             }
         }
     }
-}
-
-@Composable
-private fun TmdbToggleRow(
-    isTablet: Boolean,
-    title: String,
-    description: String,
-    checked: Boolean,
-    enabled: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    SettingsSwitchRow(
-        title = title,
-        description = description,
-        checked = checked,
-        enabled = enabled,
-        isTablet = isTablet,
-        onCheckedChange = onCheckedChange,
-    )
 }
