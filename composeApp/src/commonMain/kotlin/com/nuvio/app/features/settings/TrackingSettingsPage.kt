@@ -583,6 +583,15 @@ private fun TrackingViewingAndDiscovery(
 
     SettingsGroup(isTablet = isTablet) {
         if (isDesktop) {
+            val normalizedDaysCap = normalizeTraktContinueWatchingDaysCap(settingsUiState.continueWatchingDaysCap)
+            val dropdownOptions = continueWatchingOptions().map { option ->
+                DesktopDropdownOption(
+                    value = option.value,
+                    label = option.title,
+                    description = option.description,
+                    enabled = option.enabled,
+                )
+            }
             DesktopSettingRow(
                 title = stringResource(Res.string.trakt_continue_watching_window),
                 description = stringResource(
@@ -591,10 +600,12 @@ private fun TrackingViewingAndDiscovery(
                 ),
                 enabled = traktProgressActive,
             ) {
-                DesktopSelectChip(
-                    label = continueWatchingDaysCapLabel(settingsUiState.continueWatchingDaysCap),
+                DesktopDropdownSelect(
+                    label = continueWatchingDaysCapLabel(normalizedDaysCap),
+                    options = dropdownOptions,
+                    selectedValue = normalizedDaysCap,
+                    onSelected = TrackingSettingsRepository::setContinueWatchingDaysCap,
                     enabled = traktProgressActive,
-                    onClick = { activePickerName = TrackingViewingPicker.CONTINUE_WATCHING.name },
                 )
             }
         } else {
@@ -624,17 +635,19 @@ private fun TrackingViewingAndDiscovery(
         )
     }
 
-    when (activePicker) {
-        TrackingViewingPicker.CONTINUE_WATCHING -> TrackingAdaptivePicker(
-            isTablet = isTablet,
-            title = stringResource(Res.string.trakt_cw_window_title),
-            subtitle = stringResource(Res.string.trakt_cw_window_subtitle),
-            selectedValue = normalizeTraktContinueWatchingDaysCap(settingsUiState.continueWatchingDaysCap),
-            options = continueWatchingOptions(),
-            onSelected = TrackingSettingsRepository::setContinueWatchingDaysCap,
-            onDismiss = { activePickerName = null },
-        )
-        null -> Unit
+    if (!isDesktop) {
+        when (activePicker) {
+            TrackingViewingPicker.CONTINUE_WATCHING -> TrackingAdaptivePicker(
+                isTablet = isTablet,
+                title = stringResource(Res.string.trakt_cw_window_title),
+                subtitle = stringResource(Res.string.trakt_cw_window_subtitle),
+                selectedValue = normalizeTraktContinueWatchingDaysCap(settingsUiState.continueWatchingDaysCap),
+                options = continueWatchingOptions(),
+                onSelected = TrackingSettingsRepository::setContinueWatchingDaysCap,
+                onDismiss = { activePickerName = null },
+            )
+            null -> Unit
+        }
     }
 }
 
@@ -963,16 +976,38 @@ private fun AnimeIdPreferenceSection(
     var showPicker by rememberSaveable { mutableStateOf(false) }
 
     SettingsGroup(isTablet = isTablet) {
-        TrackingPreferenceActionRow(
-            title = stringResource(Res.string.settings_tracking_anime_id_title),
-            description = stringResource(Res.string.settings_tracking_anime_id_subtitle),
-            value = animeIdPreferenceLabel(settingsUiState.simklAnimeIdPreference),
-            isTablet = isTablet,
-            onClick = { showPicker = true },
-        )
+        if (isDesktop) {
+            val dropdownOptions = animeIdPreferenceOptions().map { option ->
+                DesktopDropdownOption(
+                    value = option.value,
+                    label = option.title,
+                    description = option.description,
+                    enabled = option.enabled,
+                )
+            }
+            DesktopSettingRow(
+                title = stringResource(Res.string.settings_tracking_anime_id_title),
+                description = stringResource(Res.string.settings_tracking_anime_id_subtitle),
+            ) {
+                DesktopDropdownSelect(
+                    label = animeIdPreferenceLabel(settingsUiState.simklAnimeIdPreference),
+                    options = dropdownOptions,
+                    selectedValue = settingsUiState.simklAnimeIdPreference,
+                    onSelected = TrackingSettingsRepository::setSimklAnimeIdPreference,
+                )
+            }
+        } else {
+            TrackingPreferenceActionRow(
+                title = stringResource(Res.string.settings_tracking_anime_id_title),
+                description = stringResource(Res.string.settings_tracking_anime_id_subtitle),
+                value = animeIdPreferenceLabel(settingsUiState.simklAnimeIdPreference),
+                isTablet = isTablet,
+                onClick = { showPicker = true },
+            )
+        }
     }
 
-    if (showPicker) {
+    if (!isDesktop && showPicker) {
         TrackingAdaptivePicker(
             isTablet = isTablet,
             title = stringResource(Res.string.settings_tracking_anime_id_dialog_title),

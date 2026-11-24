@@ -32,6 +32,7 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.updater.AppUpdaterPlatform
 import com.nuvio.app.features.updater.UpdateChannel
 import com.nuvio.app.features.updater.UpdatePreferences
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -41,6 +42,30 @@ internal fun UpdateChannelSettingsRow(isTablet: Boolean) {
     if (AppUpdaterPlatform.hasSingleUpdateChannel) return
 
     val channel by UpdatePreferences.shared.channel.collectAsState()
+    if (isDesktop) {
+        val options = UpdateChannel.entries
+            .filter { it != UpdateChannel.ALL_RELEASES }
+            .map { option ->
+                DesktopDropdownOption(
+                    value = option,
+                    label = updateChannelLabel(option),
+                    description = updateChannelDescription(option),
+                )
+            }
+        DesktopSettingRow(
+            title = stringResource(Res.string.updates_channel_title),
+            description = stringResource(Res.string.updates_channel_description),
+        ) {
+            DesktopDropdownSelect(
+                label = updateChannelLabel(channel),
+                options = options,
+                selectedValue = channel,
+                onSelected = UpdatePreferences.shared::setChannel,
+            )
+        }
+        return
+    }
+
     var showDialog by rememberSaveable { mutableStateOf(false) }
     val tokens = MaterialTheme.nuvio
     SettingsNavigationRow(
@@ -86,13 +111,7 @@ internal fun UpdateChannelSettingsRow(isTablet: Boolean) {
                                 color = tokens.colors.textPrimary,
                             )
                             Text(
-                                text = stringResource(
-                                    when (option) {
-                                        UpdateChannel.STABLE -> Res.string.updates_channel_stable_description
-                                        UpdateChannel.BETA -> Res.string.updates_channel_beta_description
-                                        UpdateChannel.ALL_RELEASES -> Res.string.updates_channel_all_releases_description
-                                    },
-                                ),
+                                text = updateChannelDescription(option),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = tokens.colors.textSecondary,
                             )
@@ -116,5 +135,14 @@ private fun updateChannelLabel(channel: UpdateChannel): String = stringResource(
         UpdateChannel.STABLE -> Res.string.updates_channel_stable
         UpdateChannel.BETA -> Res.string.updates_channel_beta
         UpdateChannel.ALL_RELEASES -> Res.string.updates_channel_all_releases
+    },
+)
+
+@Composable
+private fun updateChannelDescription(channel: UpdateChannel): String = stringResource(
+    when (channel) {
+        UpdateChannel.STABLE -> Res.string.updates_channel_stable_description
+        UpdateChannel.BETA -> Res.string.updates_channel_beta_description
+        UpdateChannel.ALL_RELEASES -> Res.string.updates_channel_all_releases_description
     },
 )

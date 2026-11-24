@@ -112,13 +112,21 @@ internal fun LazyListScope.appearanceSettingsContent(
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 if (isDesktop) {
+                    val languageOptions = AppLanguage.entries.map { language ->
+                        DesktopDropdownOption(
+                            value = language,
+                            label = stringResource(language.labelRes),
+                        )
+                    }
                     DesktopSettingRow(
                         title = stringResource(Res.string.settings_appearance_app_language),
                         description = stringResource(selectedAppLanguage.labelRes),
                     ) {
-                        DesktopSelectChip(
+                        DesktopDropdownSelect(
                             label = stringResource(selectedAppLanguage.labelRes),
-                            onClick = { showLanguageSheet = true },
+                            options = languageOptions,
+                            selectedValue = selectedAppLanguage,
+                            onSelected = onAppLanguageSelected,
                         )
                     }
                 } else {
@@ -132,7 +140,7 @@ internal fun LazyListScope.appearanceSettingsContent(
             }
         }
 
-        if (showLanguageSheet) {
+        if (!isDesktop && showLanguageSheet) {
             AppearanceLanguageBottomSheet(
                 selectedLanguage = selectedAppLanguage,
                 onLanguageSelected = {

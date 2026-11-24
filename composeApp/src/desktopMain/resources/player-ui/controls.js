@@ -834,15 +834,22 @@ const setProgress = (positionMs, durationMs, bufferedPositionMs) => {
   seek.value = Math.round(percent * 10);
   seek.style.setProperty("--progress", `${percent}%`);
   seek.style.setProperty("--bufferProgress", `${bufferPercent}%`);
-  setTextContent(positionLabel, formatTime(positionMs));
-  setTextContent(durationLabel, formatTime(durationMs));
+  const clampedDurationMs = durationMs - (durationMs % 1000);
+  const remainingTimeMs = Math.max(0, clampedDurationMs - positionMs + (positionMs % 1000 == 0 ? 0 : 1000));
+  if (positionLabel) {
+    setTextContent(positionLabel, formatTime(positionMs));
+  }
+  if (durationLabel) {
+    setTextContent(
+      durationLabel,
+      timeLabelShowRemaining ? `-${formatTime(remainingTimeMs)}` : formatTime(durationMs),
+    );
+  }
   if (timeLabel) {
-    durationMs = durationMs - (durationMs % 1000);
     if (timeLabelShowRemaining) {
-      let remainingTimeMs = durationMs - positionMs + (positionMs % 1000 == 0 ? 0 : 1000);
       setTextContent(timeLabel, `-${formatTime(remainingTimeMs)}`);
     } else {
-      setTextContent(timeLabel, `${formatTime(positionMs)} / ${formatTime(durationMs)}`);
+      setTextContent(timeLabel, `${formatTime(positionMs)} / ${formatTime(clampedDurationMs)}`);
     }
   }
 };
@@ -3281,7 +3288,7 @@ const shortcutCommandForEvent = event => {
 };
 
 const visibleActionButtons = () =>
-  Array.from(document.querySelectorAll(".action-pill .action"))
+  Array.from(document.querySelectorAll(".action-row .action"))
     .filter(button => !button.hidden && !button.disabled && window.getComputedStyle(button).display !== "none");
 
 const setFocusedActionButton = (button, { focus = true } = {}) => {
@@ -3313,7 +3320,7 @@ const ensureActionFocus = ({ focus = true } = {}) => {
 const syncActionFocusState = () => {
   const controls = visibleActionButtons();
   const visibleSet = new Set(controls);
-  document.querySelectorAll(".action-pill .action.focused").forEach(button => {
+  document.querySelectorAll(".action-row .action.focused").forEach(button => {
     if (!visibleSet.has(button)) button.classList.remove("focused");
   });
   if (controls.some(button => button.classList.contains("focused"))) return;
@@ -3527,7 +3534,7 @@ document.addEventListener("pointerleave", () => {
 }, true);
 document.addEventListener("focusin", event => {
   isChromeFocusInside = isChromeInteractionTarget(event.target);
-  const actionButton = event.target.closest && event.target.closest(".action-pill .action");
+  const actionButton = event.target.closest && event.target.closest(".action-row .action");
   if (actionButton) {
     setFocusedActionButton(actionButton, { focus: false });
   }
@@ -3558,7 +3565,7 @@ window.addEventListener("blur", () => {
 document.querySelectorAll("[data-command]").forEach(button => {
   button.addEventListener("click", event => {
     event.stopPropagation();
-    if (button.closest(".action-pill")) {
+    if (button.closest(".action-row")) {
       setFocusedActionButton(button, { focus: false });
     }
     noteChromeActivity(true);
@@ -4029,11 +4036,19 @@ volumeButton.addEventListener("click", () => {
   send("volumeChangeTemporary", state.volumeLevel);
 });
 
-timeLabel.addEventListener("click", () => {
+const toggleRemainingTimeDisplay = () => {
   noteChromeActivity();
   timeLabelShowRemaining = !timeLabelShowRemaining;
   renderChrome();
-});
+};
+
+if (durationLabel) {
+  durationLabel.addEventListener("click", toggleRemainingTimeDisplay);
+}
+
+if (timeLabel) {
+  timeLabel.addEventListener("click", toggleRemainingTimeDisplay);
+}
 
 window.playerUpdate = update => {
   const durationMs = Math.round((Number(update.duration) || 0) * 1000);
@@ -4167,7 +4182,7 @@ window.playerControls = nextState => {
 
 const isControlsSurfaceEvent = event => {
   if (activeModal) return true;
-  if (event.target.closest("button, input, textarea, select, a, .action-pill, .volume-control, .modal-layer, .skip-prompt, .next-episode-card")) {
+  if (event.target.closest("button, input, textarea, select, a, .seek-row, .action-row, .action-group, .volume-control, .modal-layer, .skip-prompt, .next-episode-card")) {
     return true;
   }
 
@@ -4494,7 +4509,7 @@ root.addEventListener("dblclick", event => {
 
 root.addEventListener("wheel", event => {
   if (playbackErrorText() || activeModal) return;
-  const isProgressTarget = Boolean(event.target.closest("#seek, .time-row, .time-pill, .scrub"));
+  const isProgressTarget = Boolean(event.target.closest("#seek, .seek-row, .time-pill, .scrub"));
   const hasSeekModifier = event.shiftKey || event.ctrlKey || event.altKey || event.metaKey;
   const delta = event.deltaY !== 0 ? Math.sign(event.deltaY) * -1 : Math.sign(event.deltaX);
   if (delta === 0) return;

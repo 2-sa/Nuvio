@@ -243,43 +243,42 @@
           <div class="player-badges" id="playerBadges" hidden></div>
         </section>
         <div class="chapter-title" id="chapterTitle" hidden></div>
-        <div class="seek-wrap" id="seekWrap">
-          <div class="seek-tooltip" id="seekTooltip" hidden>
-            <span class="seek-tooltip-chapter" id="seekTooltipChapter" hidden></span>
-            <span class="seek-tooltip-time" id="seekTooltipTime">00:00</span>
+        <div class="seek-row">
+          <span class="time-pill time-position" id="position">00:00</span>
+          <div class="seek-wrap" id="seekWrap">
+            <div class="seek-tooltip" id="seekTooltip" hidden>
+              <span class="seek-tooltip-chapter" id="seekTooltipChapter" hidden></span>
+              <span class="seek-tooltip-time" id="seekTooltipTime">00:00</span>
+            </div>
+            <input id="seek" class="scrub" type="range" min="0" max="1000" value="0" aria-label="Seek">
+            <div class="chapter-marks" id="chapterMarks" aria-hidden="true"></div>
           </div>
-          <input id="seek" class="scrub" type="range" min="0" max="1000" value="0" aria-label="Seek">
-          <div class="chapter-marks" id="chapterMarks" aria-hidden="true"></div>
-        </div>
-        <div class="time-row">
-          <span class="time-pill" id="position">00:00</span>
-          <span class="time-pill" id="duration">00:00</span>
+          <button class="time-pill time-duration" id="duration" type="button" aria-label="Toggle between total and remaining time" title="Toggle between total and remaining time">00:00</button>
         </div>
         <div class="action-row">
-          <div class="action-pill">
+          <div class="action-group action-group-start">
             <button class="action playback-action" id="toggle" data-command="toggle" aria-label="Play" title="Play">
               <svg><use id="toggleIcon" href="#icon-play"></use></svg><span id="toggleLabel">Play</span>
             </button>
             <button class="action optional" id="nextEpisodeButton" data-command="playNextEpisode" aria-label="Next episode" title="Next episode" hidden>
               <svg><use href="#icon-skip-next"></use></svg><span id="nextEpisodeButtonLabel">Next episode</span>
             </button>
-            <button class="action" data-command="resize" title="Fit"><svg><use href="#icon-aspect"></use></svg><span id="resizeLabel">Fit</span></button>
-            <button class="action" data-command="speed" title="1x"><svg><use href="#icon-speed"></use></svg><span id="speedLabel">1x</span></button>
-            <button class="action" data-command="subtitles" title="Subs"><svg><use href="#icon-subs"></use></svg><span id="subtitlesLabel">Subs</span></button>
-            <button class="action" data-command="audio" title="Audio"><svg><use href="#icon-audio"></use></svg><span id="audioLabel">Audio</span></button>
-            <button class="action optional" id="sourcesButton" data-command="sources" title="Sources"><svg><use href="#icon-source"></use></svg><span id="sourcesLabel">Sources</span></button>
-            <button class="action optional" id="episodesButton" data-command="episodes" title="Episodes"><svg><use href="#icon-episodes"></use></svg><span id="episodesLabel">Episodes</span></button>
-            <button class="action optional" id="chaptersButton" data-command="chapters" title="Chapters" hidden><svg><use href="#icon-chapters"></use></svg><span id="chaptersLabel">Chapters</span></button>
-            <button class="action optional" id="streamInfoButton" data-command="streamInfo" title="Stream info"><svg><use href="#icon-info"></use></svg><span id="streamInfoLabel">Stream info</span></button>
-          </div>
-          <div class="playback-status">
             <div class="volume-control" id="volumeControl" aria-label="Volume">
               <button class="volume-button" id="volumeButton" aria-label="Mute" type="button">
                 <svg><use id="volumeIcon" href="#icon-volume"></use></svg>
               </button>
               <input id="volumeSlider" class="volume-slider" type="range" min="0" max="200" value="100" aria-label="Volume">
             </div>
-            <div class="time-label" id="timeLabel" aria-label="Toggle between total and remaining time" title="Toggle between total and remaining time">00:00 / 00:00</div>
+          </div>
+          <div class="action-group action-group-end">
+            <button class="action optional" id="streamInfoButton" data-command="streamInfo" title="Stream info"><svg><use href="#icon-info"></use></svg><span id="streamInfoLabel">Stream info</span></button>
+            <button class="action" data-command="speed" title="1x"><svg><use href="#icon-speed"></use></svg><span id="speedLabel">1x</span></button>
+            <button class="action" data-command="resize" title="Fit"><svg><use href="#icon-aspect"></use></svg><span id="resizeLabel">Fit</span></button>
+            <button class="action" data-command="subtitles" title="Subs"><svg><use href="#icon-subs"></use></svg><span id="subtitlesLabel">Subs</span></button>
+            <button class="action" data-command="audio" title="Audio"><svg><use href="#icon-audio"></use></svg><span id="audioLabel">Audio</span></button>
+            <button class="action optional" id="sourcesButton" data-command="sources" title="Sources"><svg><use href="#icon-source"></use></svg><span id="sourcesLabel">Sources</span></button>
+            <button class="action optional" id="episodesButton" data-command="episodes" title="Episodes"><svg><use href="#icon-episodes"></use></svg><span id="episodesLabel">Episodes</span></button>
+            <button class="action optional" id="chaptersButton" data-command="chapters" title="Chapters" hidden><svg><use href="#icon-chapters"></use></svg><span id="chaptersLabel">Chapters</span></button>
           </div>
         </div>
       </section>

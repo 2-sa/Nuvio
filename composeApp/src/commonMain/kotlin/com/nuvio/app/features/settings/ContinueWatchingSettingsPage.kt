@@ -163,13 +163,22 @@ internal fun LazyListScope.continueWatchingSettingsContent(
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 if (isDesktop) {
+                    val clickActionOptions = ContinueWatchingClickAction.entries.map { action ->
+                        DesktopDropdownOption(
+                            value = action,
+                            label = stringResource(action.labelRes),
+                            description = stringResource(action.descriptionRes),
+                        )
+                    }
                     DesktopSettingRow(
                         title = stringResource(Res.string.settings_continue_watching_click_action_title),
                         description = stringResource(Res.string.settings_continue_watching_click_action_description),
                     ) {
-                        DesktopSelectChip(
+                        DesktopDropdownSelect(
                             label = stringResource(clickAction.labelRes),
-                            onClick = { showClickActionSheet = true },
+                            options = clickActionOptions,
+                            selectedValue = clickAction,
+                            onSelected = ContinueWatchingPreferencesRepository::setClickAction,
                         )
                     }
                 } else {
@@ -183,7 +192,7 @@ internal fun LazyListScope.continueWatchingSettingsContent(
             }
         }
 
-        if (showClickActionSheet) {
+        if (!isDesktop && showClickActionSheet) {
             ContinueWatchingClickActionDialog(
                 currentAction = clickAction,
                 onActionSelected = { action ->
@@ -217,21 +226,24 @@ internal fun LazyListScope.continueWatchingSettingsContent(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                val currentModeLabel = stringResource(
-                    when (sortMode) {
-                        ContinueWatchingSortMode.DEFAULT -> Res.string.settings_continue_watching_sort_mode_default
-                        ContinueWatchingSortMode.STREAMING_STYLE -> Res.string.settings_continue_watching_sort_mode_streaming
-                        ContinueWatchingSortMode.SPLIT_UPCOMING -> Res.string.settings_continue_watching_sort_mode_split_upcoming
-                    }
-                )
+                val currentModeLabel = stringResource(sortMode.labelRes)
                 if (isDesktop) {
+                    val sortModeOptions = ContinueWatchingSortMode.entries.map { mode ->
+                        DesktopDropdownOption(
+                            value = mode,
+                            label = stringResource(mode.labelRes),
+                            description = stringResource(mode.descriptionRes),
+                        )
+                    }
                     DesktopSettingRow(
                         title = stringResource(Res.string.settings_continue_watching_sort_mode_title),
                         description = currentModeLabel,
                     ) {
-                        DesktopSelectChip(
+                        DesktopDropdownSelect(
                             label = currentModeLabel,
-                            onClick = { showSortModeSheet = true },
+                            options = sortModeOptions,
+                            selectedValue = sortMode,
+                            onSelected = ContinueWatchingPreferencesRepository::setSortMode,
                         )
                     }
                 } else {
@@ -245,7 +257,7 @@ internal fun LazyListScope.continueWatchingSettingsContent(
             }
         }
 
-        if (showSortModeSheet) {
+        if (!isDesktop && showSortModeSheet) {
             ContinueWatchingSortModeDialog(
                 currentMode = sortMode,
                 onModeSelected = { mode ->
@@ -377,6 +389,20 @@ private val ContinueWatchingClickAction.descriptionRes: StringResource
         ContinueWatchingClickAction.STREAM -> Res.string.settings_continue_watching_click_action_stream_desc
         ContinueWatchingClickAction.DETAILS -> Res.string.settings_continue_watching_click_action_details_desc
         ContinueWatchingClickAction.DETAILS_FOR_UPCOMING -> Res.string.settings_continue_watching_click_action_details_upcoming_desc
+    }
+
+private val ContinueWatchingSortMode.labelRes: StringResource
+    get() = when (this) {
+        ContinueWatchingSortMode.DEFAULT -> Res.string.settings_continue_watching_sort_mode_default
+        ContinueWatchingSortMode.STREAMING_STYLE -> Res.string.settings_continue_watching_sort_mode_streaming
+        ContinueWatchingSortMode.SPLIT_UPCOMING -> Res.string.settings_continue_watching_sort_mode_split_upcoming
+    }
+
+private val ContinueWatchingSortMode.descriptionRes: StringResource
+    get() = when (this) {
+        ContinueWatchingSortMode.DEFAULT -> Res.string.settings_continue_watching_sort_mode_default_desc
+        ContinueWatchingSortMode.STREAMING_STYLE -> Res.string.settings_continue_watching_sort_mode_streaming_desc
+        ContinueWatchingSortMode.SPLIT_UPCOMING -> Res.string.settings_continue_watching_sort_mode_split_upcoming_desc
     }
 
 @Composable

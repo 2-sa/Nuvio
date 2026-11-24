@@ -48,30 +48,95 @@ internal fun PlaybackSubtitleSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                val subtitleLanguageEnabled = !settings.externalPlayerEnabled || settings.externalPlayerForwardSubtitles
                 val preferredSubtitleLabel = when (settings.preferredSubtitleLanguage) {
                     SubtitleLanguageOption.NONE -> stringResource(Res.string.settings_playback_option_none)
                     SubtitleLanguageOption.DEVICE -> stringResource(Res.string.settings_playback_option_device_language)
                     SubtitleLanguageOption.FORCED -> stringResource(Res.string.settings_playback_option_forced)
                     else -> languageLabelForCode(settings.preferredSubtitleLanguage)
                 }
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_preferred_subtitle_language),
-                    description = preferredSubtitleLabel,
-                    enabled = !settings.externalPlayerEnabled || settings.externalPlayerForwardSubtitles,
-                    isTablet = isTablet,
-                    valueLabel = preferredSubtitleLabel,
-                    onClick = { showPreferredSubtitleDialog = true },
-                )
+                if (isDesktop) {
+                    val preferredSubtitleOptions = listOf(
+                        DesktopDropdownOption(
+                            value = SubtitleLanguageOption.NONE,
+                            label = stringResource(Res.string.settings_playback_option_none),
+                        ),
+                        DesktopDropdownOption(
+                            value = SubtitleLanguageOption.DEVICE,
+                            label = stringResource(Res.string.settings_playback_option_device_language),
+                        ),
+                        DesktopDropdownOption(
+                            value = SubtitleLanguageOption.FORCED,
+                            label = stringResource(Res.string.settings_playback_option_forced),
+                        ),
+                    ) + AvailableLanguageOptions.map { option ->
+                        DesktopDropdownOption(
+                            value = option.code,
+                            label = stringResource(option.labelRes),
+                        )
+                    }
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_preferred_subtitle_language),
+                        enabled = subtitleLanguageEnabled,
+                    ) {
+                        DesktopDropdownSelect(
+                            label = preferredSubtitleLabel,
+                            options = preferredSubtitleOptions,
+                            selectedValue = settings.preferredSubtitleLanguage,
+                            onSelected = PlayerSettingsRepository::setPreferredSubtitleLanguage,
+                            enabled = subtitleLanguageEnabled,
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_preferred_subtitle_language),
+                        description = preferredSubtitleLabel,
+                        enabled = subtitleLanguageEnabled,
+                        isTablet = isTablet,
+                        valueLabel = preferredSubtitleLabel,
+                        onClick = { showPreferredSubtitleDialog = true },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 val secondarySubtitleLabel = languageLabelForCode(settings.secondaryPreferredSubtitleLanguage)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_secondary_subtitle_language),
-                    description = secondarySubtitleLabel,
-                    enabled = !settings.externalPlayerEnabled || settings.externalPlayerForwardSubtitles,
-                    isTablet = isTablet,
-                    valueLabel = secondarySubtitleLabel,
-                    onClick = { showSecondarySubtitleDialog = true },
-                )
+                if (isDesktop) {
+                    val secondarySubtitleOptions = listOf<DesktopDropdownOption<String?>>(
+                        DesktopDropdownOption(
+                            value = null,
+                            label = stringResource(Res.string.settings_playback_option_none),
+                        ),
+                        DesktopDropdownOption(
+                            value = SubtitleLanguageOption.FORCED,
+                            label = stringResource(Res.string.settings_playback_option_forced),
+                        ),
+                    ) + AvailableLanguageOptions.map { option ->
+                        DesktopDropdownOption<String?>(
+                            value = option.code,
+                            label = stringResource(option.labelRes),
+                        )
+                    }
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_secondary_subtitle_language),
+                        enabled = subtitleLanguageEnabled,
+                    ) {
+                        DesktopDropdownSelect(
+                            label = secondarySubtitleLabel,
+                            options = secondarySubtitleOptions,
+                            selectedValue = settings.secondaryPreferredSubtitleLanguage,
+                            onSelected = PlayerSettingsRepository::setSecondaryPreferredSubtitleLanguage,
+                            enabled = subtitleLanguageEnabled,
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_secondary_subtitle_language),
+                        description = secondarySubtitleLabel,
+                        enabled = subtitleLanguageEnabled,
+                        isTablet = isTablet,
+                        valueLabel = secondarySubtitleLabel,
+                        onClick = { showSecondarySubtitleDialog = true },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 AutoSyncPlaybackSettingsRows(
                     isTablet = isTablet,
@@ -215,7 +280,7 @@ internal fun PlaybackSubtitleSettings(
         }
     }
 
-    if (showPreferredSubtitleDialog) {
+    if (!isDesktop && showPreferredSubtitleDialog) {
         LanguageSelectionDialog(
             title = stringResource(Res.string.settings_playback_preferred_subtitle_language),
             options = listOf(
@@ -234,7 +299,7 @@ internal fun PlaybackSubtitleSettings(
         )
     }
 
-    if (showSecondarySubtitleDialog) {
+    if (!isDesktop && showSecondarySubtitleDialog) {
         LanguageSelectionDialog(
             title = stringResource(Res.string.settings_playback_secondary_subtitle_language),
             options = listOf(

@@ -84,13 +84,32 @@ internal fun PlaybackStreamSettings(
                 if (settings.streamReuseLastLinkEnabled) {
                     SettingsGroupDivider(isTablet = isTablet)
                     val cacheDurationLabel = formatReuseCacheDuration(settings.streamReuseLastLinkCacheHours)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_last_link_cache_duration),
-                        description = cacheDurationLabel,
-                        isTablet = isTablet,
-                        valueLabel = cacheDurationLabel,
-                        onClick = { showReuseCacheDurationDialog = true },
-                    )
+                    if (isDesktop) {
+                        val durationOptions = ReuseCacheDurationOptions.map { hours ->
+                            DesktopDropdownOption(
+                                value = hours,
+                                label = formatReuseCacheDuration(hours),
+                            )
+                        }
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_playback_last_link_cache_duration),
+                        ) {
+                            DesktopDropdownSelect(
+                                label = cacheDurationLabel,
+                                options = durationOptions,
+                                selectedValue = settings.streamReuseLastLinkCacheHours,
+                                onSelected = PlayerSettingsRepository::setStreamReuseLastLinkCacheHours,
+                            )
+                        }
+                    } else {
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_last_link_cache_duration),
+                            description = cacheDurationLabel,
+                            isTablet = isTablet,
+                            valueLabel = cacheDurationLabel,
+                            onClick = { showReuseCacheDurationDialog = true },
+                        )
+                    }
                 }
             }
         }
@@ -101,13 +120,34 @@ internal fun PlaybackStreamSettings(
         ) {
             SettingsGroup(isTablet = isTablet) {
                 val streamSelectionModeLabel = stringResource(settings.streamAutoPlayMode.labelRes)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_stream_selection_mode),
-                    description = streamSelectionModeLabel,
-                    isTablet = isTablet,
-                    valueLabel = streamSelectionModeLabel,
-                    onClick = { showAutoPlayModeDialog = true },
-                )
+                if (isDesktop) {
+                    val modeOptions = StreamAutoPlayMode.entries.map { mode ->
+                        DesktopDropdownOption(
+                            value = mode,
+                            label = stringResource(mode.labelRes),
+                            description = stringResource(mode.descriptionRes),
+                        )
+                    }
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_stream_selection_mode),
+                        description = stringResource(settings.streamAutoPlayMode.descriptionRes),
+                    ) {
+                        DesktopDropdownSelect(
+                            label = streamSelectionModeLabel,
+                            options = modeOptions,
+                            selectedValue = settings.streamAutoPlayMode,
+                            onSelected = PlayerSettingsRepository::setStreamAutoPlayMode,
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_stream_selection_mode),
+                        description = streamSelectionModeLabel,
+                        isTablet = isTablet,
+                        valueLabel = streamSelectionModeLabel,
+                        onClick = { showAutoPlayModeDialog = true },
+                    )
+                }
                 if (settings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
                     SettingsGroupDivider(isTablet = isTablet)
                     val notSetLabel = stringResource(Res.string.settings_playback_not_set)
@@ -258,45 +298,169 @@ internal fun PlaybackStreamSettings(
                 }
                 if (settings.streamAutoPlaySource != StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
                     SettingsGroupDivider(isTablet = isTablet)
-                    val addonSubtitle = if (settings.streamAutoPlaySelectedAddons.isEmpty()) {
-                        stringResource(Res.string.settings_playback_all_addons)
+                    if (isDesktop) {
+                        val addonNames = addonUiState.addons
+                            .enabledAddons()
+                            .mapNotNull { it.manifest }
+                            .filter { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
+                            .map { it.name }
+                            .distinct()
+                            .sorted()
+                        val activeSelectedAddons = settings.streamAutoPlaySelectedAddons.intersect(addonNames.toSet())
+                        val allAddonsLabel = stringResource(Res.string.settings_playback_all_addons)
+                        val addonLabel = if (activeSelectedAddons.isEmpty()) {
+                            allAddonsLabel
+                        } else {
+                            stringResource(Res.string.settings_playback_selected_count, activeSelectedAddons.size)
+                        }
+                        val addonOptions = buildList<DesktopDropdownOption<ProviderSelectionKey>> {
+                            add(DesktopDropdownOption(value = ProviderSelectionKey.All, label = allAddonsLabel))
+                            if (addonNames.isEmpty()) {
+                                add(
+                                    DesktopDropdownOption(
+                                        value = ProviderSelectionKey.EmptyPlaceholder,
+                                        label = stringResource(Res.string.settings_playback_no_items_available),
+                                        enabled = false,
+                                    ),
+                                )
+                            } else {
+                                addonNames.forEach { name ->
+                                    add(DesktopDropdownOption(value = ProviderSelectionKey.Item(name), label = name))
+                                }
+                            }
+                        }
+                        val selectedKeys: Set<ProviderSelectionKey> = if (activeSelectedAddons.isEmpty()) {
+                            setOf(ProviderSelectionKey.All)
+                        } else {
+                            activeSelectedAddons.map { ProviderSelectionKey.Item(it) }.toSet()
+                        }
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_playback_allowed_addons),
+                        ) {
+                            DesktopDropdownMultiSelect(
+                                label = addonLabel,
+                                options = addonOptions,
+                                selectedValues = selectedKeys,
+                                onToggle = { key ->
+                                    when (key) {
+                                        ProviderSelectionKey.All -> {
+                                            PlayerSettingsRepository.setStreamAutoPlaySelectedAddons(emptySet())
+                                        }
+                                        is ProviderSelectionKey.Item -> {
+                                            val updated = if (key.name in activeSelectedAddons) {
+                                                activeSelectedAddons - key.name
+                                            } else {
+                                                activeSelectedAddons + key.name
+                                            }
+                                            PlayerSettingsRepository.setStreamAutoPlaySelectedAddons(updated)
+                                        }
+                                        ProviderSelectionKey.EmptyPlaceholder -> Unit
+                                    }
+                                },
+                            )
+                        }
                     } else {
-                        stringResource(
-                            Res.string.settings_playback_selected_count,
-                            settings.streamAutoPlaySelectedAddons.size,
+                        val addonSubtitle = if (settings.streamAutoPlaySelectedAddons.isEmpty()) {
+                            stringResource(Res.string.settings_playback_all_addons)
+                        } else {
+                            stringResource(
+                                Res.string.settings_playback_selected_count,
+                                settings.streamAutoPlaySelectedAddons.size,
+                            )
+                        }
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_allowed_addons),
+                            description = addonSubtitle,
+                            isTablet = isTablet,
+                            valueLabel = addonSubtitle,
+                            onClick = { showAutoPlayAddonSelectionDialog = true },
                         )
                     }
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_allowed_addons),
-                        description = addonSubtitle,
-                        isTablet = isTablet,
-                        valueLabel = addonSubtitle,
-                        onClick = { showAutoPlayAddonSelectionDialog = true },
-                    )
                 }
                 if (pluginsEnabled && settings.streamAutoPlaySource != StreamAutoPlaySource.INSTALLED_ADDONS_ONLY) {
                     SettingsGroupDivider(isTablet = isTablet)
-                    val pluginSubtitle = if (settings.streamAutoPlaySelectedPlugins.isEmpty()) {
-                        stringResource(Res.string.settings_playback_all_plugins)
+                    if (isDesktop) {
+                        val pluginNames = pluginUiState.scrapers
+                            .filter { it.enabled }
+                            .map { it.name }
+                            .distinct()
+                            .sorted()
+                        val activeSelectedPlugins = settings.streamAutoPlaySelectedPlugins.intersect(pluginNames.toSet())
+                        val allPluginsLabel = stringResource(Res.string.settings_playback_all_plugins)
+                        val pluginLabel = if (activeSelectedPlugins.isEmpty()) {
+                            allPluginsLabel
+                        } else {
+                            stringResource(Res.string.settings_playback_selected_count, activeSelectedPlugins.size)
+                        }
+                        val pluginOptions = buildList<DesktopDropdownOption<ProviderSelectionKey>> {
+                            add(DesktopDropdownOption(value = ProviderSelectionKey.All, label = allPluginsLabel))
+                            if (pluginNames.isEmpty()) {
+                                add(
+                                    DesktopDropdownOption(
+                                        value = ProviderSelectionKey.EmptyPlaceholder,
+                                        label = stringResource(Res.string.settings_playback_no_items_available),
+                                        enabled = false,
+                                    ),
+                                )
+                            } else {
+                                pluginNames.forEach { name ->
+                                    add(DesktopDropdownOption(value = ProviderSelectionKey.Item(name), label = name))
+                                }
+                            }
+                        }
+                        val selectedKeys: Set<ProviderSelectionKey> = if (activeSelectedPlugins.isEmpty()) {
+                            setOf(ProviderSelectionKey.All)
+                        } else {
+                            activeSelectedPlugins.map { ProviderSelectionKey.Item(it) }.toSet()
+                        }
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_playback_allowed_plugins),
+                        ) {
+                            DesktopDropdownMultiSelect(
+                                label = pluginLabel,
+                                options = pluginOptions,
+                                selectedValues = selectedKeys,
+                                onToggle = { key ->
+                                    when (key) {
+                                        ProviderSelectionKey.All -> {
+                                            PlayerSettingsRepository.setStreamAutoPlaySelectedPlugins(emptySet())
+                                        }
+                                        is ProviderSelectionKey.Item -> {
+                                            val updated = if (key.name in activeSelectedPlugins) {
+                                                activeSelectedPlugins - key.name
+                                            } else {
+                                                activeSelectedPlugins + key.name
+                                            }
+                                            PlayerSettingsRepository.setStreamAutoPlaySelectedPlugins(updated)
+                                        }
+                                        ProviderSelectionKey.EmptyPlaceholder -> Unit
+                                    }
+                                },
+                            )
+                        }
                     } else {
-                        stringResource(
-                            Res.string.settings_playback_selected_count,
-                            settings.streamAutoPlaySelectedPlugins.size,
+                        val pluginSubtitle = if (settings.streamAutoPlaySelectedPlugins.isEmpty()) {
+                            stringResource(Res.string.settings_playback_all_plugins)
+                        } else {
+                            stringResource(
+                                Res.string.settings_playback_selected_count,
+                                settings.streamAutoPlaySelectedPlugins.size,
+                            )
+                        }
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_allowed_plugins),
+                            description = pluginSubtitle,
+                            isTablet = isTablet,
+                            valueLabel = pluginSubtitle,
+                            onClick = { showAutoPlayPluginSelectionDialog = true },
                         )
                     }
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_allowed_plugins),
-                        description = pluginSubtitle,
-                        isTablet = isTablet,
-                        valueLabel = pluginSubtitle,
-                        onClick = { showAutoPlayPluginSelectionDialog = true },
-                    )
                 }
             }
         }
     }
 
-    if (showReuseCacheDurationDialog) {
+    if (!isDesktop && showReuseCacheDurationDialog) {
         ReuseCacheDurationDialog(
             selectedHours = settings.streamReuseLastLinkCacheHours,
             onDurationSelected = { hours ->
@@ -307,7 +471,7 @@ internal fun PlaybackStreamSettings(
         )
     }
 
-    if (showAutoPlayModeDialog) {
+    if (!isDesktop && showAutoPlayModeDialog) {
         StreamAutoPlayModeDialog(
             selectedMode = settings.streamAutoPlayMode,
             onModeSelected = {
@@ -318,7 +482,7 @@ internal fun PlaybackStreamSettings(
         )
     }
 
-    if (showAutoPlaySourceDialog) {
+    if (!isDesktop && showAutoPlaySourceDialog) {
         StreamAutoPlaySourceDialog(
             pluginsEnabled = pluginsEnabled,
             selectedSource = settings.streamAutoPlaySource,
@@ -330,7 +494,7 @@ internal fun PlaybackStreamSettings(
         )
     }
 
-    if (showAutoPlayAddonSelectionDialog) {
+    if (!isDesktop && showAutoPlayAddonSelectionDialog) {
         val addonNames = addonUiState.addons
             .enabledAddons()
             .mapNotNull { it.manifest }
@@ -351,7 +515,7 @@ internal fun PlaybackStreamSettings(
         )
     }
 
-    if (pluginsEnabled && showAutoPlayPluginSelectionDialog) {
+    if (!isDesktop && pluginsEnabled && showAutoPlayPluginSelectionDialog) {
         val pluginNames = pluginUiState.scrapers
             .filter { it.enabled }
             .map { it.name }
@@ -382,6 +546,14 @@ internal fun PlaybackStreamSettings(
     }
 }
 
+private val ReuseCacheDurationOptions = listOf(1, 2, 3, 6, 12, 24, 48, 72, 168)
+
+private sealed interface ProviderSelectionKey {
+    data object All : ProviderSelectionKey
+    data object EmptyPlaceholder : ProviderSelectionKey
+    data class Item(val name: String) : ProviderSelectionKey
+}
+
 @Composable
 private fun formatReuseCacheDuration(hours: Int): String = when {
     hours < 24 && hours == 1 -> stringResource(Res.string.settings_playback_duration_hour_one, hours)
@@ -401,8 +573,6 @@ private fun ReuseCacheDurationDialog(
     onDurationSelected: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val options = listOf(1, 2, 3, 6, 12, 24, 48, 72, 168)
-
     DialogSurface(
         onDismissRequest = onDismiss,
         title = stringResource(Res.string.settings_playback_last_link_cache_duration),
@@ -411,7 +581,7 @@ private fun ReuseCacheDurationDialog(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            options.forEach { hours ->
+            ReuseCacheDurationOptions.forEach { hours ->
                 val isSelected = hours == selectedHours
                 DialogOption(
                     text = formatReuseCacheDuration(hours),
@@ -453,4 +623,11 @@ internal val StreamAutoPlayMode.labelRes: StringResource
         StreamAutoPlayMode.MANUAL -> Res.string.settings_playback_stream_selection_mode_manual
         StreamAutoPlayMode.FIRST_STREAM -> Res.string.settings_playback_stream_selection_mode_first_stream
         StreamAutoPlayMode.REGEX_MATCH -> Res.string.settings_playback_stream_selection_mode_regex
+    }
+
+private val StreamAutoPlayMode.descriptionRes: StringResource
+    get() = when (this) {
+        StreamAutoPlayMode.MANUAL -> Res.string.settings_playback_stream_selection_mode_manual_description
+        StreamAutoPlayMode.FIRST_STREAM -> Res.string.settings_playback_stream_selection_mode_first_stream_description
+        StreamAutoPlayMode.REGEX_MATCH -> Res.string.settings_playback_stream_selection_mode_regex_description
     }

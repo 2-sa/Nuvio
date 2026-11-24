@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,11 +37,13 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,6 +81,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioBackButton
@@ -106,6 +110,7 @@ import nuvio.composeapp.generated.resources.settings_homescreen_pinned
 import nuvio.composeapp.generated.resources.settings_homescreen_pinned_to_top
 import nuvio.composeapp.generated.resources.settings_homescreen_reorder
 import nuvio.composeapp.generated.resources.settings_homescreen_visible
+import nuvio.composeapp.generated.resources.settings_search_empty
 import nuvio.composeapp.generated.resources.settings_search_placeholder
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -1708,6 +1713,386 @@ internal fun DesktopControlPill(
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
+}
+
+internal data class DesktopDropdownOption<T>(
+    val value: T,
+    val label: String,
+    val description: String? = null,
+    val enabled: Boolean = true,
+)
+
+@Composable
+internal fun <T> DesktopDropdownSelect(
+    label: String,
+    options: List<DesktopDropdownOption<T>>,
+    selectedValue: T,
+    onSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val tokens = MaterialTheme.nuvio
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val showSearch = options.size > 12
+    val trimmedQuery = searchQuery.trim()
+    val filteredOptions = remember(options, trimmedQuery) {
+        if (trimmedQuery.isEmpty()) {
+            options
+        } else {
+            options.filter { option ->
+                option.label.contains(trimmedQuery, ignoreCase = true) ||
+                    (option.description?.contains(trimmedQuery, ignoreCase = true) == true)
+            }
+        }
+    }
+
+    Box(modifier = modifier) {
+        DesktopSelectChip(
+            label = label,
+            enabled = enabled,
+            showChevron = true,
+            onClick = { if (enabled) expanded = true },
+        )
+        DropdownMenu(
+            expanded = expanded && enabled,
+            onDismissRequest = {
+                expanded = false
+                searchQuery = ""
+            },
+            offset = DpOffset(0.dp, 6.dp),
+            shape = RoundedCornerShape(12.dp),
+            containerColor = tokens.colors.surfacePopover,
+            tonalElevation = tokens.elevation.flat,
+            shadowElevation = tokens.elevation.overlay,
+            border = BorderStroke(tokens.borders.thin, Color.White.copy(alpha = 0.14f)),
+            modifier = Modifier
+                .widthIn(min = 210.dp, max = 340.dp)
+                .heightIn(max = 360.dp),
+        ) {
+            if (showSearch) {
+                DesktopDropdownSearchField(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                )
+            }
+            if (filteredOptions.isEmpty()) {
+                DesktopDropdownEmptyState()
+            } else {
+                filteredOptions.forEach { option ->
+                    val isSelected = option.value == selectedValue
+                    DesktopDropdownOptionRow(
+                        label = option.label,
+                        description = option.description,
+                        selected = isSelected,
+                        enabled = option.enabled,
+                        role = Role.RadioButton,
+                        onClick = {
+                            onSelected(option.value)
+                            expanded = false
+                            searchQuery = ""
+                        },
+                        trailing = {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    tint = tokens.colors.accent,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun <T> DesktopDropdownMultiSelect(
+    label: String,
+    options: List<DesktopDropdownOption<T>>,
+    selectedValues: Set<T>,
+    onToggle: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val tokens = MaterialTheme.nuvio
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val showSearch = options.size > 12
+    val trimmedQuery = searchQuery.trim()
+    val filteredOptions = remember(options, trimmedQuery) {
+        if (trimmedQuery.isEmpty()) {
+            options
+        } else {
+            options.filter { option ->
+                option.label.contains(trimmedQuery, ignoreCase = true) ||
+                    (option.description?.contains(trimmedQuery, ignoreCase = true) == true)
+            }
+        }
+    }
+
+    Box(modifier = modifier) {
+        DesktopSelectChip(
+            label = label,
+            enabled = enabled,
+            showChevron = true,
+            onClick = { if (enabled) expanded = true },
+        )
+        DropdownMenu(
+            expanded = expanded && enabled,
+            onDismissRequest = {
+                expanded = false
+                searchQuery = ""
+            },
+            offset = DpOffset(0.dp, 6.dp),
+            shape = RoundedCornerShape(12.dp),
+            containerColor = tokens.colors.surfacePopover,
+            tonalElevation = tokens.elevation.flat,
+            shadowElevation = tokens.elevation.overlay,
+            border = BorderStroke(tokens.borders.thin, Color.White.copy(alpha = 0.14f)),
+            modifier = Modifier
+                .widthIn(min = 210.dp, max = 340.dp)
+                .heightIn(max = 360.dp),
+        ) {
+            if (showSearch) {
+                DesktopDropdownSearchField(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                )
+            }
+            if (filteredOptions.isEmpty()) {
+                DesktopDropdownEmptyState()
+            } else {
+                filteredOptions.forEach { option ->
+                    val isSelected = option.value in selectedValues
+                    DesktopDropdownOptionRow(
+                        label = option.label,
+                        description = option.description,
+                        selected = isSelected,
+                        enabled = option.enabled,
+                        role = Role.Checkbox,
+                        onClick = { onToggle(option.value) },
+                        trailing = {
+                            val checkboxShape = RoundedCornerShape(5.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clip(checkboxShape)
+                                    .then(
+                                        if (isSelected) {
+                                            Modifier.background(
+                                                color = if (option.enabled) {
+                                                    tokens.colors.accent
+                                                } else {
+                                                    tokens.colors.accent.copy(alpha = tokens.opacity.disabled)
+                                                },
+                                                shape = checkboxShape,
+                                            )
+                                        } else {
+                                            Modifier.border(
+                                                width = 1.5.dp,
+                                                color = Color.White.copy(alpha = if (option.enabled) 0.28f else 0.12f),
+                                                shape = checkboxShape,
+                                            )
+                                        },
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        tint = if (option.enabled) {
+                                            Color.White
+                                        } else {
+                                            Color.White.copy(alpha = tokens.opacity.disabled)
+                                        },
+                                        modifier = Modifier.size(13.dp),
+                                    )
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopDropdownSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(8.dp)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .clip(shape)
+                .background(Color.White.copy(alpha = 0.06f), shape)
+                .border(tokens.borders.thin, Color.White.copy(alpha = 0.10f), shape)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = null,
+                tint = tokens.colors.textMuted,
+                modifier = Modifier.size(14.dp),
+            )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = stringResource(Res.string.settings_search_placeholder),
+                        style = MaterialTheme.nuvioTypeScale.bodySm.copy(fontSize = 12.5.sp),
+                        color = tokens.colors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.nuvioTypeScale.bodySm.copy(
+                        fontSize = 12.5.sp,
+                        color = tokens.colors.textPrimary,
+                        textDirection = TextDirection.Content,
+                    ),
+                    cursorBrush = SolidColor(tokens.colors.accent),
+                )
+            }
+            if (query.isNotEmpty()) {
+                val clearInteraction = remember { MutableInteractionSource() }
+                val isClearHovered by clearInteraction.collectIsHoveredAsState()
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(if (isClearHovered) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.08f))
+                        .hoverable(clearInteraction)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .clickable(
+                            interactionSource = clearInteraction,
+                            indication = null,
+                            role = Role.Button,
+                            onClick = { onQueryChange("") },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(Res.string.compose_search_clear),
+                        tint = tokens.colors.textMuted,
+                        modifier = Modifier.size(11.dp),
+                    )
+                }
+            }
+        }
+        HorizontalDivider(
+            thickness = tokens.borders.hairline,
+            color = Color.White.copy(alpha = 0.08f),
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun DesktopDropdownEmptyState() {
+    val tokens = MaterialTheme.nuvio
+    Text(
+        text = stringResource(Res.string.settings_search_empty),
+        style = MaterialTheme.nuvioTypeScale.bodySm.copy(fontSize = 12.5.sp),
+        color = tokens.colors.textMuted,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    )
+}
+
+@Composable
+private fun DesktopDropdownOptionRow(
+    label: String,
+    description: String?,
+    selected: Boolean,
+    enabled: Boolean,
+    role: Role,
+    onClick: () -> Unit,
+    trailing: @Composable () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val rowShape = RoundedCornerShape(8.dp)
+    val bgColor = when {
+        selected -> tokens.colors.accent.copy(alpha = 0.15f)
+        enabled && isHovered -> Color.White.copy(alpha = 0.08f)
+        else -> Color.Transparent
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .clip(rowShape)
+            .background(bgColor, rowShape)
+            .then(
+                if (enabled) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                role = role,
+                onClick = onClick,
+            )
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.nuvioTypeScale.bodySm.copy(
+                    fontSize = 13.5.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                ),
+                color = if (enabled) tokens.colors.textPrimary else tokens.colors.textDisabled,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!description.isNullOrBlank()) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.nuvioTypeScale.bodySm.copy(fontSize = 11.5.sp),
+                    color = if (enabled) tokens.colors.textMuted else tokens.colors.textDisabled,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        trailing()
+    }
 }
 
 

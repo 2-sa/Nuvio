@@ -178,12 +178,49 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                     onCheckedChange = StreamBadgeSettingsRepository::setShowInPlayer,
                 )
                 if (currentSettings.showInPlayer && currentRules.hasImport) {
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_stream_player_badges_title),
-                        description = playerBadgesLabel(currentRules, currentSettings.playerBadgeSource),
-                        isTablet = isTablet,
-                        onClick = { showPlayerBadgesDialog = true },
-                    )
+                    if (isDesktop) {
+                        val normalizedImports = currentRules.normalized().imports
+                        val selectedPlayerBadgeSource = normalizedImports
+                            .firstOrNull { it.sourceUrl.equals(currentSettings.playerBadgeSource, ignoreCase = true) }
+                            ?.sourceUrl
+                            .orEmpty()
+                        val sameSourceLabel = stringResource(Res.string.settings_stream_player_badges_same)
+                        val playerBadgeOptions = buildList {
+                            add(
+                                DesktopDropdownOption(
+                                    value = "",
+                                    label = sameSourceLabel,
+                                ),
+                            )
+                            normalizedImports.forEach { import ->
+                                add(
+                                    DesktopDropdownOption(
+                                        value = import.sourceUrl,
+                                        label = import.sourceUrl,
+                                    ),
+                                )
+                            }
+                        }
+                        SettingsGroupDivider(isTablet = isTablet)
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_stream_player_badges_title),
+                            description = stringResource(Res.string.settings_stream_player_badges_description),
+                        ) {
+                            DesktopDropdownSelect(
+                                label = selectedPlayerBadgeSource.ifEmpty { sameSourceLabel },
+                                options = playerBadgeOptions,
+                                selectedValue = selectedPlayerBadgeSource,
+                                onSelected = StreamBadgeSettingsRepository::setPlayerBadgeSource,
+                            )
+                        }
+                    } else {
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_stream_player_badges_title),
+                            description = playerBadgesLabel(currentRules, currentSettings.playerBadgeSource),
+                            isTablet = isTablet,
+                            onClick = { showPlayerBadgesDialog = true },
+                        )
+                    }
                 }
             }
         }
@@ -200,12 +237,35 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
         ) {
             SettingsGroup(isTablet = isTablet) {
                 if (!isTablet) {
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_stream_background_title),
-                        description = streamBackgroundModeLabel(currentSettings.backgroundMode),
-                        isTablet = false,
-                        onClick = { showBackgroundDialog = true },
-                    )
+                    if (isDesktop) {
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_stream_background_title),
+                            description = stringResource(Res.string.settings_stream_background_description),
+                        ) {
+                            DesktopSegmentedControl(
+                                options = listOf(
+                                    DesktopSegmentedOption(
+                                        value = StreamBackgroundMode.Cinematic,
+                                        label = stringResource(Res.string.settings_meta_background_mode_cinematic),
+                                    ),
+                                    DesktopSegmentedOption(
+                                        value = StreamBackgroundMode.Normal,
+                                        label = stringResource(Res.string.settings_meta_background_mode_normal),
+                                    ),
+                                ),
+                                selected = currentSettings.backgroundMode,
+                                onSelected = StreamBadgeSettingsRepository::setBackgroundMode,
+                            )
+                        }
+                        SettingsGroupDivider(isTablet = false)
+                    } else {
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_stream_background_title),
+                            description = streamBackgroundModeLabel(currentSettings.backgroundMode),
+                            isTablet = false,
+                            onClick = { showBackgroundDialog = true },
+                        )
+                    }
                 }
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_stream_addon_logo_title),
@@ -224,7 +284,7 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
             )
         }
 
-        if (showPlayerBadgesDialog) {
+        if (showPlayerBadgesDialog && !isDesktop) {
             PlayerBadgesDialog(
                 rules = currentRules,
                 selectedSource = currentSettings.playerBadgeSource,
@@ -236,7 +296,7 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
             )
         }
 
-        if (showBackgroundDialog && !isTablet) {
+        if (showBackgroundDialog && !isTablet && !isDesktop) {
             StreamBackgroundModeDialog(
                 selectedMode = currentSettings.backgroundMode,
                 onModeSelected = { mode ->
@@ -247,7 +307,7 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
             )
         }
 
-        if (showBadgePositionDialog) {
+        if (showBadgePositionDialog && !isDesktop) {
             StreamBadgePositionDialog(
                 selectedPlacement = currentSettings.badgePlacement,
                 onPlacementSelected = { placement ->

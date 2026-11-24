@@ -26,6 +26,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.skip.AutoSkipSegmentType
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -53,14 +55,52 @@ internal fun PlaybackSkipSettings(
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 val autoSkipSummary = autoSkipSelectionSummary(settings.autoSkipSegmentTypes)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_auto_skip_segments),
-                    description = autoSkipSummary,
-                    enabled = settings.skipIntroEnabled && !settings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    valueLabel = autoSkipSummary,
-                    onClick = { showAutoSkipSegmentDialog = true },
-                )
+                val autoSkipEnabled = settings.skipIntroEnabled && !settings.externalPlayerEnabled
+                if (isDesktop) {
+                    val segmentOptions = AutoSkipSegmentType.entries.map { segmentType ->
+                        DesktopDropdownOption(
+                            value = segmentType,
+                            label = when (segmentType) {
+                                AutoSkipSegmentType.INTRO -> stringResource(Res.string.settings_playback_auto_skip_intro)
+                                AutoSkipSegmentType.RECAP -> stringResource(Res.string.settings_playback_auto_skip_recap)
+                                AutoSkipSegmentType.OUTRO -> stringResource(Res.string.settings_playback_auto_skip_outro)
+                                AutoSkipSegmentType.MOVIE_CREDITS -> stringResource(Res.string.settings_playback_auto_skip_movie_credits)
+                            },
+                            description = when (segmentType) {
+                                AutoSkipSegmentType.INTRO -> stringResource(Res.string.settings_playback_auto_skip_intro_description)
+                                AutoSkipSegmentType.RECAP -> stringResource(Res.string.settings_playback_auto_skip_recap_description)
+                                AutoSkipSegmentType.OUTRO -> stringResource(Res.string.settings_playback_auto_skip_outro_description)
+                                AutoSkipSegmentType.MOVIE_CREDITS -> stringResource(Res.string.settings_playback_auto_skip_movie_credits_description)
+                            },
+                        )
+                    }
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_auto_skip_segments),
+                        enabled = autoSkipEnabled,
+                    ) {
+                        DesktopDropdownMultiSelect(
+                            label = autoSkipSummary,
+                            options = segmentOptions,
+                            selectedValues = settings.autoSkipSegmentTypes,
+                            onToggle = { segmentType ->
+                                PlayerSettingsRepository.setAutoSkipSegmentTypeEnabled(
+                                    segmentType,
+                                    segmentType !in settings.autoSkipSegmentTypes,
+                                )
+                            },
+                            enabled = autoSkipEnabled,
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_auto_skip_segments),
+                        description = autoSkipSummary,
+                        enabled = autoSkipEnabled,
+                        isTablet = isTablet,
+                        valueLabel = autoSkipSummary,
+                        onClick = { showAutoSkipSegmentDialog = true },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_playback_anime_skip),
@@ -127,7 +167,7 @@ internal fun PlaybackSkipSettings(
         }
     }
 
-    if (showAutoSkipSegmentDialog) {
+    if (!isDesktop && showAutoSkipSegmentDialog) {
         AutoSkipSegmentSelectionDialog(
             selectedTypes = settings.autoSkipSegmentTypes,
             onTypeToggled = PlayerSettingsRepository::setAutoSkipSegmentTypeEnabled,

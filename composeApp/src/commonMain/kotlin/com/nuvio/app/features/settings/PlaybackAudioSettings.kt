@@ -43,24 +43,92 @@ internal fun PlaybackAudioSettings(
                     AudioLanguageOption.ORIGINAL -> stringResource(Res.string.settings_playback_option_original)
                     else -> languageLabelForCode(settings.preferredAudioLanguage)
                 }
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_preferred_audio_language),
-                    description = preferredAudioLabel,
-                    enabled = !settings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    valueLabel = preferredAudioLabel,
-                    onClick = { showPreferredAudioDialog = true },
-                )
+                if (isDesktop) {
+                    val originalHint = stringResource(Res.string.settings_playback_option_original_hint)
+                    val preferredAudioOptions = listOf(
+                        DesktopDropdownOption(
+                            value = AudioLanguageOption.DEFAULT,
+                            label = stringResource(Res.string.settings_playback_option_default),
+                        ),
+                        DesktopDropdownOption(
+                            value = AudioLanguageOption.DEVICE,
+                            label = stringResource(Res.string.settings_playback_option_device_language),
+                        ),
+                        DesktopDropdownOption(
+                            value = AudioLanguageOption.ORIGINAL,
+                            label = stringResource(Res.string.settings_playback_option_original),
+                            description = originalHint,
+                        ),
+                    ) + AvailableLanguageOptions.map { option ->
+                        DesktopDropdownOption(
+                            value = option.code,
+                            label = stringResource(option.labelRes),
+                        )
+                    }
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_preferred_audio_language),
+                        enabled = !settings.externalPlayerEnabled,
+                    ) {
+                        DesktopDropdownSelect(
+                            label = preferredAudioLabel,
+                            options = preferredAudioOptions,
+                            selectedValue = settings.preferredAudioLanguage,
+                            onSelected = PlayerSettingsRepository::setPreferredAudioLanguage,
+                            enabled = !settings.externalPlayerEnabled,
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_preferred_audio_language),
+                        description = preferredAudioLabel,
+                        enabled = !settings.externalPlayerEnabled,
+                        isTablet = isTablet,
+                        valueLabel = preferredAudioLabel,
+                        onClick = { showPreferredAudioDialog = true },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 val secondaryAudioLabel = languageLabelForCode(settings.secondaryPreferredAudioLanguage)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_secondary_audio_language),
-                    description = secondaryAudioLabel,
-                    enabled = !settings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    valueLabel = secondaryAudioLabel,
-                    onClick = { showSecondaryAudioDialog = true },
-                )
+                if (isDesktop) {
+                    val originalHint = stringResource(Res.string.settings_playback_option_original_hint)
+                    val secondaryAudioOptions = listOf<DesktopDropdownOption<String?>>(
+                        DesktopDropdownOption(
+                            value = null,
+                            label = stringResource(Res.string.settings_playback_option_none),
+                        ),
+                        DesktopDropdownOption(
+                            value = AudioLanguageOption.ORIGINAL,
+                            label = stringResource(Res.string.settings_playback_option_original),
+                            description = originalHint,
+                        ),
+                    ) + AvailableLanguageOptions.map { option ->
+                        DesktopDropdownOption<String?>(
+                            value = option.code,
+                            label = stringResource(option.labelRes),
+                        )
+                    }
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_secondary_audio_language),
+                        enabled = !settings.externalPlayerEnabled,
+                    ) {
+                        DesktopDropdownSelect(
+                            label = secondaryAudioLabel,
+                            options = secondaryAudioOptions,
+                            selectedValue = settings.secondaryPreferredAudioLanguage,
+                            onSelected = PlayerSettingsRepository::setSecondaryPreferredAudioLanguage,
+                            enabled = !settings.externalPlayerEnabled,
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_secondary_audio_language),
+                        description = secondaryAudioLabel,
+                        enabled = !settings.externalPlayerEnabled,
+                        isTablet = isTablet,
+                        valueLabel = secondaryAudioLabel,
+                        onClick = { showSecondaryAudioDialog = true },
+                    )
+                }
                 if (!isIos && !isDesktop) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsSwitchRow(
@@ -94,14 +162,34 @@ internal fun PlaybackAudioSettings(
                     )
                     if (settings.effectiveDownmixEnabled) {
                         SettingsGroupDivider(isTablet = isTablet)
-                        SettingsNavigationRow(
-                            title = stringResource(Res.string.settings_playback_downmix_channels),
-                            description = settings.audioOutputChannels.settingValue,
-                            enabled = downmixAvailable,
-                            isTablet = isTablet,
-                            valueLabel = settings.audioOutputChannels.settingValue,
-                            onClick = { showDownmixChannelsDialog = true },
-                        )
+                        if (isDesktop) {
+                            DesktopSettingRow(
+                                title = stringResource(Res.string.settings_playback_downmix_channels),
+                                enabled = downmixAvailable,
+                            ) {
+                                DesktopDropdownSelect(
+                                    label = settings.audioOutputChannels.settingValue,
+                                    options = AudioOutputChannels.entries.map { channel ->
+                                        DesktopDropdownOption(
+                                            value = channel,
+                                            label = channel.settingValue,
+                                        )
+                                    },
+                                    selectedValue = settings.audioOutputChannels,
+                                    onSelected = PlayerSettingsRepository::setAudioOutputChannels,
+                                    enabled = downmixAvailable,
+                                )
+                            }
+                        } else {
+                            SettingsNavigationRow(
+                                title = stringResource(Res.string.settings_playback_downmix_channels),
+                                description = settings.audioOutputChannels.settingValue,
+                                enabled = downmixAvailable,
+                                isTablet = isTablet,
+                                valueLabel = settings.audioOutputChannels.settingValue,
+                                onClick = { showDownmixChannelsDialog = true },
+                            )
+                        }
                         SettingsGroupDivider(isTablet = isTablet)
                         SettingsSwitchRow(
                             title = stringResource(Res.string.settings_playback_downmix_maintain_volume),
@@ -133,7 +221,7 @@ internal fun PlaybackAudioSettings(
         }
     }
 
-    if (showDownmixChannelsDialog) {
+    if (!isDesktop && showDownmixChannelsDialog) {
         SettingsChoiceDialog(
             title = stringResource(Res.string.settings_playback_downmix_channels),
             options = AudioOutputChannels.entries,
@@ -147,7 +235,7 @@ internal fun PlaybackAudioSettings(
         )
     }
 
-    if (showPreferredAudioDialog) {
+    if (!isDesktop && showPreferredAudioDialog) {
         val originalHint = stringResource(Res.string.settings_playback_option_original_hint)
         LanguageSelectionDialog(
             title = stringResource(Res.string.settings_playback_preferred_audio_language),
@@ -167,7 +255,7 @@ internal fun PlaybackAudioSettings(
         )
     }
 
-    if (showSecondaryAudioDialog) {
+    if (!isDesktop && showSecondaryAudioDialog) {
         val originalHint = stringResource(Res.string.settings_playback_option_original_hint)
         LanguageSelectionDialog(
             title = stringResource(Res.string.settings_playback_secondary_audio_language),

@@ -47,6 +47,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.isDesktop
 import com.nuvio.app.features.debrid.DEBRID_PREPARE_INSTANT_PLAYBACK_DEFAULT_LIMIT
 import com.nuvio.app.features.debrid.DebridCredentialValidator
 import com.nuvio.app.features.debrid.DebridDeviceAuthorization
@@ -252,14 +253,35 @@ internal fun LazyListScope.debridSettingsContent(
                 )
                 if (settings.canResolvePlayableLinks && resolverProviders.size > 1 && activeResolverProvider != null) {
                     SettingsGroupDivider(isTablet = isTablet)
-                    DebridPreferenceRow(
-                        isTablet = isTablet,
-                        title = stringResource(Res.string.settings_debrid_resolve_with),
-                        description = stringResource(Res.string.settings_debrid_resolve_with_description),
-                        value = activeResolverProvider.displayName,
-                        enabled = true,
-                        onClick = { showResolverProviderDialog = true },
-                    )
+                    if (isDesktop) {
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_debrid_resolve_with),
+                            description = stringResource(Res.string.settings_debrid_resolve_with_description),
+                        ) {
+                            DesktopDropdownSelect(
+                                label = activeResolverProvider.displayName,
+                                options = resolverProviders.map { provider ->
+                                    DesktopDropdownOption(
+                                        value = provider,
+                                        label = provider.displayName,
+                                    )
+                                },
+                                selectedValue = activeResolverProvider,
+                                onSelected = { provider ->
+                                    DebridSettingsRepository.setPreferredResolverProviderId(provider.id)
+                                },
+                            )
+                        }
+                    } else {
+                        DebridPreferenceRow(
+                            isTablet = isTablet,
+                            title = stringResource(Res.string.settings_debrid_resolve_with),
+                            description = stringResource(Res.string.settings_debrid_resolve_with_description),
+                            value = activeResolverProvider.displayName,
+                            enabled = true,
+                            onClick = { showResolverProviderDialog = true },
+                        )
+                    }
                 }
                 if (!settings.hasResolverProvider) {
                     SettingsGroupDivider(isTablet = isTablet)
@@ -271,7 +293,7 @@ internal fun LazyListScope.debridSettingsContent(
             }
         }
 
-        if (showResolverProviderDialog && resolverProviders.size > 1 && activeResolverProvider != null) {
+        if (!isDesktop && showResolverProviderDialog && resolverProviders.size > 1 && activeResolverProvider != null) {
             DebridSingleChoiceDialog(
                 title = stringResource(Res.string.settings_debrid_resolve_with),
                 selectedValue = activeResolverProvider,
@@ -381,17 +403,39 @@ internal fun LazyListScope.debridSettingsContent(
                 )
                 if (prepareEnabled) {
                     SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_debrid_prepare_stream_count),
-                        description = prepareCountLabel(prepareLimit),
-                        isTablet = isTablet,
-                        onClick = { showPrepareCountDialog = true },
-                    )
+                    if (isDesktop) {
+                        val prepareCountOptions = listOf(1, 2, 3, 5).map { limit ->
+                            DesktopDropdownOption(
+                                value = limit,
+                                label = prepareCountLabel(limit),
+                            )
+                        }
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_debrid_prepare_stream_count),
+                            description = stringResource(Res.string.settings_debrid_prepare_stream_count_warning),
+                            enabled = settings.canResolvePlayableLinks,
+                        ) {
+                            DesktopDropdownSelect(
+                                label = prepareCountLabel(prepareLimit),
+                                options = prepareCountOptions,
+                                selectedValue = prepareLimit,
+                                enabled = settings.canResolvePlayableLinks,
+                                onSelected = DebridSettingsRepository::setInstantPlaybackPreparationLimit,
+                            )
+                        }
+                    } else {
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_debrid_prepare_stream_count),
+                            description = prepareCountLabel(prepareLimit),
+                            isTablet = isTablet,
+                            onClick = { showPrepareCountDialog = true },
+                        )
+                    }
                 }
             }
         }
 
-        if (showPrepareCountDialog) {
+        if (!isDesktop && showPrepareCountDialog) {
             DebridPrepareCountDialog(
                 selectedLimit = prepareLimit,
                 onLimitSelected = { limit ->
@@ -413,71 +457,177 @@ internal fun LazyListScope.debridSettingsContent(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                DebridPreferenceRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_debrid_max_results),
-                    description = stringResource(Res.string.settings_debrid_max_results_desc),
-                    value = streamMaxResultsLabel(preferences.maxResults),
-                    enabled = settings.canResolvePlayableLinks,
-                    onClick = { activeStreamPicker = DebridStreamPicker.MAX_RESULTS },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                DebridPreferenceRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_debrid_sort_results),
-                    description = stringResource(Res.string.settings_debrid_sort_results_desc),
-                    value = sortProfileLabel(preferences.sortCriteria),
-                    enabled = settings.canResolvePlayableLinks,
-                    onClick = { activeStreamPicker = DebridStreamPicker.SORT_MODE },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                DebridPreferenceRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_debrid_per_resolution_limit),
-                    description = stringResource(Res.string.settings_debrid_per_resolution_limit_desc),
-                    value = streamMaxResultsLabel(preferences.maxPerResolution),
-                    enabled = settings.canResolvePlayableLinks,
-                    onClick = { activeStreamPicker = DebridStreamPicker.MAX_PER_RESOLUTION },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                DebridPreferenceRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_debrid_per_quality_limit),
-                    description = stringResource(Res.string.settings_debrid_per_quality_limit_desc),
-                    value = streamMaxResultsLabel(preferences.maxPerQuality),
-                    enabled = settings.canResolvePlayableLinks,
-                    onClick = { activeStreamPicker = DebridStreamPicker.MAX_PER_QUALITY },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                DebridPreferenceRow(
-                    isTablet = isTablet,
-                    title = stringResource(Res.string.settings_debrid_size_range),
-                    description = stringResource(Res.string.settings_debrid_size_range_desc),
-                    value = sizeRangeLabel(preferences),
-                    enabled = settings.canResolvePlayableLinks,
-                    onClick = { activeStreamPicker = DebridStreamPicker.SIZE_RANGE },
-                )
-                rows.forEach { row ->
+                if (isDesktop) {
+                    val maxResultsOptions = listOf(0, 5, 10, 20, 50).map { value ->
+                        DesktopDropdownOption(value = value, label = streamMaxResultsLabel(value))
+                    }
+                    val sortProfileOptions = listOf(
+                        DebridSortProfile.ORIGINAL,
+                        DebridSortProfile.BEST_QUALITY,
+                        DebridSortProfile.LARGEST,
+                        DebridSortProfile.SMALLEST,
+                        DebridSortProfile.AUDIO,
+                        DebridSortProfile.LANGUAGE,
+                    ).map { profile ->
+                        DesktopDropdownOption(value = profile, label = sortProfileLabel(profile))
+                    }
+                    val perLimitOptions = listOf(0, 1, 2, 3, 5).map { value ->
+                        DesktopDropdownOption(value = value, label = streamMaxResultsLabel(value))
+                    }
+                    val sizeRangeOptions = listOf(0 to 0, 0 to 5, 0 to 10, 5 to 20, 10 to 50, 20 to 100).map { range ->
+                        DesktopDropdownOption(value = range, label = sizeRangeLabel(range.first, range.second))
+                    }
+                    val selectedSortProfile = sortProfileFor(preferences.sortCriteria)
+
+                    DesktopDebridSingleSelectRow(
+                        title = stringResource(Res.string.settings_debrid_max_results),
+                        description = stringResource(Res.string.settings_debrid_max_results_desc),
+                        valueLabel = streamMaxResultsLabel(preferences.maxResults),
+                        enabled = settings.canResolvePlayableLinks,
+                        options = maxResultsOptions,
+                        selectedValue = preferences.maxResults,
+                        onSelected = { value ->
+                            DebridSettingsRepository.setStreamPreferences(preferences.copy(maxResults = value))
+                        },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopDebridSingleSelectRow(
+                        title = stringResource(Res.string.settings_debrid_sort_results),
+                        description = stringResource(Res.string.settings_debrid_sort_results_desc),
+                        valueLabel = sortProfileLabel(selectedSortProfile),
+                        enabled = settings.canResolvePlayableLinks,
+                        options = sortProfileOptions,
+                        selectedValue = selectedSortProfile,
+                        onSelected = { value ->
+                            DebridSettingsRepository.setStreamPreferences(
+                                preferences.copy(sortCriteria = sortCriteriaForProfile(value)),
+                            )
+                        },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopDebridSingleSelectRow(
+                        title = stringResource(Res.string.settings_debrid_per_resolution_limit),
+                        description = stringResource(Res.string.settings_debrid_per_resolution_limit_desc),
+                        valueLabel = streamMaxResultsLabel(preferences.maxPerResolution),
+                        enabled = settings.canResolvePlayableLinks,
+                        options = perLimitOptions,
+                        selectedValue = preferences.maxPerResolution,
+                        onSelected = { value ->
+                            DebridSettingsRepository.setStreamPreferences(preferences.copy(maxPerResolution = value))
+                        },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopDebridSingleSelectRow(
+                        title = stringResource(Res.string.settings_debrid_per_quality_limit),
+                        description = stringResource(Res.string.settings_debrid_per_quality_limit_desc),
+                        valueLabel = streamMaxResultsLabel(preferences.maxPerQuality),
+                        enabled = settings.canResolvePlayableLinks,
+                        options = perLimitOptions,
+                        selectedValue = preferences.maxPerQuality,
+                        onSelected = { value ->
+                            DebridSettingsRepository.setStreamPreferences(preferences.copy(maxPerQuality = value))
+                        },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopDebridSingleSelectRow(
+                        title = stringResource(Res.string.settings_debrid_size_range),
+                        description = stringResource(Res.string.settings_debrid_size_range_desc),
+                        valueLabel = sizeRangeLabel(preferences),
+                        enabled = settings.canResolvePlayableLinks,
+                        options = sizeRangeOptions,
+                        selectedValue = preferences.sizeMinGb to preferences.sizeMaxGb,
+                        onSelected = { value ->
+                            DebridSettingsRepository.setStreamPreferences(
+                                preferences.copy(sizeMinGb = value.first, sizeMaxGb = value.second),
+                            )
+                        },
+                    )
+                } else {
+                    DebridPreferenceRow(
+                        isTablet = isTablet,
+                        title = stringResource(Res.string.settings_debrid_max_results),
+                        description = stringResource(Res.string.settings_debrid_max_results_desc),
+                        value = streamMaxResultsLabel(preferences.maxResults),
+                        enabled = settings.canResolvePlayableLinks,
+                        onClick = { activeStreamPicker = DebridStreamPicker.MAX_RESULTS },
+                    )
                     SettingsGroupDivider(isTablet = isTablet)
                     DebridPreferenceRow(
                         isTablet = isTablet,
-                        title = row.title,
-                        description = row.description,
-                        value = row.value,
+                        title = stringResource(Res.string.settings_debrid_sort_results),
+                        description = stringResource(Res.string.settings_debrid_sort_results_desc),
+                        value = sortProfileLabel(preferences.sortCriteria),
                         enabled = settings.canResolvePlayableLinks,
-                        onClick = { activeStreamPicker = row.picker },
+                        onClick = { activeStreamPicker = DebridStreamPicker.SORT_MODE },
                     )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DebridPreferenceRow(
+                        isTablet = isTablet,
+                        title = stringResource(Res.string.settings_debrid_per_resolution_limit),
+                        description = stringResource(Res.string.settings_debrid_per_resolution_limit_desc),
+                        value = streamMaxResultsLabel(preferences.maxPerResolution),
+                        enabled = settings.canResolvePlayableLinks,
+                        onClick = { activeStreamPicker = DebridStreamPicker.MAX_PER_RESOLUTION },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DebridPreferenceRow(
+                        isTablet = isTablet,
+                        title = stringResource(Res.string.settings_debrid_per_quality_limit),
+                        description = stringResource(Res.string.settings_debrid_per_quality_limit_desc),
+                        value = streamMaxResultsLabel(preferences.maxPerQuality),
+                        enabled = settings.canResolvePlayableLinks,
+                        onClick = { activeStreamPicker = DebridStreamPicker.MAX_PER_QUALITY },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DebridPreferenceRow(
+                        isTablet = isTablet,
+                        title = stringResource(Res.string.settings_debrid_size_range),
+                        description = stringResource(Res.string.settings_debrid_size_range_desc),
+                        value = sizeRangeLabel(preferences),
+                        enabled = settings.canResolvePlayableLinks,
+                        onClick = { activeStreamPicker = DebridStreamPicker.SIZE_RANGE },
+                    )
+                }
+                rows.forEach { row ->
+                    SettingsGroupDivider(isTablet = isTablet)
+                    if (
+                        isDesktop &&
+                        row.picker != DebridStreamPicker.REQUIRED_RELEASE_GROUPS &&
+                        row.picker != DebridStreamPicker.EXCLUDED_RELEASE_GROUPS
+                    ) {
+                        DesktopDebridRuleRow(
+                            row = row,
+                            preferences = preferences,
+                            enabled = settings.canResolvePlayableLinks,
+                            onPreferencesChanged = DebridSettingsRepository::setStreamPreferences,
+                        )
+                    } else {
+                        DebridPreferenceRow(
+                            isTablet = isTablet,
+                            title = row.title,
+                            description = row.description,
+                            value = row.value,
+                            enabled = settings.canResolvePlayableLinks,
+                            onClick = { activeStreamPicker = row.picker },
+                        )
+                    }
                 }
             }
         }
 
         activeStreamPicker?.let { picker ->
-            DebridStreamPreferenceDialog(
-                picker = picker,
-                preferences = preferences,
-                onPreferencesChanged = DebridSettingsRepository::setStreamPreferences,
-                onDismiss = { activeStreamPicker = null },
-            )
+            if (
+                !isDesktop ||
+                picker == DebridStreamPicker.REQUIRED_RELEASE_GROUPS ||
+                picker == DebridStreamPicker.EXCLUDED_RELEASE_GROUPS
+            ) {
+                DebridStreamPreferenceDialog(
+                    picker = picker,
+                    preferences = preferences,
+                    onPreferencesChanged = DebridSettingsRepository::setStreamPreferences,
+                    onDismiss = { activeStreamPicker = null },
+                )
+            }
         }
     }
 
@@ -736,6 +886,304 @@ private fun DebridPreferenceRow(
             color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium,
         )
+    }
+}
+
+@Composable
+private fun <T> DesktopDebridSingleSelectRow(
+    title: String,
+    description: String,
+    valueLabel: String,
+    enabled: Boolean,
+    options: List<DesktopDropdownOption<T>>,
+    selectedValue: T,
+    onSelected: (T) -> Unit,
+) {
+    DesktopSettingRow(
+        title = title,
+        description = description,
+        enabled = enabled,
+    ) {
+        DesktopDropdownSelect(
+            label = valueLabel,
+            options = options,
+            selectedValue = selectedValue,
+            enabled = enabled,
+            onSelected = onSelected,
+        )
+    }
+}
+
+@Composable
+private fun <T> DesktopDebridMultiSelectRow(
+    title: String,
+    description: String,
+    valueLabel: String,
+    enabled: Boolean,
+    values: List<T>,
+    selectedValues: List<T>,
+    optionLabel: (T) -> String,
+    fallbackWhenEmpty: List<T>? = null,
+    onSelectionChanged: (List<T>) -> Unit,
+) {
+    DesktopSettingRow(
+        title = title,
+        description = description,
+        enabled = enabled,
+    ) {
+        DesktopDropdownMultiSelect(
+            label = valueLabel,
+            options = values.map { option ->
+                DesktopDropdownOption(
+                    value = option,
+                    label = optionLabel(option),
+                )
+            },
+            selectedValues = selectedValues.toSet(),
+            enabled = enabled,
+            onToggle = { item ->
+                val updated = if (item in selectedValues) {
+                    selectedValues - item
+                } else {
+                    selectedValues + item
+                }
+                onSelectionChanged(
+                    if (fallbackWhenEmpty != null && updated.isEmpty()) {
+                        fallbackWhenEmpty
+                    } else {
+                        updated
+                    },
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun DesktopDebridRuleRow(
+    row: DebridRuleRow,
+    preferences: DebridStreamPreferences,
+    enabled: Boolean,
+    onPreferencesChanged: (DebridStreamPreferences) -> Unit,
+) {
+    when (row.picker) {
+        DebridStreamPicker.PREFERRED_RESOLUTIONS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamResolution.defaultOrder,
+            selectedValues = preferences.preferredResolutions,
+            optionLabel = { it.label },
+            fallbackWhenEmpty = DebridStreamResolution.defaultOrder,
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(preferredResolutions = it)) },
+        )
+        DebridStreamPicker.REQUIRED_RESOLUTIONS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamResolution.defaultOrder,
+            selectedValues = preferences.requiredResolutions,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(requiredResolutions = it)) },
+        )
+        DebridStreamPicker.EXCLUDED_RESOLUTIONS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamResolution.defaultOrder,
+            selectedValues = preferences.excludedResolutions,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(excludedResolutions = it)) },
+        )
+        DebridStreamPicker.PREFERRED_QUALITIES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamQuality.defaultOrder,
+            selectedValues = preferences.preferredQualities,
+            optionLabel = { it.label },
+            fallbackWhenEmpty = DebridStreamQuality.defaultOrder,
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(preferredQualities = it)) },
+        )
+        DebridStreamPicker.REQUIRED_QUALITIES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamQuality.defaultOrder,
+            selectedValues = preferences.requiredQualities,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(requiredQualities = it)) },
+        )
+        DebridStreamPicker.EXCLUDED_QUALITIES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamQuality.defaultOrder,
+            selectedValues = preferences.excludedQualities,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(excludedQualities = it)) },
+        )
+        DebridStreamPicker.PREFERRED_VISUAL_TAGS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamVisualTag.defaultOrder,
+            selectedValues = preferences.preferredVisualTags,
+            optionLabel = { it.label },
+            fallbackWhenEmpty = DebridStreamVisualTag.defaultOrder,
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(preferredVisualTags = it)) },
+        )
+        DebridStreamPicker.REQUIRED_VISUAL_TAGS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamVisualTag.defaultOrder,
+            selectedValues = preferences.requiredVisualTags,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(requiredVisualTags = it)) },
+        )
+        DebridStreamPicker.EXCLUDED_VISUAL_TAGS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamVisualTag.defaultOrder,
+            selectedValues = preferences.excludedVisualTags,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(excludedVisualTags = it)) },
+        )
+        DebridStreamPicker.PREFERRED_AUDIO_TAGS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamAudioTag.defaultOrder,
+            selectedValues = preferences.preferredAudioTags,
+            optionLabel = { it.label },
+            fallbackWhenEmpty = DebridStreamAudioTag.defaultOrder,
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(preferredAudioTags = it)) },
+        )
+        DebridStreamPicker.REQUIRED_AUDIO_TAGS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamAudioTag.defaultOrder,
+            selectedValues = preferences.requiredAudioTags,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(requiredAudioTags = it)) },
+        )
+        DebridStreamPicker.EXCLUDED_AUDIO_TAGS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamAudioTag.defaultOrder,
+            selectedValues = preferences.excludedAudioTags,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(excludedAudioTags = it)) },
+        )
+        DebridStreamPicker.PREFERRED_AUDIO_CHANNELS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamAudioChannel.defaultOrder,
+            selectedValues = preferences.preferredAudioChannels,
+            optionLabel = { it.label },
+            fallbackWhenEmpty = DebridStreamAudioChannel.defaultOrder,
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(preferredAudioChannels = it)) },
+        )
+        DebridStreamPicker.REQUIRED_AUDIO_CHANNELS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamAudioChannel.defaultOrder,
+            selectedValues = preferences.requiredAudioChannels,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(requiredAudioChannels = it)) },
+        )
+        DebridStreamPicker.EXCLUDED_AUDIO_CHANNELS -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamAudioChannel.defaultOrder,
+            selectedValues = preferences.excludedAudioChannels,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(excludedAudioChannels = it)) },
+        )
+        DebridStreamPicker.PREFERRED_ENCODES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamEncode.defaultOrder,
+            selectedValues = preferences.preferredEncodes,
+            optionLabel = { it.label },
+            fallbackWhenEmpty = DebridStreamEncode.defaultOrder,
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(preferredEncodes = it)) },
+        )
+        DebridStreamPicker.REQUIRED_ENCODES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamEncode.defaultOrder,
+            selectedValues = preferences.requiredEncodes,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(requiredEncodes = it)) },
+        )
+        DebridStreamPicker.EXCLUDED_ENCODES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamEncode.defaultOrder,
+            selectedValues = preferences.excludedEncodes,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(excludedEncodes = it)) },
+        )
+        DebridStreamPicker.PREFERRED_LANGUAGES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamLanguage.entries,
+            selectedValues = preferences.preferredLanguages,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(preferredLanguages = it)) },
+        )
+        DebridStreamPicker.REQUIRED_LANGUAGES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamLanguage.entries,
+            selectedValues = preferences.requiredLanguages,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(requiredLanguages = it)) },
+        )
+        DebridStreamPicker.EXCLUDED_LANGUAGES -> DesktopDebridMultiSelectRow(
+            title = row.title,
+            description = row.description,
+            valueLabel = row.value,
+            enabled = enabled,
+            values = DebridStreamLanguage.entries,
+            selectedValues = preferences.excludedLanguages,
+            optionLabel = { it.label },
+            onSelectionChanged = { onPreferencesChanged(preferences.copy(excludedLanguages = it)) },
+        )
+        else -> Unit
     }
 }
 
