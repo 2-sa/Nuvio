@@ -39,6 +39,7 @@ import nuvio.composeapp.generated.resources.servers_add_description
 import nuvio.composeapp.generated.resources.servers_empty
 import nuvio.composeapp.generated.resources.servers_section_add
 import nuvio.composeapp.generated.resources.servers_section_connected
+import nuvio.composeapp.generated.resources.settings_action_open
 import nuvio.composeapp.generated.resources.settings_content_discovery_collections_description
 import nuvio.composeapp.generated.resources.settings_servers_collections_open
 import nuvio.composeapp.generated.resources.silo_add_description
@@ -103,6 +104,7 @@ internal fun LazyListScope.mediaServersSettingsContent(
                         description = connection.statusText(uiState.failures[connection.id]),
                         icon = Icons.Rounded.Dns,
                         isTablet = isTablet,
+                        actionLabel = stringResource(Res.string.settings_action_open),
                         onClick = { open(connection) },
                     )
                 }
@@ -123,6 +125,7 @@ internal fun LazyListScope.mediaServersSettingsContent(
                         icon = Icons.Rounded.Add,
                         iconPainter = provider.logo(),
                         isTablet = isTablet,
+                        actionLabel = stringResource(Res.string.settings_action_open),
                         onClick = { signIn = ServerSignInRequest(provider) },
                     )
                 }

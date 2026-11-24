@@ -253,23 +253,34 @@ internal fun LayoutNavigationBarSection(
             }
             if (isDesktop) {
                 if (liquidGlassNativeTabBarSupported) SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
+                val navOptions = DesktopNavigationLayout.entries.map { layout ->
+                    DesktopSegmentedOption(
+                        value = layout,
+                        label = stringResource(layout.labelRes),
+                        enabled = isTablet || layout == DesktopNavigationLayout.TopBar,
+                    )
+                }
+                DesktopSettingRow(
                     title = stringResource(Res.string.settings_appearance_desktop_navigation),
-                    description = if (isTablet) {
-                        stringResource(desktopNavigationLayout.labelRes)
-                    } else {
-                        stringResource(Res.string.settings_appearance_desktop_navigation_top_bar)
-                    },
-                    isTablet = isTablet,
-                    onClick = {
-                        if (isTablet) {
-                            showDesktopNavigationSheet = true
-                        }
-                    },
-                )
+                    description = stringResource(
+                        if (isTablet) desktopNavigationLayout.labelRes
+                        else Res.string.settings_appearance_desktop_navigation_top_bar,
+                    ),
+                ) {
+                    DesktopSegmentedControl(
+                        options = navOptions,
+                        selected = if (isTablet) desktopNavigationLayout else DesktopNavigationLayout.TopBar,
+                        onSelected = { layout ->
+                            if (isTablet) {
+                                ThemeSettingsRepository.setDesktopNavigationLayout(layout)
+                            }
+                        },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 val isSidebarActive = isTablet && desktopNavigationLayout == DesktopNavigationLayout.Sidebar
-                SettingsNavigationRow(
+                val desktopBarStyles = listOf(NavBarStyle.ADAPTIVE, NavBarStyle.EXPANDED, NavBarStyle.COMPACT)
+                DesktopSettingRow(
                     title = stringResource(
                         if (isSidebarActive) {
                             Res.string.settings_appearance_sidebar_style
@@ -278,9 +289,22 @@ internal fun LayoutNavigationBarSection(
                         },
                     ),
                     description = stringResource(selectedNavBarStyle.labelRes),
-                    isTablet = isTablet,
-                    onClick = { showNavBarStyleSheet = true },
-                )
+                ) {
+                    DesktopSegmentedControl(
+                        options = desktopBarStyles.map { style ->
+                            DesktopSegmentedOption(
+                                value = style,
+                                label = stringResource(style.labelRes),
+                            )
+                        },
+                        selected = if (selectedNavBarStyle in desktopBarStyles) {
+                            selectedNavBarStyle
+                        } else {
+                            NavBarStyle.ADAPTIVE
+                        },
+                        onSelected = ThemeSettingsRepository::setNavBarStyle,
+                    )
+                }
             } else if (navBarStyleAvailable) {
                 if (liquidGlassNativeTabBarSupported) SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(

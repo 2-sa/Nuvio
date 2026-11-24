@@ -30,6 +30,7 @@ import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.labelRes
+import com.nuvio.app.isDesktop
 import com.nuvio.app.isIos
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -110,12 +111,24 @@ internal fun LazyListScope.appearanceSettingsContent(
                     )
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_appearance_app_language),
-                    description = stringResource(selectedAppLanguage.labelRes),
-                    isTablet = isTablet,
-                    onClick = { showLanguageSheet = true },
-                )
+                if (isDesktop) {
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_appearance_app_language),
+                        description = stringResource(selectedAppLanguage.labelRes),
+                    ) {
+                        DesktopSelectChip(
+                            label = stringResource(selectedAppLanguage.labelRes),
+                            onClick = { showLanguageSheet = true },
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_appearance_app_language),
+                        description = stringResource(selectedAppLanguage.labelRes),
+                        isTablet = isTablet,
+                        onClick = { showLanguageSheet = true },
+                    )
+                }
             }
         }
 

@@ -44,16 +44,42 @@ internal fun PlaybackPlayerSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_player_preference),
-                    description = if (settings.externalPlayerEnabled) {
-                        stringResource(Res.string.settings_playback_player_preference_external)
-                    } else {
-                        stringResource(Res.string.settings_playback_player_preference_internal)
-                    },
-                    isTablet = isTablet,
-                    onClick = { showExternalPlayerDialog = true },
-                )
+                if (isDesktop) {
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_player_preference),
+                        description = if (settings.externalPlayerEnabled) {
+                            stringResource(Res.string.settings_playback_player_preference_external)
+                        } else {
+                            stringResource(Res.string.settings_playback_player_preference_internal)
+                        },
+                    ) {
+                        DesktopSegmentedControl(
+                            options = listOf(
+                                DesktopSegmentedOption(
+                                    value = false,
+                                    label = stringResource(Res.string.settings_playback_player_preference_internal),
+                                ),
+                                DesktopSegmentedOption(
+                                    value = true,
+                                    label = stringResource(Res.string.settings_playback_player_preference_external),
+                                ),
+                            ),
+                            selected = settings.externalPlayerEnabled,
+                            onSelected = PlayerSettingsRepository::setExternalPlayerEnabled,
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_player_preference),
+                        description = if (settings.externalPlayerEnabled) {
+                            stringResource(Res.string.settings_playback_player_preference_external)
+                        } else {
+                            stringResource(Res.string.settings_playback_player_preference_internal)
+                        },
+                        isTablet = isTablet,
+                        onClick = { showExternalPlayerDialog = true },
+                    )
+                }
                 if (isIos && settings.externalPlayerEnabled) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(

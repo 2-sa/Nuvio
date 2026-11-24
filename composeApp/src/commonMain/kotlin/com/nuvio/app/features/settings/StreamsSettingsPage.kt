@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.isDesktop
 import com.nuvio.app.features.streams.STREAM_BADGE_IMPORT_LIMIT
 import com.nuvio.app.features.streams.StreamBadgeChip
 import com.nuvio.app.features.streams.StreamBadgeChipSize
@@ -100,6 +101,7 @@ import nuvio.composeapp.generated.resources.settings_stream_addon_logo_descripti
 import nuvio.composeapp.generated.resources.settings_stream_display_section
 import nuvio.composeapp.generated.resources.settings_stream_background_title
 import nuvio.composeapp.generated.resources.settings_stream_background_description
+import nuvio.composeapp.generated.resources.settings_action_open
 import nuvio.composeapp.generated.resources.settings_meta_background_mode_cinematic
 import nuvio.composeapp.generated.resources.settings_meta_background_mode_normal
 import org.jetbrains.compose.resources.stringResource
@@ -129,18 +131,44 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                     isTablet = isTablet,
                     onCheckedChange = StreamBadgeSettingsRepository::setShowFileSizeBadges,
                 )
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_stream_badge_position_title),
-                    description = badgePlacementLabel,
-                    isTablet = isTablet,
-                    onClick = { showBadgePositionDialog = true },
-                )
+                if (isDesktop) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_stream_badge_position_title),
+                        description = stringResource(Res.string.settings_stream_badge_position_description),
+                    ) {
+                        DesktopSegmentedControl(
+                            options = listOf(
+                                DesktopSegmentedOption(
+                                    value = StreamBadgePlacement.TOP,
+                                    label = stringResource(Res.string.settings_stream_badge_position_top),
+                                ),
+                                DesktopSegmentedOption(
+                                    value = StreamBadgePlacement.BOTTOM,
+                                    label = stringResource(Res.string.settings_stream_badge_position_bottom),
+                                ),
+                            ),
+                            selected = currentSettings.badgePlacement,
+                            onSelected = StreamBadgeSettingsRepository::setBadgePlacement,
+                        )
+                    }
+                    SettingsGroupDivider(isTablet = isTablet)
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_stream_badge_position_title),
+                        description = badgePlacementLabel,
+                        isTablet = isTablet,
+                        onClick = { showBadgePositionDialog = true },
+                    )
+                }
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_stream_badge_urls_title),
                     description = badgeRulesPreview(currentRules),
                     isTablet = isTablet,
+                    actionLabel = stringResource(Res.string.settings_action_open),
                     onClick = { showBadgeImportDialog = true },
                 )
+                if (isDesktop) SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_stream_badges_in_player_title),
                     description = stringResource(Res.string.settings_stream_badges_in_player_description),

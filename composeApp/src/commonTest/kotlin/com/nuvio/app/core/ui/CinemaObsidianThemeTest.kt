@@ -15,27 +15,27 @@ class CinemaObsidianThemeTest {
         val palette = ThemeColors.getColorPalette(AppTheme.CINEMA_OBSIDIAN)
 
         assertEquals(ThemeColors.CinemaObsidian, palette)
-        assertEquals(Color(0xFF090C12), palette.background)
-        assertEquals(Color(0xFF111622), palette.backgroundElevated)
-        assertEquals(Color(0xFF171E2E), palette.backgroundCard)
-        assertEquals(Color(0xFF1B2336), palette.surfacePopover)
-        assertEquals(Color(0xFF3B82F6), palette.secondary)
-        assertEquals(Color(0xFF6366F1), palette.secondaryVariant)
+        assertEquals(Color(0xFF07090F), palette.background)
+        assertEquals(Color(0xFF0B0F1A), palette.backgroundElevated)
+        assertEquals(Color(0xFF111827), palette.backgroundCard)
+        assertEquals(Color(0xFF172033), palette.surfacePopover)
+        assertEquals(Color(0xFF4F7CFF), palette.secondary)
+        assertEquals(Color(0xFF7C5CFF), palette.secondaryVariant)
         assertEquals(
-            listOf(Color(0xFF38BDF8), Color(0xFF3B82F6), Color(0xFF6366F1)),
+            listOf(Color(0xFF38BDF8), Color(0xFF4F7CFF), Color(0xFF818CF8)),
             palette.accentGradient,
         )
         assertEquals(Color.White, palette.onSecondary)
         assertEquals(Color.White, palette.onSecondaryVariant)
-        assertEquals(Color(0xFF60A5FA), palette.focusRing)
-        assertEquals(Color(0xFF172542), palette.focusBackground)
-        assertEquals(Color(0xFF1E293B).copy(alpha = 0.55f), palette.borderSubtle)
-        assertEquals(Color(0xFF24324A), palette.borderDefault)
-        assertEquals(Color(0xFF3B4F72), palette.borderStrong)
+        assertEquals(Color(0xFF7DA4FF), palette.focusRing)
+        assertEquals(Color(0xFF142142), palette.focusBackground)
+        assertEquals(Color.White.copy(alpha = 0.07f), palette.borderSubtle)
+        assertEquals(Color.White.copy(alpha = 0.13f), palette.borderDefault)
+        assertEquals(Color.White.copy(alpha = 0.24f), palette.borderStrong)
         assertEquals(Color(0xFFF8FAFC), palette.textPrimary)
         assertEquals(Color(0xFFCBD5E1), palette.textSecondary)
-        assertEquals(Color(0xFF94A3B8), palette.textMuted)
-        assertEquals("#3B82F6", palette.nativeAccentHex)
+        assertEquals(Color(0xFF8E9BB0), palette.textMuted)
+        assertEquals("#4F7CFF", palette.nativeAccentHex)
     }
 
     @Test
@@ -46,17 +46,17 @@ class CinemaObsidianThemeTest {
             colorScheme = null,
         )
 
-        assertEquals(Color(0xFF090C12), tokens.colors.background)
-        assertEquals(Color(0xFF111622), tokens.colors.surface)
-        assertEquals(Color(0xFF111622), tokens.colors.surfaceElevated)
-        assertEquals(Color(0xFF171E2E), tokens.colors.surfaceCard)
-        assertEquals(Color(0xFF1B2336), tokens.colors.surfacePopover)
-        assertEquals(Color(0xFF1E293B).copy(alpha = 0.55f), tokens.colors.borderSubtle)
-        assertEquals(Color(0xFF24324A), tokens.colors.borderDefault)
-        assertEquals(Color(0xFF3B4F72), tokens.colors.borderStrong)
+        assertEquals(Color(0xFF07090F), tokens.colors.background)
+        assertEquals(Color(0xFF0B0F1A), tokens.colors.surface)
+        assertEquals(Color(0xFF0B0F1A), tokens.colors.surfaceElevated)
+        assertEquals(Color(0xFF111827), tokens.colors.surfaceCard)
+        assertEquals(Color(0xFF172033), tokens.colors.surfacePopover)
+        assertEquals(Color.White.copy(alpha = 0.07f), tokens.colors.borderSubtle)
+        assertEquals(Color.White.copy(alpha = 0.13f), tokens.colors.borderDefault)
+        assertEquals(Color.White.copy(alpha = 0.24f), tokens.colors.borderStrong)
         assertEquals(Color(0xFFF8FAFC), tokens.colors.textPrimary)
         assertEquals(Color(0xFFCBD5E1), tokens.colors.textSecondary)
-        assertEquals(Color(0xFF94A3B8), tokens.colors.textMuted)
+        assertEquals(Color(0xFF8E9BB0), tokens.colors.textMuted)
 
         val amoledTokens = defaultNuvioThemeTokens(
             palette = ThemeColors.CinemaObsidian,
@@ -67,20 +67,20 @@ class CinemaObsidianThemeTest {
     }
 
     @Test
-    fun existingThemesRetainLegacySurfaceBorderAndTextDefaults() {
+    fun existingThemesUseUpgradedVividSurfaceBorderAndTextDefaults() {
         val tokens = defaultNuvioThemeTokens(
             palette = ThemeColors.White,
             amoled = false,
             colorScheme = null,
         )
 
-        assertEquals(Color(0xFF222222), tokens.colors.surfacePopover)
-        assertEquals(Color(0xFF252A2A).copy(alpha = 0.55f), tokens.colors.borderSubtle)
-        assertEquals(Color(0xFF252A2A), tokens.colors.borderDefault)
-        assertEquals(Color(0xFF3A4040), tokens.colors.borderStrong)
-        assertEquals(Color(0xFFF5F7F8), tokens.colors.textPrimary)
-        assertEquals(Color(0xFFB8BEC5), tokens.colors.textSecondary)
-        assertEquals(Color(0xFF969CA3), tokens.colors.textMuted)
+        assertEquals(Color(0xFF1F2631), tokens.colors.surfacePopover)
+        assertEquals(Color.White.copy(alpha = 0.07f), tokens.colors.borderSubtle)
+        assertEquals(Color.White.copy(alpha = 0.13f), tokens.colors.borderDefault)
+        assertEquals(Color.White.copy(alpha = 0.24f), tokens.colors.borderStrong)
+        assertEquals(Color(0xFFF8FAFC), tokens.colors.textPrimary)
+        assertEquals(Color(0xFFCBD5E1), tokens.colors.textSecondary)
+        assertEquals(Color(0xFF8E9BB0), tokens.colors.textMuted)
     }
 
     @Test

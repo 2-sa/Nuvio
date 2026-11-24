@@ -2643,4 +2643,9 @@
     <string name="settings_account_switch_profile_desc">التبديل بين الملفات الشخصية</string>
     <string name="settings_account_watch_party_desc">إنشاء أو الانضمام لغرفة مشاهدة مشتركة</string>
     <string name="settings_servers_collections_open">فتح المجموعات</string>
+    <string name="settings_tracking_unavailable_footer">غير مفعّل في هذا الإصدار: %1$s</string>
+    <string name="settings_action_open">فتح</string>
+    <string name="settings_action_change">تغيير</string>
+    <string name="settings_action_clear">مسح</string>
+    <string name="settings_action_trim">تحرير الآن</string>
 </resources>

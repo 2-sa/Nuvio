@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.isDesktop
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.mdblist.MdbListTracker
 import com.nuvio.app.features.profiles.ProfileRepository
@@ -252,78 +253,260 @@ private fun TrackingDataSources(
     }
 
     SettingsGroup(isTablet = isTablet) {
-        TrackingPreferenceActionRow(
-            title = stringResource(Res.string.trakt_library_source_title),
-            description = stringResource(Res.string.trakt_library_source_subtitle),
-            value = librarySourceModeLabel(effectiveLibrarySource),
-            supportingMessage = libraryFallback,
-            isTablet = isTablet,
-            onClick = { activePickerName = TrackingDataPicker.LIBRARY.name },
-        )
-        SettingsGroupDivider(isTablet = isTablet)
-        TrackingPreferenceActionRow(
-            title = stringResource(Res.string.trakt_watch_progress_title),
-            description = stringResource(Res.string.trakt_watch_progress_subtitle),
-            value = watchProgressSourceLabel(effectiveProgressSource),
-            supportingMessage = progressFallback,
-            isLoading = transitionState.isRefreshing,
-            isTablet = isTablet,
-            onClick = { activePickerName = TrackingDataPicker.WATCH_PROGRESS.name },
-        )
-        if (transitionState.lastRefreshSucceeded == false && !transitionState.isRefreshing) {
+        if (isDesktop) {
+            val libraryDescription = listOfNotNull(
+                stringResource(Res.string.trakt_library_source_subtitle),
+                libraryFallback?.takeIf(String::isNotBlank),
+            ).joinToString("\n")
+            DesktopSettingRow(
+                title = stringResource(Res.string.trakt_library_source_title),
+                description = libraryDescription,
+            ) {
+                DesktopSegmentedControl(
+                    options = listOf(
+                        DesktopSegmentedOption(
+                            value = LibrarySourceMode.LOCAL,
+                            label = stringResource(Res.string.trakt_library_source_nuvio),
+                        ),
+                        DesktopSegmentedOption(
+                            value = LibrarySourceMode.TRAKT,
+                            label = stringResource(Res.string.trakt_library_source_trakt),
+                            enabled = traktConnected,
+                        ),
+                        DesktopSegmentedOption(
+                            value = LibrarySourceMode.SIMKL,
+                            label = stringResource(Res.string.tracking_source_simkl),
+                            enabled = simklConnected,
+                        ),
+                        DesktopSegmentedOption(
+                            value = LibrarySourceMode.MDBLIST,
+                            label = stringResource(Res.string.tracking_source_mdblist),
+                            enabled = mdblistConnected,
+                        ),
+                    ),
+                    selected = effectiveLibrarySource,
+                    onSelected = TrackingSettingsRepository::setLibrarySourceMode,
+                )
+            }
             SettingsGroupDivider(isTablet = isTablet)
-            TrackingInlineErrorRow(
-                isTablet = isTablet,
-                message = stringResource(Res.string.settings_tracking_progress_refresh_failed),
-                onRetry = {
-                    scope.launch {
-                        WatchProgressSourceCoordinator.refreshActiveSource(ProfileRepository.activeProfileId)
+            val progressDescription = listOfNotNull(
+                stringResource(Res.string.trakt_watch_progress_subtitle),
+                progressFallback?.takeIf(String::isNotBlank),
+            ).joinToString("\n")
+            DesktopSettingRow(
+                title = stringResource(Res.string.trakt_watch_progress_title),
+                description = progressDescription,
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (transitionState.isRefreshing) {
+                        NuvioLoadingIndicator(modifier = Modifier.size(16.dp))
                     }
-                },
-            )
-        }
-        if (traktConnected || simklConnected) {
-            val effectiveRecommendationsSource = effectiveTrackingRecommendationsSource(
-                source = settingsUiState.moreLikeThisSource,
-                traktConnected = traktConnected,
-            )
-            val recommendationsFallback = if (effectiveRecommendationsSource != settingsUiState.moreLikeThisSource) {
-                stringResource(
-                    Res.string.settings_tracking_source_fallback,
-                    moreLikeThisSourceLabel(settingsUiState.moreLikeThisSource),
-                    moreLikeThisSourceLabel(effectiveRecommendationsSource),
-                )
-            } else {
-                null
+                    DesktopSegmentedControl(
+                        options = listOf(
+                            DesktopSegmentedOption(
+                                value = WatchProgressSource.NUVIO_SYNC,
+                                label = stringResource(Res.string.trakt_watch_progress_source_nuvio),
+                            ),
+                            DesktopSegmentedOption(
+                                value = WatchProgressSource.TRAKT,
+                                label = stringResource(Res.string.trakt_watch_progress_source_trakt),
+                                enabled = traktConnected,
+                            ),
+                            DesktopSegmentedOption(
+                                value = WatchProgressSource.SIMKL,
+                                label = stringResource(Res.string.tracking_source_simkl),
+                                enabled = simklConnected,
+                            ),
+                            DesktopSegmentedOption(
+                                value = WatchProgressSource.MDBLIST,
+                                label = stringResource(Res.string.tracking_source_mdblist),
+                                enabled = mdblistConnected,
+                            ),
+                        ),
+                        selected = effectiveProgressSource,
+                        onSelected = { source ->
+                            scope.launch {
+                                WatchProgressSourceCoordinator.selectSource(
+                                    profileId = ProfileRepository.activeProfileId,
+                                    source = source,
+                                )
+                            }
+                        },
+                    )
+                }
             }
+            if (transitionState.lastRefreshSucceeded == false && !transitionState.isRefreshing) {
+                SettingsGroupDivider(isTablet = isTablet)
+                TrackingInlineErrorRow(
+                    isTablet = isTablet,
+                    message = stringResource(Res.string.settings_tracking_progress_refresh_failed),
+                    onRetry = {
+                        scope.launch {
+                            WatchProgressSourceCoordinator.refreshActiveSource(ProfileRepository.activeProfileId)
+                        }
+                    },
+                )
+            }
+            if (traktConnected || simklConnected) {
+                val effectiveRecommendationsSource = effectiveTrackingRecommendationsSource(
+                    source = settingsUiState.moreLikeThisSource,
+                    traktConnected = traktConnected,
+                )
+                val recommendationsFallback = if (effectiveRecommendationsSource != settingsUiState.moreLikeThisSource) {
+                    stringResource(
+                        Res.string.settings_tracking_source_fallback,
+                        moreLikeThisSourceLabel(settingsUiState.moreLikeThisSource),
+                        moreLikeThisSourceLabel(effectiveRecommendationsSource),
+                    )
+                } else {
+                    null
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                DesktopSettingRow(
+                    title = stringResource(Res.string.trakt_more_like_this_source_title),
+                    description = listOfNotNull(
+                        stringResource(Res.string.trakt_more_like_this_source_subtitle),
+                        recommendationsFallback?.takeIf(String::isNotBlank),
+                    ).joinToString("\n"),
+                ) {
+                    DesktopSegmentedControl(
+                        options = listOf(
+                            DesktopSegmentedOption(
+                                value = MoreLikeThisSourcePreference.TMDB,
+                                label = stringResource(Res.string.trakt_more_like_this_source_tmdb),
+                            ),
+                            DesktopSegmentedOption(
+                                value = MoreLikeThisSourcePreference.TRAKT,
+                                label = stringResource(Res.string.trakt_more_like_this_source_trakt),
+                                enabled = traktConnected,
+                            ),
+                            DesktopSegmentedOption(
+                                value = MoreLikeThisSourcePreference.SIMKL,
+                                label = stringResource(Res.string.trakt_more_like_this_source_simkl),
+                                enabled = simklConnected,
+                            ),
+                        ),
+                        selected = effectiveRecommendationsSource,
+                        onSelected = TrackingSettingsRepository::setMoreLikeThisSource,
+                    )
+                }
+            }
+            if (simklConnected || mdblistConnected) {
+                val effectiveRatingSource = settingsUiState.ratingSource?.takeIf { it in connectedProviders }
+                val ratingsFallback = settingsUiState.ratingSource?.takeIf { effectiveRatingSource == null }?.let { source ->
+                    stringResource(
+                        Res.string.settings_tracking_source_fallback,
+                        ratingSourceLabel(source),
+                        ratingSourceLabel(null),
+                    )
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                DesktopSettingRow(
+                    title = stringResource(Res.string.settings_tracking_ratings),
+                    description = listOfNotNull(
+                        stringResource(Res.string.settings_tracking_ratings_description),
+                        ratingsFallback?.takeIf(String::isNotBlank),
+                    ).joinToString("\n"),
+                ) {
+                    DesktopSegmentedControl(
+                        options = listOf(
+                            DesktopSegmentedOption<TrackingProviderId?>(
+                                value = null,
+                                label = ratingSourceLabel(null),
+                            ),
+                            DesktopSegmentedOption<TrackingProviderId?>(
+                                value = TrackingProviderId.SIMKL,
+                                label = ratingSourceLabel(TrackingProviderId.SIMKL),
+                                enabled = simklConnected,
+                            ),
+                            DesktopSegmentedOption<TrackingProviderId?>(
+                                value = TrackingProviderId.MDBLIST,
+                                label = ratingSourceLabel(TrackingProviderId.MDBLIST),
+                                enabled = mdblistConnected,
+                            ),
+                        ),
+                        selected = effectiveRatingSource,
+                        onSelected = TrackingRatings::setSource,
+                    )
+                }
+            }
+        } else {
+            TrackingPreferenceActionRow(
+                title = stringResource(Res.string.trakt_library_source_title),
+                description = stringResource(Res.string.trakt_library_source_subtitle),
+                value = librarySourceModeLabel(effectiveLibrarySource),
+                supportingMessage = libraryFallback,
+                isTablet = isTablet,
+                onClick = { activePickerName = TrackingDataPicker.LIBRARY.name },
+            )
             SettingsGroupDivider(isTablet = isTablet)
             TrackingPreferenceActionRow(
-                title = stringResource(Res.string.trakt_more_like_this_source_title),
-                description = stringResource(Res.string.trakt_more_like_this_source_subtitle),
-                value = moreLikeThisSourceLabel(effectiveRecommendationsSource),
-                supportingMessage = recommendationsFallback,
+                title = stringResource(Res.string.trakt_watch_progress_title),
+                description = stringResource(Res.string.trakt_watch_progress_subtitle),
+                value = watchProgressSourceLabel(effectiveProgressSource),
+                supportingMessage = progressFallback,
+                isLoading = transitionState.isRefreshing,
                 isTablet = isTablet,
-                onClick = { activePickerName = TrackingDataPicker.MORE_LIKE_THIS.name },
+                onClick = { activePickerName = TrackingDataPicker.WATCH_PROGRESS.name },
             )
-        }
-        if (simklConnected || mdblistConnected) {
-            val effectiveRatingSource = settingsUiState.ratingSource?.takeIf { it in connectedProviders }
-            val ratingsFallback = settingsUiState.ratingSource?.takeIf { effectiveRatingSource == null }?.let { source ->
-                stringResource(
-                    Res.string.settings_tracking_source_fallback,
-                    ratingSourceLabel(source),
-                    ratingSourceLabel(null),
+            if (transitionState.lastRefreshSucceeded == false && !transitionState.isRefreshing) {
+                SettingsGroupDivider(isTablet = isTablet)
+                TrackingInlineErrorRow(
+                    isTablet = isTablet,
+                    message = stringResource(Res.string.settings_tracking_progress_refresh_failed),
+                    onRetry = {
+                        scope.launch {
+                            WatchProgressSourceCoordinator.refreshActiveSource(ProfileRepository.activeProfileId)
+                        }
+                    },
                 )
             }
-            SettingsGroupDivider(isTablet = isTablet)
-            TrackingPreferenceActionRow(
-                title = stringResource(Res.string.settings_tracking_ratings),
-                description = stringResource(Res.string.settings_tracking_ratings_description),
-                value = ratingSourceLabel(effectiveRatingSource),
-                supportingMessage = ratingsFallback,
-                isTablet = isTablet,
-                onClick = { activePickerName = TrackingDataPicker.RATINGS.name },
-            )
+            if (traktConnected || simklConnected) {
+                val effectiveRecommendationsSource = effectiveTrackingRecommendationsSource(
+                    source = settingsUiState.moreLikeThisSource,
+                    traktConnected = traktConnected,
+                )
+                val recommendationsFallback = if (effectiveRecommendationsSource != settingsUiState.moreLikeThisSource) {
+                    stringResource(
+                        Res.string.settings_tracking_source_fallback,
+                        moreLikeThisSourceLabel(settingsUiState.moreLikeThisSource),
+                        moreLikeThisSourceLabel(effectiveRecommendationsSource),
+                    )
+                } else {
+                    null
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                TrackingPreferenceActionRow(
+                    title = stringResource(Res.string.trakt_more_like_this_source_title),
+                    description = stringResource(Res.string.trakt_more_like_this_source_subtitle),
+                    value = moreLikeThisSourceLabel(effectiveRecommendationsSource),
+                    supportingMessage = recommendationsFallback,
+                    isTablet = isTablet,
+                    onClick = { activePickerName = TrackingDataPicker.MORE_LIKE_THIS.name },
+                )
+            }
+            if (simklConnected || mdblistConnected) {
+                val effectiveRatingSource = settingsUiState.ratingSource?.takeIf { it in connectedProviders }
+                val ratingsFallback = settingsUiState.ratingSource?.takeIf { effectiveRatingSource == null }?.let { source ->
+                    stringResource(
+                        Res.string.settings_tracking_source_fallback,
+                        ratingSourceLabel(source),
+                        ratingSourceLabel(null),
+                    )
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                TrackingPreferenceActionRow(
+                    title = stringResource(Res.string.settings_tracking_ratings),
+                    description = stringResource(Res.string.settings_tracking_ratings_description),
+                    value = ratingSourceLabel(effectiveRatingSource),
+                    supportingMessage = ratingsFallback,
+                    isTablet = isTablet,
+                    onClick = { activePickerName = TrackingDataPicker.RATINGS.name },
+                )
+            }
         }
     }
 
@@ -399,17 +582,34 @@ private fun TrackingViewingAndDiscovery(
     )
 
     SettingsGroup(isTablet = isTablet) {
-        TrackingPreferenceActionRow(
-            title = stringResource(Res.string.trakt_continue_watching_window),
-            description = stringResource(
-                if (traktProgressActive) Res.string.trakt_continue_watching_subtitle
-                else Res.string.settings_tracking_trakt_progress_required,
-            ),
-            value = continueWatchingDaysCapLabel(settingsUiState.continueWatchingDaysCap),
-            enabled = traktProgressActive,
-            isTablet = isTablet,
-            onClick = { activePickerName = TrackingViewingPicker.CONTINUE_WATCHING.name },
-        )
+        if (isDesktop) {
+            DesktopSettingRow(
+                title = stringResource(Res.string.trakt_continue_watching_window),
+                description = stringResource(
+                    if (traktProgressActive) Res.string.trakt_continue_watching_subtitle
+                    else Res.string.settings_tracking_trakt_progress_required,
+                ),
+                enabled = traktProgressActive,
+            ) {
+                DesktopSelectChip(
+                    label = continueWatchingDaysCapLabel(settingsUiState.continueWatchingDaysCap),
+                    enabled = traktProgressActive,
+                    onClick = { activePickerName = TrackingViewingPicker.CONTINUE_WATCHING.name },
+                )
+            }
+        } else {
+            TrackingPreferenceActionRow(
+                title = stringResource(Res.string.trakt_continue_watching_window),
+                description = stringResource(
+                    if (traktProgressActive) Res.string.trakt_continue_watching_subtitle
+                    else Res.string.settings_tracking_trakt_progress_required,
+                ),
+                value = continueWatchingDaysCapLabel(settingsUiState.continueWatchingDaysCap),
+                enabled = traktProgressActive,
+                isTablet = isTablet,
+                onClick = { activePickerName = TrackingViewingPicker.CONTINUE_WATCHING.name },
+            )
+        }
         SettingsGroupDivider(isTablet = isTablet)
         SettingsSwitchRow(
             title = stringResource(Res.string.settings_trakt_comments),

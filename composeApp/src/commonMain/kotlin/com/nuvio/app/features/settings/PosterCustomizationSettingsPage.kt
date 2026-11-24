@@ -235,8 +235,8 @@ internal fun LazyListScope.posterCustomizationSettingsContent(
         ) {
             SettingsGroup(isTablet = isTablet) {
                 val tokens = MaterialTheme.nuvio
-                val horizontalPadding = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
-                val verticalPadding = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16
+                val horizontalPadding = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
+                val verticalPadding = if (isDesktop) NuvioTokens.Space.s14 else if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16
                 val scope = rememberCoroutineScope()
                 var urlTestResult by remember(currentPattern) { mutableStateOf<ApiKeyTestResult>(ApiKeyTestResult.Idle) }
                 Column(
@@ -476,8 +476,8 @@ private fun CardDepthStyleControls(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
-                vertical = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16,
+                horizontal = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                vertical = if (isDesktop) NuvioTokens.Space.s14 else if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16,
             ),
         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
     ) {
@@ -939,8 +939,8 @@ private fun PosterCardStyleControls(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
-                vertical = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16,
+                horizontal = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                vertical = if (isDesktop) NuvioTokens.Space.s14 else if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16,
             ),
         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s14),
     ) {

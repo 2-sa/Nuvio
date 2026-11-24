@@ -31,6 +31,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
+import nuvio.composeapp.generated.resources.settings_action_clear
+import nuvio.composeapp.generated.resources.settings_action_trim
 import nuvio.composeapp.generated.resources.settings_advanced_clear_cw_cache
 import nuvio.composeapp.generated.resources.settings_advanced_clear_cw_cache_done
 import nuvio.composeapp.generated.resources.settings_advanced_clear_cw_cache_subtitle
@@ -212,6 +214,7 @@ internal fun LazyListScope.advancedSettingsContent(
                             stringResource(Res.string.settings_advanced_clear_cw_cache_subtitle)
                         },
                         isTablet = isTablet,
+                        actionLabel = stringResource(Res.string.settings_action_clear),
                         onClick = {
                             if (!cleared) {
                                 ContinueWatchingEnrichmentCache.clearAll(ProfileRepository.activeProfileId)
@@ -232,6 +235,7 @@ internal fun LazyListScope.advancedSettingsContent(
                             title = stringResource(Res.string.settings_advanced_trim_memory),
                             description = memorySnapshot.formatSummary(),
                             isTablet = isTablet,
+                            actionLabel = stringResource(Res.string.settings_action_trim),
                             onClick = {
                                 requestPlatformMemoryTrim(MemoryTrimLevel.Minimized)
                                 scope.launch {

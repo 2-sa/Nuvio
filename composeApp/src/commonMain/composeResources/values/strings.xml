@@ -2762,4 +2762,9 @@
     <string name="settings_account_switch_profile_desc">Switch between personal or family profiles</string>
     <string name="settings_account_watch_party_desc">Create or join a synchronized Watch Party room</string>
     <string name="settings_servers_collections_open">Open Collections</string>
+    <string name="settings_tracking_unavailable_footer">Not enabled in this build: %1$s</string>
+    <string name="settings_action_open">Open</string>
+    <string name="settings_action_change">Change</string>
+    <string name="settings_action_clear">Clear</string>
+    <string name="settings_action_trim">Trim Now</string>
 </resources>

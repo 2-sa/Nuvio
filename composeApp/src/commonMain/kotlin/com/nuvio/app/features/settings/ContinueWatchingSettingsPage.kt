@@ -36,6 +36,7 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingClickAction
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import com.nuvio.app.features.watchprogress.ContinueWatchingSortMode
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_continue_watching_click_action_description
 import nuvio.composeapp.generated.resources.settings_continue_watching_click_action_details
@@ -161,12 +162,24 @@ internal fun LazyListScope.continueWatchingSettingsContent(
                     )
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_continue_watching_click_action_title),
-                    description = stringResource(clickAction.labelRes),
-                    isTablet = isTablet,
-                    onClick = { showClickActionSheet = true },
-                )
+                if (isDesktop) {
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_continue_watching_click_action_title),
+                        description = stringResource(Res.string.settings_continue_watching_click_action_description),
+                    ) {
+                        DesktopSelectChip(
+                            label = stringResource(clickAction.labelRes),
+                            onClick = { showClickActionSheet = true },
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_continue_watching_click_action_title),
+                        description = stringResource(clickAction.labelRes),
+                        isTablet = isTablet,
+                        onClick = { showClickActionSheet = true },
+                    )
+                }
             }
         }
 
@@ -211,12 +224,24 @@ internal fun LazyListScope.continueWatchingSettingsContent(
                         ContinueWatchingSortMode.SPLIT_UPCOMING -> Res.string.settings_continue_watching_sort_mode_split_upcoming
                     }
                 )
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_continue_watching_sort_mode_title),
-                    description = currentModeLabel,
-                    isTablet = isTablet,
-                    onClick = { showSortModeSheet = true },
-                )
+                if (isDesktop) {
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_continue_watching_sort_mode_title),
+                        description = currentModeLabel,
+                    ) {
+                        DesktopSelectChip(
+                            label = currentModeLabel,
+                            onClick = { showSortModeSheet = true },
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_continue_watching_sort_mode_title),
+                        description = currentModeLabel,
+                        isTablet = isTablet,
+                        onClick = { showSortModeSheet = true },
+                    )
+                }
             }
         }
 

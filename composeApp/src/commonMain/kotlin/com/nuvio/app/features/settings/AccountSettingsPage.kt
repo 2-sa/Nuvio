@@ -125,58 +125,136 @@ private fun AccountSettingsBody(
     val deleteAccountFallbackMessage = stringResource(Res.string.auth_account_deletion_failed)
     val canDeleteAccount = AppFeaturePolicy.accountDeletionEnabled && authState is AuthState.Authenticated
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NuvioSurfaceCard {
-            Text(
-                text = stringResource(Res.string.compose_settings_page_account),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-
-            when (val state = authState) {
-                is AuthState.Authenticated -> {
-                    AccountInfoRow(
-                        label = stringResource(Res.string.settings_account_status),
-                        value = if (state.isAnonymous) {
-                            stringResource(Res.string.settings_account_status_anonymous)
-                        } else {
-                            stringResource(Res.string.settings_account_status_signed_in)
-                        },
-                        valueColor = MaterialTheme.colorScheme.primary,
-                    )
-                    state.email?.takeUnless { state.isAnonymous }?.let { email ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        AccountInfoRow(
-                            label = stringResource(Res.string.settings_account_email),
-                            value = email,
-                        )
+    if (isDesktop) {
+        val tokens = MaterialTheme.nuvio
+        SettingsSection(
+            title = stringResource(Res.string.compose_settings_page_account),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                when (val state = authState) {
+                    is AuthState.Authenticated -> {
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_account_status),
+                            description = state.email?.takeUnless { state.isAnonymous },
+                        ) {
+                            SettingsStatusPill(
+                                label = if (state.isAnonymous) {
+                                    stringResource(Res.string.settings_account_status_anonymous)
+                                } else {
+                                    stringResource(Res.string.settings_account_status_signed_in)
+                                },
+                                tone = if (state.isAnonymous) SettingsStatusTone.Neutral else SettingsStatusTone.Success,
+                            )
+                        }
+                    }
+                    else -> {
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_account_status),
+                            description = stringResource(Res.string.settings_account_not_signed_in),
+                        ) {
+                            SettingsStatusPill(
+                                label = stringResource(Res.string.settings_account_not_signed_in),
+                                tone = SettingsStatusTone.Neutral,
+                            )
+                        }
                     }
                 }
-                else -> {
-                    Text(
-                        text = stringResource(Res.string.settings_account_not_signed_in),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                SettingsGroupDivider(isTablet = isTablet)
+                DesktopSettingRow(
+                    title = stringResource(Res.string.settings_account_sign_out),
+                    description = stringResource(Res.string.settings_account_sign_out_confirm_message),
+                ) {
+                    DesktopSelectChip(
+                        label = stringResource(Res.string.settings_account_sign_out),
+                        showChevron = false,
+                        onClick = { showSignOutConfirm = true },
                     )
+                }
+                if (canDeleteAccount) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_account_delete_account),
+                        description = listOfNotNull(
+                            stringResource(Res.string.settings_account_delete_account_description),
+                            deleteErrorMessage,
+                        ).joinToString("\n"),
+                    ) {
+                        Button(
+                            onClick = {
+                                deleteErrorMessage = null
+                                showDeleteConfirm = true
+                            },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = tokens.colors.danger.copy(alpha = 0.16f),
+                                contentColor = tokens.colors.danger,
+                            ),
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.settings_account_delete_account),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
                 }
             }
         }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            NuvioSurfaceCard {
+                Text(
+                    text = stringResource(Res.string.compose_settings_page_account),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(14.dp))
 
-        NuvioPrimaryButton(
-            text = stringResource(Res.string.settings_account_sign_out),
-            onClick = { showSignOutConfirm = true },
-        )
+                when (val state = authState) {
+                    is AuthState.Authenticated -> {
+                        AccountInfoRow(
+                            label = stringResource(Res.string.settings_account_status),
+                            value = if (state.isAnonymous) {
+                                stringResource(Res.string.settings_account_status_anonymous)
+                            } else {
+                                stringResource(Res.string.settings_account_status_signed_in)
+                            },
+                            valueColor = MaterialTheme.colorScheme.primary,
+                        )
+                        state.email?.takeUnless { state.isAnonymous }?.let { email ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            AccountInfoRow(
+                                label = stringResource(Res.string.settings_account_email),
+                                value = email,
+                            )
+                        }
+                    }
+                    else -> {
+                        Text(
+                            text = stringResource(Res.string.settings_account_not_signed_in),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
 
-        if (canDeleteAccount) {
-            DeleteAccountCard(
-                errorMessage = deleteErrorMessage,
-                onDeleteClick = {
-                    deleteErrorMessage = null
-                    showDeleteConfirm = true
-                },
+            NuvioPrimaryButton(
+                text = stringResource(Res.string.settings_account_sign_out),
+                onClick = { showSignOutConfirm = true },
             )
+
+            if (canDeleteAccount) {
+                DeleteAccountCard(
+                    errorMessage = deleteErrorMessage,
+                    onDeleteClick = {
+                        deleteErrorMessage = null
+                        showDeleteConfirm = true
+                    },
+                )
+            }
         }
     }
 

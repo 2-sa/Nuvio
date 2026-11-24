@@ -107,8 +107,16 @@ internal fun SettingsApiKeyCard(
     val isTesting = testResult is ApiKeyTestResult.Testing
     val canTest = !isTesting && (normalizedDraft.isNotBlank() || supportsDefaultFallback)
 
-    val horizontalPadding = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
-    val verticalPadding = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s14
+    val horizontalPadding = when {
+        isDesktop -> 0.dp
+        isTablet -> NuvioTokens.Space.s20
+        else -> NuvioTokens.Space.s16
+    }
+    val verticalPadding = when {
+        isDesktop -> NuvioTokens.Space.s14
+        isTablet -> NuvioTokens.Space.s18
+        else -> NuvioTokens.Space.s14
+    }
 
     Column(
         modifier = Modifier
@@ -242,11 +250,11 @@ internal fun SettingsApiKeyCard(
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = tokens.colors.accent.copy(alpha = 0.78f),
-                unfocusedBorderColor = tokens.colors.borderSubtle,
-                focusedContainerColor = tokens.colors.surfaceElevated,
-                unfocusedContainerColor = tokens.colors.surfaceElevated,
-                disabledContainerColor = tokens.colors.surfaceElevated,
+                focusedBorderColor = tokens.colors.accent,
+                unfocusedBorderColor = Color.White.copy(alpha = 0.13f),
+                focusedContainerColor = Color.White.copy(alpha = 0.05f),
+                unfocusedContainerColor = Color.White.copy(alpha = 0.035f),
+                disabledContainerColor = Color.White.copy(alpha = 0.03f),
                 cursorColor = tokens.colors.accent,
             ),
         )

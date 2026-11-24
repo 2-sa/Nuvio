@@ -298,7 +298,10 @@ private fun TmdbLanguageRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16, vertical = if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s14),
+            .padding(
+                horizontal = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                vertical = if (isDesktop) NuvioTokens.Space.s14 else if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s14,
+            ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

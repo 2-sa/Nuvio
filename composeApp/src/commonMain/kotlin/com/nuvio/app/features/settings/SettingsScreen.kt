@@ -84,6 +84,7 @@ import com.nuvio.app.core.ui.isLiquidGlassNativeTabBarSupported
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioContentEntry
 import com.nuvio.app.core.ui.nuvioTypeScale
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
@@ -1397,7 +1398,7 @@ private fun DesktopSettingsScreen(
     ) {
         Surface(
             modifier = Modifier
-                .width(264.dp)
+                .width(248.dp)
                 .fillMaxHeight(),
             color = tokens.colors.surfaceElevated,
         ) {
@@ -1418,7 +1419,7 @@ private fun DesktopSettingsScreen(
                     Text(
                         text = stringResource(Res.string.compose_settings_page_root),
                         style = MaterialTheme.nuvioTypeScale.titleMd.copy(
-                            fontSize = 21.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                         ),
                         color = tokens.colors.textPrimary,
@@ -1564,27 +1565,29 @@ private fun DesktopSettingsScreen(
                     .background(tokens.colors.background)
                     .nuvioContentEntry(),
             ) {
-                val ambientAlpha = if (tokens.colors.background == Color.Black) 0.03f else 0.055f
+                val palette = MaterialTheme.themePalette
+                val ambientAlpha = if (tokens.colors.background == Color.Black) 0.045f else 0.085f
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp)
+                        .height(260.dp)
                         .align(Alignment.TopCenter)
                         .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    tokens.colors.accent.copy(alpha = ambientAlpha),
+                                    palette.accentGradient.first().copy(alpha = ambientAlpha),
+                                    tokens.colors.accent.copy(alpha = ambientAlpha * 0.35f),
                                     Color.Transparent,
                                 ),
                             ),
                         ),
                 )
-                val baseHorizontalPadding = NuvioTokens.Space.s36
-                val maxContentWidth = 1040.dp
-                val contentHorizontalPadding = if (maxWidth > maxContentWidth + baseHorizontalPadding * 2) {
-                    (maxWidth - maxContentWidth) / 2
+                val edgePadding = 32.dp
+                val maxReadableWidth = 1520.dp
+                val trailingPadding = if (maxWidth > maxReadableWidth + edgePadding * 2) {
+                    maxWidth - maxReadableWidth - edgePadding
                 } else {
-                    baseHorizontalPadding
+                    edgePadding
                 }
                 LazyColumn(
                     state = detailListState,
@@ -1592,12 +1595,12 @@ private fun DesktopSettingsScreen(
                         .fillMaxSize()
                         .desktopSmoothWheelScroll(detailListState),
                     contentPadding = PaddingValues(
-                        start = contentHorizontalPadding,
+                        start = edgePadding,
                         top = detailTopOffset,
-                        end = contentHorizontalPadding,
+                        end = trailingPadding,
                         bottom = NuvioTokens.Space.s40 + bottomOverlayPadding,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s18),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s24),
                 ) {
                     if (isSearchActive) {
                         item(key = "desktop-search-header") {

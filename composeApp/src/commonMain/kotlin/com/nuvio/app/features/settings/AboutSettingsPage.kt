@@ -9,9 +9,11 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -246,41 +248,50 @@ private fun DesktopAboutHeroCard(
             append(basedOn)
         }
     }
-    val cardShape = RoundedCornerShape(NuvioTokens.Radius.xl)
+    val cardShape = RoundedCornerShape(12.dp)
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = tokens.colors.surfaceCard,
-        shape = cardShape,
-        border = BorderStroke(tokens.borders.thin, tokens.colors.accent.copy(alpha = 0.28f)),
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        tokens.colors.accent.copy(alpha = 0.16f),
+                        tokens.colors.accentStrong.copy(alpha = 0.08f),
+                        Color.White.copy(alpha = 0.02f),
+                    ),
+                ),
+            ),
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            tokens.colors.accent.copy(alpha = 0.12f),
-                            Color.Transparent,
-                        ),
-                    ),
-                )
-                .padding(horizontal = NuvioTokens.Space.s24, vertical = NuvioTokens.Space.s20),
+                .height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .background(tokens.colors.accent),
+            )
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = NuvioTokens.Space.s20, vertical = NuvioTokens.Space.s18),
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s20),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
                     ) {
-                        MemberBrandWordmark(height = 30.dp)
+                        MemberBrandWordmark(height = 28.dp)
                         SettingsStatusPill(
                             label = "v${AppVersionPolicy.displayVersionName}",
                             tone = SettingsStatusTone.Neutral,
@@ -308,21 +319,21 @@ private fun DesktopAboutHeroCard(
                             clipboardManager.setText(AnnotatedString(copyPayload))
                             NuvioToastController.show(copiedToast)
                         },
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(tokens.borders.thin, tokens.colors.borderDefault),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(tokens.borders.thin, Color.White.copy(alpha = 0.16f)),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = tokens.colors.surfaceElevated,
+                            containerColor = Color.White.copy(alpha = 0.06f),
                             contentColor = tokens.colors.textPrimary,
                         ),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp),
                         modifier = Modifier
-                            .heightIn(min = 40.dp)
+                            .heightIn(min = 38.dp)
                             .pointerHoverIcon(PointerIcon.Hand),
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.ContentCopy,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(15.dp),
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -335,20 +346,20 @@ private fun DesktopAboutHeroCard(
                     if (onCheckForUpdatesClick != null) {
                         Button(
                             onClick = onCheckForUpdatesClick,
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = tokens.colors.accent,
                                 contentColor = tokens.colors.onAccent,
                             ),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp),
                             modifier = Modifier
-                                .heightIn(min = 40.dp)
+                                .heightIn(min = 38.dp)
                                 .pointerHoverIcon(PointerIcon.Hand),
                         ) {
                             Icon(
                                 imageVector = SettingsSearchTarget.CheckForUpdates.icon,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(15.dp),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
