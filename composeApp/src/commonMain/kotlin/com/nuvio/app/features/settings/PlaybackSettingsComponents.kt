@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.Slider
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.*
 import kotlin.math.roundToInt
 
@@ -72,7 +74,7 @@ internal fun SettingsSliderRow(
     enabled: Boolean = true,
     onValueChange: (Int) -> Unit,
 ) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    val horizontalPadding = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp
     val rangeStart = valueRange.first.toFloat()
     val rangeEnd = valueRange.last.toFloat()
     var isDragging by remember { mutableStateOf(false) }
@@ -86,6 +88,7 @@ internal fun SettingsSliderRow(
 
     Column(
         modifier = Modifier
+            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = 10.dp)
             .alpha(if (enabled) 1f else 0.55f),

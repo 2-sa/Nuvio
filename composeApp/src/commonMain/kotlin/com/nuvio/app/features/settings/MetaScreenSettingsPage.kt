@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -46,6 +47,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -160,65 +163,129 @@ internal fun LazyListScope.metaScreenSettingsContent(
                         )
                     }
                 }
-                if (supportsPosterNavigationMotion) {
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_meta_poster_transition),
-                        description = stringResource(Res.string.settings_meta_poster_transition_description),
-                        checked = uiState.posterTransitionEnabled,
-                        isTablet = isTablet,
-                        onCheckedChange = MetaScreenSettingsRepository::setPosterTransitionEnabled,
-                    )
-                }
-                if (showHeroTrailerPlaybackSetting) {
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_meta_hero_trailer_playback),
-                        description = stringResource(Res.string.settings_meta_hero_trailer_playback_description),
-                        checked = uiState.heroTrailerPlayback,
-                        isTablet = isTablet,
-                        onCheckedChange = { MetaScreenSettingsRepository.setHeroTrailerPlayback(it) },
-                    )
-                }
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_meta_tab_layout),
-                    description = stringResource(Res.string.settings_meta_tab_layout_description),
-                    checked = uiState.tabLayout,
-                    isTablet = isTablet,
-                    onCheckedChange = { MetaScreenSettingsRepository.setTabLayout(it) },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                RatingsSettings(isTablet = isTablet, uiState = uiState)
-                SettingsGroupDivider(isTablet = isTablet)
                 val shuffleProfile by remember {
                     EpisodeShuffleRepository.ensureLoaded()
                     EpisodeShuffleRepository.uiState
                 }.collectAsStateWithLifecycle()
                 val shuffleSaveFailed = stringResource(Res.string.shuffle_save_failed)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.random_episode_title),
-                    description = stringResource(Res.string.layout_random_episode_sub),
-                    checked = shuffleProfile.available,
-                    isTablet = isTablet,
-                    onCheckedChange = {
-                        if (!EpisodeShuffleRepository.setAvailable(it)) NuvioToastController.show(shuffleSaveFailed)
-                    },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                MetaEpisodeCardStyleSelector(
-                    isTablet = isTablet,
-                    selectedStyle = uiState.episodeCardStyle,
-                    onStyleSelected = MetaScreenSettingsRepository::setEpisodeCardStyle,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_meta_blur_unwatched_episodes),
-                    description = stringResource(Res.string.settings_meta_blur_unwatched_episodes_description),
-                    checked = uiState.blurUnwatchedEpisodes,
-                    isTablet = isTablet,
-                    onCheckedChange = { MetaScreenSettingsRepository.setBlurUnwatchedEpisodes(it) },
-                )
+                if (isDesktop) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsToggleGrid(
+                        items = listOfNotNull(
+                            if (supportsPosterNavigationMotion) {
+                                SettingsToggleGridItem(
+                                    id = "posterTransition",
+                                    title = stringResource(Res.string.settings_meta_poster_transition),
+                                    description = stringResource(Res.string.settings_meta_poster_transition_description),
+                                    checked = uiState.posterTransitionEnabled,
+                                    onCheckedChange = MetaScreenSettingsRepository::setPosterTransitionEnabled,
+                                )
+                            } else {
+                                null
+                            },
+                            if (showHeroTrailerPlaybackSetting) {
+                                SettingsToggleGridItem(
+                                    id = "heroTrailerPlayback",
+                                    title = stringResource(Res.string.settings_meta_hero_trailer_playback),
+                                    description = stringResource(Res.string.settings_meta_hero_trailer_playback_description),
+                                    checked = uiState.heroTrailerPlayback,
+                                    onCheckedChange = { MetaScreenSettingsRepository.setHeroTrailerPlayback(it) },
+                                )
+                            } else {
+                                null
+                            },
+                            SettingsToggleGridItem(
+                                id = "tabLayout",
+                                title = stringResource(Res.string.settings_meta_tab_layout),
+                                description = stringResource(Res.string.settings_meta_tab_layout_description),
+                                checked = uiState.tabLayout,
+                                onCheckedChange = { MetaScreenSettingsRepository.setTabLayout(it) },
+                            ),
+                            SettingsToggleGridItem(
+                                id = "randomEpisode",
+                                title = stringResource(Res.string.random_episode_title),
+                                description = stringResource(Res.string.layout_random_episode_sub),
+                                checked = shuffleProfile.available,
+                                onCheckedChange = {
+                                    if (!EpisodeShuffleRepository.setAvailable(it)) {
+                                        NuvioToastController.show(shuffleSaveFailed)
+                                    }
+                                },
+                            ),
+                            SettingsToggleGridItem(
+                                id = "blurUnwatchedEpisodes",
+                                title = stringResource(Res.string.settings_meta_blur_unwatched_episodes),
+                                description = stringResource(Res.string.settings_meta_blur_unwatched_episodes_description),
+                                checked = uiState.blurUnwatchedEpisodes,
+                                onCheckedChange = { MetaScreenSettingsRepository.setBlurUnwatchedEpisodes(it) },
+                            ),
+                        ),
+                        isTablet = isTablet,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    RatingsSettings(isTablet = isTablet, uiState = uiState)
+                    SettingsGroupDivider(isTablet = isTablet)
+                    MetaEpisodeCardStyleSelector(
+                        isTablet = isTablet,
+                        selectedStyle = uiState.episodeCardStyle,
+                        onStyleSelected = MetaScreenSettingsRepository::setEpisodeCardStyle,
+                    )
+                } else {
+                    if (supportsPosterNavigationMotion) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSwitchRow(
+                            title = stringResource(Res.string.settings_meta_poster_transition),
+                            description = stringResource(Res.string.settings_meta_poster_transition_description),
+                            checked = uiState.posterTransitionEnabled,
+                            isTablet = isTablet,
+                            onCheckedChange = MetaScreenSettingsRepository::setPosterTransitionEnabled,
+                        )
+                    }
+                    if (showHeroTrailerPlaybackSetting) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSwitchRow(
+                            title = stringResource(Res.string.settings_meta_hero_trailer_playback),
+                            description = stringResource(Res.string.settings_meta_hero_trailer_playback_description),
+                            checked = uiState.heroTrailerPlayback,
+                            isTablet = isTablet,
+                            onCheckedChange = { MetaScreenSettingsRepository.setHeroTrailerPlayback(it) },
+                        )
+                    }
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_meta_tab_layout),
+                        description = stringResource(Res.string.settings_meta_tab_layout_description),
+                        checked = uiState.tabLayout,
+                        isTablet = isTablet,
+                        onCheckedChange = { MetaScreenSettingsRepository.setTabLayout(it) },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    RatingsSettings(isTablet = isTablet, uiState = uiState)
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.random_episode_title),
+                        description = stringResource(Res.string.layout_random_episode_sub),
+                        checked = shuffleProfile.available,
+                        isTablet = isTablet,
+                        onCheckedChange = {
+                            if (!EpisodeShuffleRepository.setAvailable(it)) NuvioToastController.show(shuffleSaveFailed)
+                        },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    MetaEpisodeCardStyleSelector(
+                        isTablet = isTablet,
+                        selectedStyle = uiState.episodeCardStyle,
+                        onStyleSelected = MetaScreenSettingsRepository::setEpisodeCardStyle,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_meta_blur_unwatched_episodes),
+                        description = stringResource(Res.string.settings_meta_blur_unwatched_episodes_description),
+                        checked = uiState.blurUnwatchedEpisodes,
+                        isTablet = isTablet,
+                        onCheckedChange = { MetaScreenSettingsRepository.setBlurUnwatchedEpisodes(it) },
+                    )
+                }
             }
         }
     }
@@ -274,6 +341,7 @@ private fun MetaSectionReorderableList(
 
     LazyColumn(
         modifier = Modifier
+            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .heightIn(max = if (isTablet) 820.dp else 640.dp),
         state = lazyListState,
@@ -284,7 +352,7 @@ private fun MetaSectionReorderableList(
 
                 Surface(
                     shadowElevation = elevation,
-                    color = if (isDragging) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
+                    color = if (isDesktop && !isDragging) Color.Transparent else if (isDragging) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
                 ) {
                     Column {
                         if (index > 0) {
@@ -318,7 +386,7 @@ private fun MetaSectionRow(
     dragHandleScope: ReorderableCollectionItemScope,
 ) {
     val tokens = MaterialTheme.nuvio
-    val horizontalPadding = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
+    val horizontalPadding = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16
     val verticalPadding = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -383,6 +451,7 @@ private fun MetaSectionRow(
             Switch(
                 checked = item.enabled,
                 onCheckedChange = onEnabledChange,
+                modifier = Modifier.then(if (isDesktop) Modifier.scale(0.84f) else Modifier),
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = tokens.colors.onAccent,
                     checkedTrackColor = tokens.colors.accent,
@@ -476,9 +545,10 @@ private fun MetaEpisodeCardStyleSelector(
     val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
+            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(
-                horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                horizontal = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
                 vertical = if (isTablet) NuvioTokens.Space.s18 else NuvioTokens.Space.s16,
             ),
         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),

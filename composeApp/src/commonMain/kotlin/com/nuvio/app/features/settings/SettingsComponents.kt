@@ -60,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -152,11 +153,16 @@ internal fun SettingsGroup(
 }
 
 @Composable
-internal fun SettingsGroupDivider(isTablet: Boolean) {
+internal fun SettingsGroupDivider(
+    isTablet: Boolean,
+    fullWidth: Boolean = false,
+) {
     val tokens = MaterialTheme.nuvio
     HorizontalDivider(
         modifier = if (isDesktop) {
-            Modifier.fillMaxWidth()
+            Modifier
+                .then(if (fullWidth) Modifier else Modifier.widthIn(max = 880.dp))
+                .fillMaxWidth()
         } else {
             Modifier.padding(horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16)
         },
@@ -333,7 +339,7 @@ internal fun SettingsSection(
                 Text(
                     text = title,
                     style = MaterialTheme.nuvioTypeScale.labelSm.copy(
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                     ),
                     color = tokens.colors.accent,
@@ -369,6 +375,7 @@ internal fun SettingsNavigationRow(
     enabled: Boolean = true,
     isTablet: Boolean,
     actionLabel: String? = null,
+    valueLabel: String? = null,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
@@ -376,6 +383,7 @@ internal fun SettingsNavigationRow(
     if (isDesktop) {
         Row(
             modifier = Modifier
+                .widthIn(max = 880.dp)
                 .fillMaxWidth()
                 .padding(vertical = 13.dp)
                 .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),
@@ -411,7 +419,7 @@ internal fun SettingsNavigationRow(
                         color = tokens.colors.textPrimary,
                         fontWeight = FontWeight.Medium,
                     )
-                    if (!description.isNullOrBlank()) {
+                    if (!description.isNullOrBlank() && (valueLabel == null || description != valueLabel)) {
                         Text(
                             text = description,
                             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.5.sp),
@@ -425,6 +433,13 @@ internal fun SettingsNavigationRow(
                     enabled = enabled,
                     onClick = onClick,
                     content = trailingContent,
+                )
+            } else if (valueLabel != null) {
+                DesktopSelectChip(
+                    label = valueLabel,
+                    enabled = enabled,
+                    showChevron = true,
+                    onClick = onClick,
                 )
             } else {
                 DesktopSelectChip(
@@ -533,12 +548,14 @@ internal fun SettingsSwitchRow(
     enabled: Boolean = true,
     isTablet: Boolean,
     horizontalPadding: Dp = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp,
+    constrainWidth: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
     if (isDesktop) {
         Row(
             modifier = Modifier
+                .then(if (constrainWidth) Modifier.widthIn(max = 880.dp) else Modifier)
                 .fillMaxWidth()
                 .padding(horizontal = horizontalPadding, vertical = 13.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -571,6 +588,7 @@ internal fun SettingsSwitchRow(
                 enabled = enabled,
                 modifier = Modifier
                     .padding(start = NuvioTokens.Space.s4)
+                    .scale(0.84f)
                     .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = tokens.colors.onAccent,
@@ -660,6 +678,7 @@ internal fun SettingsChipRow(
     val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
+            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(
                 horizontal = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp,
@@ -714,6 +733,7 @@ internal fun HomescreenCatalogRow(
 
     Column(
         modifier = Modifier
+            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -794,6 +814,7 @@ internal fun HomescreenCatalogRow(
                 Switch(
                     checked = item.enabled,
                     onCheckedChange = onEnabledChange,
+                    modifier = Modifier.then(if (isDesktop) Modifier.scale(0.84f) else Modifier),
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = tokens.colors.onAccent,
                         checkedTrackColor = tokens.colors.accent,
@@ -1427,7 +1448,7 @@ internal fun SettingsToggleGrid(
                 val rows = items.chunked(2)
                 rows.forEachIndexed { rowIndex, rowItems ->
                     if (rowIndex > 0) {
-                        SettingsGroupDivider(isTablet = true)
+                        SettingsGroupDivider(isTablet = true, fullWidth = true)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1443,6 +1464,7 @@ internal fun SettingsToggleGrid(
                                     enabled = item.enabled,
                                     isTablet = true,
                                     horizontalPadding = 0.dp,
+                                    constrainWidth = false,
                                     onCheckedChange = item.onCheckedChange,
                                 )
                             }
@@ -1477,11 +1499,13 @@ internal fun DesktopSettingRow(
     description: String? = null,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
+    constrainWidth: Boolean = true,
     trailingControl: @Composable () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
     Row(
         modifier = modifier
+            .then(if (constrainWidth) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(vertical = 13.dp)
             .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),

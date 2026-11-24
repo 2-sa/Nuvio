@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.items
 import com.nuvio.app.core.ui.DialogButton
@@ -82,10 +83,12 @@ internal fun PlaybackStreamSettings(
                 )
                 if (settings.streamReuseLastLinkEnabled) {
                     SettingsGroupDivider(isTablet = isTablet)
+                    val cacheDurationLabel = formatReuseCacheDuration(settings.streamReuseLastLinkCacheHours)
                     SettingsNavigationRow(
                         title = stringResource(Res.string.settings_playback_last_link_cache_duration),
-                        description = formatReuseCacheDuration(settings.streamReuseLastLinkCacheHours),
+                        description = cacheDurationLabel,
                         isTablet = isTablet,
+                        valueLabel = cacheDurationLabel,
                         onClick = { showReuseCacheDurationDialog = true },
                     )
                 }
@@ -97,19 +100,23 @@ internal fun PlaybackStreamSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                val streamSelectionModeLabel = stringResource(settings.streamAutoPlayMode.labelRes)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_stream_selection_mode),
-                    description = stringResource(settings.streamAutoPlayMode.labelRes),
+                    description = streamSelectionModeLabel,
                     isTablet = isTablet,
+                    valueLabel = streamSelectionModeLabel,
                     onClick = { showAutoPlayModeDialog = true },
                 )
                 if (settings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
                     SettingsGroupDivider(isTablet = isTablet)
                     val notSetLabel = stringResource(Res.string.settings_playback_not_set)
+                    val regexLabel = settings.streamAutoPlayRegex.ifBlank { notSetLabel }
                     SettingsNavigationRow(
                         title = stringResource(Res.string.settings_playback_regex_pattern),
-                        description = settings.streamAutoPlayRegex.ifBlank { notSetLabel },
+                        description = regexLabel,
                         isTablet = isTablet,
+                        valueLabel = regexLabel,
                         onClick = { showAutoPlayRegexDialog = true },
                     )
                 }
@@ -167,8 +174,12 @@ internal fun PlaybackStreamSettings(
                 }
                 Column(
                     modifier = Modifier
+                        .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
                         .fillMaxWidth()
-                        .padding(horizontal = if (isTablet) 18.dp else 16.dp, vertical = 10.dp),
+                        .padding(
+                            horizontal = if (isDesktop) 0.dp else if (isTablet) 18.dp else 16.dp,
+                            vertical = 10.dp,
+                        ),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -214,12 +225,37 @@ internal fun PlaybackStreamSettings(
                     )
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_source_scope),
-                    description = stringResource(settings.streamAutoPlaySource.labelRes(pluginsEnabled)),
-                    isTablet = isTablet,
-                    onClick = { showAutoPlaySourceDialog = true },
-                )
+                if (isDesktop) {
+                    val sourceScopeOptions = buildList {
+                        add(StreamAutoPlaySource.ALL_SOURCES)
+                        add(StreamAutoPlaySource.INSTALLED_ADDONS_ONLY)
+                        if (pluginsEnabled) {
+                            add(StreamAutoPlaySource.ENABLED_PLUGINS_ONLY)
+                        }
+                    }
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_source_scope),
+                        description = stringResource(settings.streamAutoPlaySource.descriptionRes(pluginsEnabled)),
+                    ) {
+                        DesktopSegmentedControl(
+                            options = sourceScopeOptions.map { source ->
+                                DesktopSegmentedOption(
+                                    value = source,
+                                    label = stringResource(source.labelRes(pluginsEnabled)),
+                                )
+                            },
+                            selected = settings.streamAutoPlaySource,
+                            onSelected = PlayerSettingsRepository::setStreamAutoPlaySource,
+                        )
+                    }
+                } else {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_source_scope),
+                        description = stringResource(settings.streamAutoPlaySource.labelRes(pluginsEnabled)),
+                        isTablet = isTablet,
+                        onClick = { showAutoPlaySourceDialog = true },
+                    )
+                }
                 if (settings.streamAutoPlaySource != StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
                     SettingsGroupDivider(isTablet = isTablet)
                     val addonSubtitle = if (settings.streamAutoPlaySelectedAddons.isEmpty()) {
@@ -234,6 +270,7 @@ internal fun PlaybackStreamSettings(
                         title = stringResource(Res.string.settings_playback_allowed_addons),
                         description = addonSubtitle,
                         isTablet = isTablet,
+                        valueLabel = addonSubtitle,
                         onClick = { showAutoPlayAddonSelectionDialog = true },
                     )
                 }
@@ -251,6 +288,7 @@ internal fun PlaybackStreamSettings(
                         title = stringResource(Res.string.settings_playback_allowed_plugins),
                         description = pluginSubtitle,
                         isTablet = isTablet,
+                        valueLabel = pluginSubtitle,
                         onClick = { showAutoPlayPluginSelectionDialog = true },
                     )
                 }
@@ -398,6 +436,16 @@ internal fun StreamAutoPlaySource.labelRes(pluginsEnabled: Boolean): StringResou
         else Res.string.settings_playback_source_scope_all_addons
     StreamAutoPlaySource.INSTALLED_ADDONS_ONLY -> Res.string.settings_playback_source_scope_installed_addons_only
     StreamAutoPlaySource.ENABLED_PLUGINS_ONLY -> Res.string.settings_playback_source_scope_enabled_plugins_only
+}
+
+private fun StreamAutoPlaySource.descriptionRes(pluginsEnabled: Boolean): StringResource = when (this) {
+    StreamAutoPlaySource.ALL_SOURCES ->
+        if (pluginsEnabled) Res.string.settings_playback_source_scope_all_sources_description
+        else Res.string.settings_playback_source_scope_all_addons_description
+    StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ->
+        Res.string.settings_playback_source_scope_installed_addons_only_description
+    StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
+        Res.string.settings_playback_source_scope_enabled_plugins_only_description
 }
 
 internal val StreamAutoPlayMode.labelRes: StringResource

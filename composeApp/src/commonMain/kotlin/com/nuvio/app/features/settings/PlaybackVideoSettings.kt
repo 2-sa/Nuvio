@@ -114,21 +114,43 @@ internal fun PlaybackVideoSettings(
                     isTablet = isTablet,
                 ) {
                     SettingsGroup(isTablet = isTablet) {
-                        SettingsSwitchRow(
-                            title = stringResource(Res.string.settings_playback_nvidia_rtx_super_resolution),
-                            description = stringResource(Res.string.settings_playback_nvidia_rtx_super_resolution_desc),
-                            checked = settings.nvidiaRtxSuperResolutionEnabled,
-                            isTablet = isTablet,
-                            onCheckedChange = PlayerSettingsRepository::setNvidiaRtxSuperResolutionEnabled,
-                        )
-                        SettingsGroupDivider(isTablet = isTablet)
-                        SettingsSwitchRow(
-                            title = stringResource(Res.string.settings_playback_nvidia_rtx_hdr),
-                            description = stringResource(Res.string.settings_playback_nvidia_rtx_hdr_desc),
-                            checked = settings.nvidiaRtxHdrEnabled,
-                            isTablet = isTablet,
-                            onCheckedChange = PlayerSettingsRepository::setNvidiaRtxHdrEnabled,
-                        )
+                        if (isDesktop) {
+                            SettingsToggleGrid(
+                                items = listOf(
+                                    SettingsToggleGridItem(
+                                        id = "nvidiaRtxSuperResolution",
+                                        title = stringResource(Res.string.settings_playback_nvidia_rtx_super_resolution),
+                                        description = stringResource(Res.string.settings_playback_nvidia_rtx_super_resolution_desc),
+                                        checked = settings.nvidiaRtxSuperResolutionEnabled,
+                                        onCheckedChange = PlayerSettingsRepository::setNvidiaRtxSuperResolutionEnabled,
+                                    ),
+                                    SettingsToggleGridItem(
+                                        id = "nvidiaRtxHdr",
+                                        title = stringResource(Res.string.settings_playback_nvidia_rtx_hdr),
+                                        description = stringResource(Res.string.settings_playback_nvidia_rtx_hdr_desc),
+                                        checked = settings.nvidiaRtxHdrEnabled,
+                                        onCheckedChange = PlayerSettingsRepository::setNvidiaRtxHdrEnabled,
+                                    ),
+                                ),
+                                isTablet = isTablet,
+                            )
+                        } else {
+                            SettingsSwitchRow(
+                                title = stringResource(Res.string.settings_playback_nvidia_rtx_super_resolution),
+                                description = stringResource(Res.string.settings_playback_nvidia_rtx_super_resolution_desc),
+                                checked = settings.nvidiaRtxSuperResolutionEnabled,
+                                isTablet = isTablet,
+                                onCheckedChange = PlayerSettingsRepository::setNvidiaRtxSuperResolutionEnabled,
+                            )
+                            SettingsGroupDivider(isTablet = isTablet)
+                            SettingsSwitchRow(
+                                title = stringResource(Res.string.settings_playback_nvidia_rtx_hdr),
+                                description = stringResource(Res.string.settings_playback_nvidia_rtx_hdr_desc),
+                                checked = settings.nvidiaRtxHdrEnabled,
+                                isTablet = isTablet,
+                                onCheckedChange = PlayerSettingsRepository::setNvidiaRtxHdrEnabled,
+                            )
+                        }
                     }
                 }
             }

@@ -22,12 +22,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
@@ -48,22 +53,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioInputField
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioSectionLabel
@@ -143,6 +161,7 @@ internal fun AddonsSettingsPageContent(
     val usePersonalMediaCopy = AppFeaturePolicy.personalMediaAddonCopyEnabled
 
     val overview = remember(uiState.addons) { uiState.addons.toOverview() }
+    val isInstalling = installModalState?.isBusy == true
     val onAddClick: () -> Unit = {
         val requestedUrl = addonUrl.trim()
         if (requestedUrl.isBlank()) {
@@ -172,44 +191,85 @@ internal fun AddonsSettingsPageContent(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val isTwoColumnDesktop = isDesktop && maxWidth >= 960.dp
+        if (isDesktop) {
+            val isTwoColumnDesktop = maxWidth >= 680.dp
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                DesktopAddonStatsStrip(overview = overview)
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            if (isTwoColumnDesktop) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
+                DesktopAddonInstallCommandBar(
+                    addonUrl = addonUrl,
+                    formMessage = formMessage,
+                    isInstalling = isInstalling,
+                    usePersonalMediaCopy = usePersonalMediaCopy,
+                    focusRequester = addInputFocusRequester,
+                    onAddonUrlChange = {
+                        addonUrl = it
+                        formMessage = null
+                    },
+                    onAddClick = onAddClick,
+                )
+
+                SectionHeader(stringResource(Res.string.addons_section_installed))
+                if (uiState.addons.isEmpty()) {
+                    EmptyStateCard(usePersonalMediaCopy = usePersonalMediaCopy)
+                } else if (isTwoColumnDesktop) {
+                    val lastIndex = uiState.addons.lastIndex
+                    val indexedAddons = uiState.addons.mapIndexed { index, addon -> index to addon }
                     Column(
-                        modifier = Modifier.weight(0.42f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        SectionHeader(stringResource(Res.string.addons_section_overview))
-                        OverviewCard(overview = overview)
+                        indexedAddons.chunked(2).forEach { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                pair.forEach { (index, addon) ->
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        InstalledAddonCardItem(
+                                            addon = addon,
+                                            index = index,
+                                            lastIndex = lastIndex,
+                                            compactDesktop = true,
+                                            onRequestDelete = { addonPendingDeletionUrl = it },
+                                            onOpenConfigure = { url -> runCatching { uriHandler.openUri(url) } },
+                                        )
+                                    }
+                                }
+                                if (pair.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
                     }
+                } else {
+                    val lastIndex = uiState.addons.lastIndex
                     Column(
-                        modifier = Modifier.weight(0.58f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        SectionHeader(stringResource(Res.string.addons_section_add_addon))
-                        AddAddonCard(
-                            addonUrl = addonUrl,
-                            formMessage = formMessage,
-                            usePersonalMediaCopy = usePersonalMediaCopy,
-                            focusRequester = addInputFocusRequester,
-                            onAddonUrlChange = {
-                                addonUrl = it
-                                formMessage = null
-                            },
-                            onAddClick = onAddClick,
-                        )
+                        uiState.addons.forEachIndexed { index, addon ->
+                            InstalledAddonCardItem(
+                                addon = addon,
+                                index = index,
+                                lastIndex = lastIndex,
+                                compactDesktop = true,
+                                onRequestDelete = { addonPendingDeletionUrl = it },
+                                onOpenConfigure = { url -> runCatching { uriHandler.openUri(url) } },
+                            )
+                        }
                     }
                 }
-            } else {
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 SectionHeader(stringResource(Res.string.addons_section_overview))
                 OverviewCard(overview = overview)
 
@@ -225,51 +285,22 @@ internal fun AddonsSettingsPageContent(
                     },
                     onAddClick = onAddClick,
                 )
-            }
 
-            SectionHeader(stringResource(Res.string.addons_section_installed))
-            if (uiState.addons.isEmpty()) {
-                EmptyStateCard(usePersonalMediaCopy = usePersonalMediaCopy)
-            } else if (isTwoColumnDesktop) {
-                val lastIndex = uiState.addons.lastIndex
-                val indexedAddons = uiState.addons.mapIndexed { index, addon -> index to addon }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    indexedAddons.chunked(2).forEach { pair ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            pair.forEach { (index, addon) ->
-                                Box(modifier = Modifier.weight(1f)) {
-                                    InstalledAddonCardItem(
-                                        addon = addon,
-                                        index = index,
-                                        lastIndex = lastIndex,
-                                        onRequestDelete = { addonPendingDeletionUrl = it },
-                                        onOpenConfigure = { url -> runCatching { uriHandler.openUri(url) } },
-                                    )
-                                }
-                            }
-                            if (pair.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
+                SectionHeader(stringResource(Res.string.addons_section_installed))
+                if (uiState.addons.isEmpty()) {
+                    EmptyStateCard(usePersonalMediaCopy = usePersonalMediaCopy)
+                } else {
+                    val lastIndex = uiState.addons.lastIndex
+                    uiState.addons.forEachIndexed { index, addon ->
+                        InstalledAddonCardItem(
+                            addon = addon,
+                            index = index,
+                            lastIndex = lastIndex,
+                            compactDesktop = false,
+                            onRequestDelete = { addonPendingDeletionUrl = it },
+                            onOpenConfigure = { url -> runCatching { uriHandler.openUri(url) } },
+                        )
                     }
-                }
-            } else {
-                val lastIndex = uiState.addons.lastIndex
-                uiState.addons.forEachIndexed { index, addon ->
-                    InstalledAddonCardItem(
-                        addon = addon,
-                        index = index,
-                        lastIndex = lastIndex,
-                        onRequestDelete = { addonPendingDeletionUrl = it },
-                        onOpenConfigure = { url -> runCatching { uriHandler.openUri(url) } },
-                    )
                 }
             }
         }
@@ -355,6 +386,7 @@ private fun InstalledAddonCardItem(
     addon: ManagedAddon,
     index: Int,
     lastIndex: Int,
+    compactDesktop: Boolean = false,
     onRequestDelete: (String) -> Unit,
     onOpenConfigure: (String) -> Unit,
 ) {
@@ -362,34 +394,794 @@ private fun InstalledAddonCardItem(
     val behaviorHints = manifest?.behaviorHints
     val showConfigureAction = behaviorHints?.configurable == true || behaviorHints?.configurationRequired == true
     val configureUrl = addon.manifestUrl.toConfigureUrl()
-    InstalledAddonCard(
-        addon = addon,
-        onMoveUpClick = if (index > 0) {
-            { AddonRepository.moveAddon(index, index - 1) }
-        } else {
-            null
-        },
-        onMoveDownClick = if (index < lastIndex) {
-            { AddonRepository.moveAddon(index, index + 1) }
-        } else {
-            null
-        },
-        onRefreshClick = {
-            AddonRepository.refreshAddon(
-                manifestUrl = addon.manifestUrl,
-                forceRefresh = true,
+    val onMoveUpClick = if (index > 0) {
+        { AddonRepository.moveAddon(index, index - 1) }
+    } else {
+        null
+    }
+    val onMoveDownClick = if (index < lastIndex) {
+        { AddonRepository.moveAddon(index, index + 1) }
+    } else {
+        null
+    }
+    val onRefreshClick = {
+        AddonRepository.refreshAddon(
+            manifestUrl = addon.manifestUrl,
+            forceRefresh = true,
+        )
+    }
+    val onEnabledChange: (Boolean) -> Unit = { enabled ->
+        AddonRepository.setAddonEnabled(addon.manifestUrl, enabled)
+    }
+    val onConfigureClick = if (showConfigureAction && configureUrl.isNotBlank()) {
+        { onOpenConfigure(configureUrl) }
+    } else {
+        null
+    }
+    val onDeleteClick = { onRequestDelete(addon.manifestUrl) }
+
+    if (compactDesktop) {
+        DesktopStudioAddonCard(
+            addon = addon,
+            onMoveUpClick = onMoveUpClick,
+            onMoveDownClick = onMoveDownClick,
+            onRefreshClick = onRefreshClick,
+            onEnabledChange = onEnabledChange,
+            onConfigureClick = onConfigureClick,
+            onDeleteClick = onDeleteClick,
+        )
+    } else {
+        InstalledAddonCard(
+            addon = addon,
+            onMoveUpClick = onMoveUpClick,
+            onMoveDownClick = onMoveDownClick,
+            onRefreshClick = onRefreshClick,
+            onEnabledChange = onEnabledChange,
+            onConfigureClick = onConfigureClick,
+            onDeleteClick = onDeleteClick,
+        )
+    }
+}
+
+@Composable
+private fun DesktopAddonStatsStrip(
+    overview: AddonOverview,
+) {
+    val tokens = MaterialTheme.nuvio
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        DesktopAddonStatPill(
+            text = stringResource(Res.string.addons_stats_installed_format, overview.totalAddons),
+        )
+        DesktopAddonStatPill(
+            text = stringResource(Res.string.addons_stats_active_format, overview.activeAddons),
+            dotColor = if (overview.activeAddons > 0) Color(0xFF34D399) else tokens.colors.textMuted,
+            accentHighlight = overview.activeAddons > 0,
+        )
+        DesktopAddonStatPill(
+            text = stringResource(Res.string.addons_stats_catalogs_format, overview.totalCatalogs),
+        )
+    }
+}
+
+@Composable
+private fun DesktopAddonStatPill(
+    text: String,
+    dotColor: Color? = null,
+    accentHighlight: Boolean = false,
+) {
+    val tokens = MaterialTheme.nuvio
+    val pillShape = RoundedCornerShape(999.dp)
+    val bgColor = if (accentHighlight && dotColor != null) {
+        dotColor.copy(alpha = 0.10f)
+    } else {
+        Color.White.copy(alpha = 0.045f)
+    }
+    val borderColor = if (accentHighlight && dotColor != null) {
+        dotColor.copy(alpha = 0.28f)
+    } else {
+        Color.White.copy(alpha = 0.09f)
+    }
+    Row(
+        modifier = Modifier
+            .clip(pillShape)
+            .background(bgColor)
+            .border(NuvioTokens.Border.thin, borderColor, pillShape)
+            .padding(horizontal = 11.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (dotColor != null) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(dotColor),
             )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+            color = if (accentHighlight && dotColor != null) dotColor else tokens.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Suppress("DEPRECATION")
+@Composable
+private fun DesktopAddonInstallCommandBar(
+    addonUrl: String,
+    formMessage: String?,
+    isInstalling: Boolean,
+    usePersonalMediaCopy: Boolean,
+    focusRequester: FocusRequester?,
+    onAddonUrlChange: (String) -> Unit,
+    onAddClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val palette = MaterialTheme.themePalette
+    val clipboardManager = LocalClipboardManager.current
+    val barShape = RoundedCornerShape(14.dp)
+    val pasteShape = RoundedCornerShape(8.dp)
+    val ctaShape = RoundedCornerShape(10.dp)
+
+    val barInteraction = remember { MutableInteractionSource() }
+    val isBarHovered by barInteraction.collectIsHoveredAsState()
+    var isInputFocused by remember { mutableStateOf(false) }
+
+    val pasteInteraction = remember { MutableInteractionSource() }
+    val isPasteHovered by pasteInteraction.collectIsHoveredAsState()
+
+    val ctaInteraction = remember { MutableInteractionSource() }
+    val isCtaHovered by ctaInteraction.collectIsHoveredAsState()
+    val ctaEnabled = addonUrl.isNotBlank() && !isInstalling
+
+    val barBorderColor by animateColorAsState(
+        targetValue = when {
+            isInputFocused -> tokens.colors.accent.copy(alpha = 0.72f)
+            isBarHovered -> Color.White.copy(alpha = 0.16f)
+            else -> Color.White.copy(alpha = 0.09f)
         },
-        onEnabledChange = { enabled ->
-            AddonRepository.setAddonEnabled(addon.manifestUrl, enabled)
-        },
-        onConfigureClick = if (showConfigureAction && configureUrl.isNotBlank()) {
-            { onOpenConfigure(configureUrl) }
-        } else {
-            null
-        },
-        onDeleteClick = { onRequestDelete(addon.manifestUrl) },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "addonInstallBarBorder",
     )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(barShape)
+                .background(Color.White.copy(alpha = 0.035f))
+                .border(NuvioTokens.Border.thin, barBorderColor, barShape)
+                .hoverable(barInteraction)
+                .padding(start = 13.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Link,
+                contentDescription = null,
+                tint = if (isInputFocused) tokens.colors.accent else tokens.colors.textMuted,
+                modifier = Modifier.size(18.dp),
+            )
+
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (addonUrl.isEmpty()) {
+                    Text(
+                        text = stringResource(
+                            if (usePersonalMediaCopy) {
+                                Res.string.addons_appstore_input_placeholder
+                            } else {
+                                Res.string.addons_input_placeholder
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.5.sp),
+                        color = tokens.colors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = addonUrl,
+                    onValueChange = onAddonUrlChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                        .onFocusChanged { isInputFocused = it.isFocused }
+                        .onPreviewKeyEvent { event ->
+                            if (
+                                event.type == KeyEventType.KeyDown &&
+                                (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                            ) {
+                                if (!isInstalling && addonUrl.isNotBlank()) {
+                                    onAddClick()
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                    singleLine = true,
+                    enabled = !isInstalling,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 13.5.sp,
+                        color = tokens.colors.textPrimary,
+                        textDirection = TextDirection.Ltr,
+                    ),
+                    cursorBrush = SolidColor(tokens.colors.accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            if (!isInstalling && addonUrl.isNotBlank()) {
+                                onAddClick()
+                            }
+                        },
+                    ),
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .height(32.dp)
+                    .clip(pasteShape)
+                    .background(
+                        if (isPasteHovered) {
+                            Color.White.copy(alpha = 0.10f)
+                        } else {
+                            Color.White.copy(alpha = 0.055f)
+                        },
+                    )
+                    .border(NuvioTokens.Border.thin, Color.White.copy(alpha = 0.09f), pasteShape)
+                    .nuvioFocusBorder(pasteShape)
+                    .hoverable(pasteInteraction)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .clickable(
+                        enabled = !isInstalling,
+                        interactionSource = pasteInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = {
+                            val pasted = clipboardManager.getText()?.text?.trim().orEmpty()
+                            if (pasted.isNotEmpty()) {
+                                onAddonUrlChange(pasted)
+                            }
+                        },
+                    )
+                    .padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ContentPaste,
+                    contentDescription = null,
+                    tint = tokens.colors.textSecondary,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = stringResource(Res.string.addons_action_paste),
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    color = tokens.colors.textSecondary,
+                    maxLines = 1,
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .alpha(if (ctaEnabled || isInstalling) 1f else tokens.opacity.disabled)
+                    .clip(ctaShape)
+                    .background(palette.accentBrush())
+                    .then(
+                        if (ctaEnabled && isCtaHovered) {
+                            Modifier.background(Color.White.copy(alpha = NuvioTokens.Opacity.hover))
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .nuvioFocusBorder(ctaShape)
+                    .then(
+                        if (ctaEnabled) {
+                            Modifier
+                                .hoverable(ctaInteraction)
+                                .pointerHoverIcon(PointerIcon.Hand)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .clickable(
+                        enabled = ctaEnabled,
+                        interactionSource = ctaInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = onAddClick,
+                    )
+                    .padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isInstalling) {
+                    NuvioLoadingIndicator(
+                        color = tokens.colors.onAccent,
+                        size = 15.dp,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null,
+                        tint = tokens.colors.onAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Text(
+                    text = stringResource(
+                        when {
+                            isInstalling -> Res.string.addon_installing
+                            usePersonalMediaCopy -> Res.string.addons_appstore_install_button
+                            else -> Res.string.addons_install_button
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = tokens.colors.onAccent,
+                    maxLines = 1,
+                )
+            }
+        }
+
+        if (usePersonalMediaCopy) {
+            Text(
+                text = stringResource(Res.string.addons_appstore_add_description),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                color = tokens.colors.textMuted,
+            )
+        }
+        formMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+                color = tokens.colors.danger,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DesktopStudioAddonCard(
+    addon: ManagedAddon,
+    onMoveUpClick: (() -> Unit)?,
+    onMoveDownClick: (() -> Unit)?,
+    onRefreshClick: () -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
+    onConfigureClick: (() -> Unit)?,
+    onDeleteClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val manifest = addon.manifest
+    val cardShape = RoundedCornerShape(14.dp)
+    val iconShape = RoundedCornerShape(10.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isHovered) {
+            tokens.colors.accent.copy(alpha = 0.40f)
+        } else {
+            Color.White.copy(alpha = 0.08f)
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "desktopAddonCardBorder",
+    )
+
+    val statusDotColor: Color
+    val statusText: String
+    val statusTextColor: Color
+    when {
+        !addon.enabled -> {
+            statusDotColor = tokens.colors.textMuted
+            statusText = stringResource(Res.string.addons_badge_disabled)
+            statusTextColor = tokens.colors.textMuted
+        }
+        addon.isRefreshing -> {
+            statusDotColor = tokens.colors.accent
+            statusText = stringResource(Res.string.addons_badge_refreshing)
+            statusTextColor = tokens.colors.accent
+        }
+        manifest != null -> {
+            statusDotColor = Color(0xFF34D399)
+            statusText = stringResource(Res.string.addons_badge_active)
+            statusTextColor = tokens.colors.textSecondary
+        }
+        else -> {
+            statusDotColor = tokens.colors.danger
+            statusText = stringResource(Res.string.addons_badge_unavailable)
+            statusTextColor = tokens.colors.danger
+        }
+    }
+
+    val capabilityBadges = remember(manifest?.resources, manifest?.catalogs) {
+        extractAddonCapabilityBadges(
+            resources = manifest?.resources?.map { it.name }.orEmpty(),
+            catalogCount = manifest?.catalogs?.size ?: 0,
+        )
+    }
+    val contentTypes = remember(manifest?.types) {
+        normalizeAddonContentTypes(manifest?.types.orEmpty())
+    }
+    val localizedTypesLine = contentTypes.map { typeKind ->
+        when (typeKind) {
+            AddonContentTypeKind.MOVIE -> stringResource(Res.string.addons_type_movie)
+            AddonContentTypeKind.SERIES -> stringResource(Res.string.addons_type_series)
+            AddonContentTypeKind.ANIME -> stringResource(Res.string.addons_type_anime)
+            AddonContentTypeKind.CHANNEL -> stringResource(Res.string.addons_type_channel)
+            AddonContentTypeKind.OTHER -> stringResource(Res.string.addons_type_other)
+        }
+    }.joinToString(separator = " · ")
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .background(tokens.colors.surfaceCard)
+            .border(NuvioTokens.Border.thin, borderColor, cardShape)
+            .hoverable(interactionSource)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Row 1: Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(iconShape)
+                    .background(Color.White.copy(alpha = 0.05f))
+                    .border(NuvioTokens.Border.thin, Color.White.copy(alpha = 0.09f), iconShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                val logoUrl = manifest?.logoUrl
+                if (!logoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Extension,
+                        contentDescription = null,
+                        tint = if (manifest != null) tokens.colors.accent else tokens.colors.textMuted,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = addon.displayTitle,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        textDirection = if (isPrimarilyLatinText(addon.displayTitle)) {
+                            TextDirection.Ltr
+                        } else {
+                            TextDirection.Content
+                        },
+                    ),
+                    color = tokens.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(statusDotColor),
+                    )
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                        color = statusTextColor,
+                        maxLines = 1,
+                    )
+                    manifest?.version?.takeIf { it.isNotBlank() }?.let { version ->
+                        Text(
+                            text = "·",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.5.sp),
+                            color = tokens.colors.textMuted,
+                        )
+                        Text(
+                            text = "v$version",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.5.sp,
+                                textDirection = TextDirection.Ltr,
+                            ),
+                            color = tokens.colors.textMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            Switch(
+                checked = addon.enabled,
+                onCheckedChange = onEnabledChange,
+                modifier = Modifier
+                    .scale(0.84f)
+                    .pointerHoverIcon(PointerIcon.Hand),
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = tokens.colors.onAccent,
+                    checkedTrackColor = tokens.colors.accent,
+                    uncheckedThumbColor = Color(0xFFE2E8F0),
+                    uncheckedTrackColor = Color.White.copy(alpha = 0.12f),
+                    uncheckedBorderColor = Color.White.copy(alpha = 0.18f),
+                ),
+            )
+        }
+
+        // Row 2: Body
+        when {
+            addon.isRefreshing && manifest == null -> {
+                Text(
+                    text = stringResource(Res.string.addons_loading_manifest_details),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+                    color = tokens.colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            addon.errorMessage != null && manifest == null -> {
+                Text(
+                    text = addon.errorMessage,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+                    color = tokens.colors.danger,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            manifest != null -> {
+                manifest.description.takeIf { it.isNotBlank() }?.let { description ->
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 12.5.sp,
+                            lineHeight = 18.sp,
+                            textDirection = if (isPrimarilyLatinText(description)) {
+                                TextDirection.Ltr
+                            } else {
+                                TextDirection.Content
+                            },
+                        ),
+                        color = tokens.colors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                addon.errorMessage?.let { staleError ->
+                    Text(
+                        text = staleError,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                        color = tokens.colors.danger,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+
+        // Hairline divider
+        HorizontalDivider(
+            thickness = NuvioTokens.Border.hairline,
+            color = Color.White.copy(alpha = 0.06f),
+        )
+
+        // Row 3: Unified Footer
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FlowRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                capabilityBadges.forEach { badge ->
+                    val label = when (badge.kind) {
+                        AddonCapabilityKind.STREAM -> stringResource(Res.string.addons_cap_stream)
+                        AddonCapabilityKind.CATALOGS -> stringResource(Res.string.addons_badge_catalogs, badge.count ?: 0)
+                        AddonCapabilityKind.META -> stringResource(Res.string.addons_cap_meta)
+                        AddonCapabilityKind.SUBTITLES -> stringResource(Res.string.addons_cap_subtitles)
+                    }
+                    DesktopCapabilityPill(
+                        text = label,
+                        accent = badge.kind == AddonCapabilityKind.STREAM,
+                    )
+                }
+                if (localizedTypesLine.isNotEmpty()) {
+                    Text(
+                        text = localizedTypesLine,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                        color = tokens.colors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 3.dp),
+                    )
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                onMoveUpClick?.let { onMoveUp ->
+                    DesktopCompactActionButton(
+                        icon = Icons.Rounded.ArrowUpward,
+                        contentDescription = stringResource(Res.string.addons_move_up),
+                        tint = tokens.colors.textSecondary,
+                        onClick = onMoveUp,
+                    )
+                }
+                onMoveDownClick?.let { onMoveDown ->
+                    DesktopCompactActionButton(
+                        icon = Icons.Rounded.ArrowDownward,
+                        contentDescription = stringResource(Res.string.addons_move_down),
+                        tint = tokens.colors.textSecondary,
+                        onClick = onMoveDown,
+                    )
+                }
+                DesktopCompactActionButton(
+                    icon = Icons.Rounded.Refresh,
+                    contentDescription = stringResource(Res.string.addons_refresh),
+                    tint = tokens.colors.textSecondary,
+                    hoverTint = tokens.colors.accent,
+                    onClick = onRefreshClick,
+                )
+                onConfigureClick?.let { onConfigure ->
+                    DesktopCompactActionButton(
+                        icon = Icons.Rounded.Settings,
+                        contentDescription = stringResource(Res.string.addons_configure),
+                        tint = tokens.colors.textSecondary,
+                        hoverTint = tokens.colors.textPrimary,
+                        onClick = onConfigure,
+                    )
+                }
+                DesktopCompactActionButton(
+                    icon = Icons.Rounded.Delete,
+                    contentDescription = stringResource(Res.string.addons_delete),
+                    tint = Color(0xFFFB7185).copy(alpha = 0.85f),
+                    hoverTint = Color(0xFFFB7185),
+                    destructive = true,
+                    onClick = onDeleteClick,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopCapabilityPill(
+    text: String,
+    accent: Boolean = false,
+) {
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(6.dp)
+    val bgColor = if (accent) tokens.colors.accent.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f)
+    val borderColor = if (accent) tokens.colors.accent.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.08f)
+    val textColor = if (accent) tokens.colors.accent else tokens.colors.textSecondary
+    Box(
+        modifier = Modifier
+            .clip(shape)
+            .background(bgColor)
+            .border(NuvioTokens.Border.thin, borderColor, shape)
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+            color = textColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun DesktopCompactActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    hoverTint: Color = MaterialTheme.nuvio.colors.textPrimary,
+    destructive: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val shape = RoundedCornerShape(7.dp)
+    val bgColor by animateColorAsState(
+        targetValue = when {
+            isHovered && destructive -> Color(0xFFFB7185).copy(alpha = 0.16f)
+            isHovered -> Color.White.copy(alpha = 0.11f)
+            else -> Color.White.copy(alpha = 0.045f)
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "desktopAddonActionBg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isHovered && destructive -> Color(0xFFFB7185).copy(alpha = 0.45f)
+            isHovered -> Color.White.copy(alpha = 0.18f)
+            else -> Color.White.copy(alpha = 0.08f)
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "desktopAddonActionBorder",
+    )
+
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .clip(shape)
+            .background(bgColor)
+            .border(NuvioTokens.Border.thin, borderColor, shape)
+            .nuvioFocusBorder(shape)
+            .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (isHovered) hoverTint else tint,
+            modifier = Modifier.size(15.dp),
+        )
+    }
 }
 
 @Composable

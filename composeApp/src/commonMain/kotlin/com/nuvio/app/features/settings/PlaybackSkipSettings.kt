@@ -52,11 +52,13 @@ internal fun PlaybackSkipSettings(
                     onCheckedChange = PlayerSettingsRepository::setSkipIntroEnabled,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
+                val autoSkipSummary = autoSkipSelectionSummary(settings.autoSkipSegmentTypes)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_auto_skip_segments),
-                    description = autoSkipSelectionSummary(settings.autoSkipSegmentTypes),
+                    description = autoSkipSummary,
                     enabled = settings.skipIntroEnabled && !settings.externalPlayerEnabled,
                     isTablet = isTablet,
+                    valueLabel = autoSkipSummary,
                     onClick = { showAutoSkipSegmentDialog = true },
                 )
                 SettingsGroupDivider(isTablet = isTablet)
@@ -71,10 +73,12 @@ internal fun PlaybackSkipSettings(
                     SettingsGroupDivider(isTablet = isTablet)
                     var showAnimeSkipClientIdDialog by remember { mutableStateOf(false) }
                     val notSetLabel = stringResource(Res.string.settings_playback_not_set)
+                    val clientIdValue = settings.animeSkipClientId.ifBlank { notSetLabel }
                     SettingsNavigationRow(
                         title = stringResource(Res.string.settings_playback_anime_skip_client_id),
-                        description = settings.animeSkipClientId.ifBlank { notSetLabel },
+                        description = clientIdValue,
                         isTablet = isTablet,
+                        valueLabel = clientIdValue,
                         onClick = { showAnimeSkipClientIdDialog = true },
                     )
                     if (showAnimeSkipClientIdDialog) {
@@ -100,10 +104,12 @@ internal fun PlaybackSkipSettings(
                     SettingsGroupDivider(isTablet = isTablet)
                     var showIntroDbApiKeyDialog by remember { mutableStateOf(false) }
                     val notSetLabel = stringResource(Res.string.settings_playback_not_set)
+                    val apiKeyValue = settings.introDbApiKey.ifBlank { notSetLabel }
                     SettingsNavigationRow(
                         title = stringResource(Res.string.settings_playback_introdb_api_key),
-                        description = settings.introDbApiKey.ifBlank { notSetLabel },
+                        description = apiKeyValue,
                         isTablet = isTablet,
+                        valueLabel = apiKeyValue,
                         onClick = { showIntroDbApiKeyDialog = true },
                     )
                     if (showIntroDbApiKeyDialog) {

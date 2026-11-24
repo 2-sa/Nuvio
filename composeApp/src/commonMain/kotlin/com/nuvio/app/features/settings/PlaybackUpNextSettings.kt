@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import com.nuvio.app.core.ui.Slider
 import com.nuvio.app.core.ui.DialogButton
@@ -27,6 +28,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -44,67 +46,135 @@ internal fun PlaybackUpNextSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_auto_play_next_episode),
-                    description = stringResource(Res.string.settings_playback_auto_play_next_episode_description),
-                    checked = settings.streamAutoPlayNextEpisodeEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayNextEpisodeEnabled,
-                )
-                if (settings.streamAutoPlayNextEpisodeEnabled &&
-                    settings.streamAutoPlayMode == StreamAutoPlayMode.MANUAL) {
+                if (isDesktop) {
+                    SettingsToggleGrid(
+                        items = listOfNotNull(
+                            SettingsToggleGridItem(
+                                id = "autoPlayNextEpisode",
+                                title = stringResource(Res.string.settings_playback_auto_play_next_episode),
+                                description = stringResource(Res.string.settings_playback_auto_play_next_episode_description),
+                                checked = settings.streamAutoPlayNextEpisodeEnabled,
+                                onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayNextEpisodeEnabled,
+                            ),
+                            if (settings.streamAutoPlayNextEpisodeEnabled &&
+                                settings.streamAutoPlayMode == StreamAutoPlayMode.MANUAL
+                            ) {
+                                SettingsToggleGridItem(
+                                    id = "autoPlayNextEpisodeFallback",
+                                    title = stringResource(Res.string.settings_playback_auto_play_next_episode_fallback),
+                                    description = stringResource(Res.string.settings_playback_auto_play_next_episode_fallback_description),
+                                    checked = settings.streamAutoPlayNextEpisodeFallbackEnabled,
+                                    onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayNextEpisodeFallbackEnabled,
+                                )
+                            } else {
+                                null
+                            },
+                            SettingsToggleGridItem(
+                                id = "preferBingeGroup",
+                                title = stringResource(Res.string.settings_playback_prefer_binge_group),
+                                description = stringResource(Res.string.settings_playback_prefer_binge_group_description),
+                                checked = settings.streamAutoPlayPreferBingeGroup,
+                                onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayPreferBingeGroup,
+                            ),
+                            if (settings.streamAutoPlayPreferBingeGroup) {
+                                SettingsToggleGridItem(
+                                    id = "reuseBingeGroup",
+                                    title = stringResource(Res.string.settings_playback_reuse_binge_group),
+                                    description = stringResource(Res.string.settings_playback_reuse_binge_group_description),
+                                    checked = settings.streamAutoPlayReuseBingeGroup,
+                                    onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayReuseBingeGroup,
+                                )
+                            } else {
+                                null
+                            },
+                            SettingsToggleGridItem(
+                                id = "preloadNextEpisode",
+                                title = stringResource(Res.string.settings_playback_preload_next_episode),
+                                description = stringResource(Res.string.settings_playback_preload_next_episode_description),
+                                checked = settings.preloadNextEpisodeSources,
+                                onCheckedChange = PlayerSettingsRepository::setPreloadNextEpisodeSources,
+                            ),
+                        ),
+                        isTablet = isTablet,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_playback_threshold_mode),
+                    ) {
+                        DesktopSegmentedControl(
+                            options = com.nuvio.app.features.player.skip.NextEpisodeThresholdMode.entries.map { mode ->
+                                DesktopSegmentedOption(
+                                    value = mode,
+                                    label = stringResource(mode.labelRes),
+                                )
+                            },
+                            selected = settings.nextEpisodeThresholdMode,
+                            onSelected = PlayerSettingsRepository::setNextEpisodeThresholdMode,
+                        )
+                    }
+                } else {
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_auto_play_next_episode),
+                        description = stringResource(Res.string.settings_playback_auto_play_next_episode_description),
+                        checked = settings.streamAutoPlayNextEpisodeEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayNextEpisodeEnabled,
+                    )
+                    if (settings.streamAutoPlayNextEpisodeEnabled &&
+                        settings.streamAutoPlayMode == StreamAutoPlayMode.MANUAL) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSwitchRow(
+                            title = stringResource(Res.string.settings_playback_auto_play_next_episode_fallback),
+                            description = stringResource(Res.string.settings_playback_auto_play_next_episode_fallback_description),
+                            checked = settings.streamAutoPlayNextEpisodeFallbackEnabled,
+                            isTablet = isTablet,
+                            onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayNextEpisodeFallbackEnabled,
+                        )
+                    }
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_playback_auto_play_next_episode_fallback),
-                        description = stringResource(Res.string.settings_playback_auto_play_next_episode_fallback_description),
-                        checked = settings.streamAutoPlayNextEpisodeFallbackEnabled,
+                        title = stringResource(Res.string.settings_playback_prefer_binge_group),
+                        description = stringResource(Res.string.settings_playback_prefer_binge_group_description),
+                        checked = settings.streamAutoPlayPreferBingeGroup,
                         isTablet = isTablet,
-                        onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayNextEpisodeFallbackEnabled,
+                        onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayPreferBingeGroup,
                     )
-                }
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_prefer_binge_group),
-                    description = stringResource(Res.string.settings_playback_prefer_binge_group_description),
-                    checked = settings.streamAutoPlayPreferBingeGroup,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayPreferBingeGroup,
-                )
-                if (settings.streamAutoPlayPreferBingeGroup) {
+                    if (settings.streamAutoPlayPreferBingeGroup) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSwitchRow(
+                            title = stringResource(Res.string.settings_playback_reuse_binge_group),
+                            description = stringResource(Res.string.settings_playback_reuse_binge_group_description),
+                            checked = settings.streamAutoPlayReuseBingeGroup,
+                            isTablet = isTablet,
+                            onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayReuseBingeGroup,
+                        )
+                    }
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_playback_reuse_binge_group),
-                        description = stringResource(Res.string.settings_playback_reuse_binge_group_description),
-                        checked = settings.streamAutoPlayReuseBingeGroup,
+                        title = stringResource(Res.string.settings_playback_preload_next_episode),
+                        description = stringResource(Res.string.settings_playback_preload_next_episode_description),
+                        checked = settings.preloadNextEpisodeSources,
                         isTablet = isTablet,
-                        onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayReuseBingeGroup,
+                        onCheckedChange = PlayerSettingsRepository::setPreloadNextEpisodeSources,
                     )
-                }
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_preload_next_episode),
-                    description = stringResource(Res.string.settings_playback_preload_next_episode_description),
-                    checked = settings.preloadNextEpisodeSources,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setPreloadNextEpisodeSources,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                var showThresholdModeDialog by remember { mutableStateOf(false) }
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_threshold_mode),
-                    description = stringResource(settings.nextEpisodeThresholdMode.labelRes),
-                    isTablet = isTablet,
-                    onClick = { showThresholdModeDialog = true },
-                )
-                if (showThresholdModeDialog) {
-                    NextEpisodeThresholdModeDialog(
-                        selected = settings.nextEpisodeThresholdMode,
-                        onSelect = {
-                            PlayerSettingsRepository.setNextEpisodeThresholdMode(it)
-                            showThresholdModeDialog = false
-                        },
-                        onDismiss = { showThresholdModeDialog = false },
+                    SettingsGroupDivider(isTablet = isTablet)
+                    var showThresholdModeDialog by remember { mutableStateOf(false) }
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_threshold_mode),
+                        description = stringResource(settings.nextEpisodeThresholdMode.labelRes),
+                        isTablet = isTablet,
+                        onClick = { showThresholdModeDialog = true },
                     )
+                    if (showThresholdModeDialog) {
+                        NextEpisodeThresholdModeDialog(
+                            selected = settings.nextEpisodeThresholdMode,
+                            onSelect = {
+                                PlayerSettingsRepository.setNextEpisodeThresholdMode(it)
+                                showThresholdModeDialog = false
+                            },
+                            onDismiss = { showThresholdModeDialog = false },
+                        )
+                    }
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 when (settings.nextEpisodeThresholdMode) {
@@ -112,8 +182,12 @@ internal fun PlaybackUpNextSettings(
                         val thresholdPercent = settings.nextEpisodeThresholdPercent
                         Column(
                             modifier = Modifier
+                                .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
                                 .fillMaxWidth()
-                                .padding(horizontal = if (isTablet) 18.dp else 16.dp, vertical = 10.dp),
+                                .padding(
+                                    horizontal = if (isDesktop) 0.dp else if (isTablet) 18.dp else 16.dp,
+                                    vertical = 10.dp,
+                                ),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -161,8 +235,12 @@ internal fun PlaybackUpNextSettings(
                         val thresholdMinutes = settings.nextEpisodeThresholdMinutesBeforeEnd
                         Column(
                             modifier = Modifier
+                                .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
                                 .fillMaxWidth()
-                                .padding(horizontal = if (isTablet) 18.dp else 16.dp, vertical = 10.dp),
+                                .padding(
+                                    horizontal = if (isDesktop) 0.dp else if (isTablet) 18.dp else 16.dp,
+                                    vertical = 10.dp,
+                                ),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

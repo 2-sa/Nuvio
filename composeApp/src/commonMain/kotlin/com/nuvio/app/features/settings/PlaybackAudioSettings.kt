@@ -37,24 +37,28 @@ internal fun PlaybackAudioSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                val preferredAudioLabel = when (settings.preferredAudioLanguage) {
+                    AudioLanguageOption.DEFAULT -> stringResource(Res.string.settings_playback_option_default)
+                    AudioLanguageOption.DEVICE -> stringResource(Res.string.settings_playback_option_device_language)
+                    AudioLanguageOption.ORIGINAL -> stringResource(Res.string.settings_playback_option_original)
+                    else -> languageLabelForCode(settings.preferredAudioLanguage)
+                }
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_preferred_audio_language),
-                    description = when (settings.preferredAudioLanguage) {
-                        AudioLanguageOption.DEFAULT -> stringResource(Res.string.settings_playback_option_default)
-                        AudioLanguageOption.DEVICE -> stringResource(Res.string.settings_playback_option_device_language)
-                        AudioLanguageOption.ORIGINAL -> stringResource(Res.string.settings_playback_option_original)
-                        else -> languageLabelForCode(settings.preferredAudioLanguage)
-                    },
+                    description = preferredAudioLabel,
                     enabled = !settings.externalPlayerEnabled,
                     isTablet = isTablet,
+                    valueLabel = preferredAudioLabel,
                     onClick = { showPreferredAudioDialog = true },
                 )
                 SettingsGroupDivider(isTablet = isTablet)
+                val secondaryAudioLabel = languageLabelForCode(settings.secondaryPreferredAudioLanguage)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_secondary_audio_language),
-                    description = languageLabelForCode(settings.secondaryPreferredAudioLanguage),
+                    description = secondaryAudioLabel,
                     enabled = !settings.externalPlayerEnabled,
                     isTablet = isTablet,
+                    valueLabel = secondaryAudioLabel,
                     onClick = { showSecondaryAudioDialog = true },
                 )
                 if (!isIos && !isDesktop) {
@@ -95,6 +99,7 @@ internal fun PlaybackAudioSettings(
                             description = settings.audioOutputChannels.settingValue,
                             enabled = downmixAvailable,
                             isTablet = isTablet,
+                            valueLabel = settings.audioOutputChannels.settingValue,
                             onClick = { showDownmixChannelsDialog = true },
                         )
                         SettingsGroupDivider(isTablet = isTablet)

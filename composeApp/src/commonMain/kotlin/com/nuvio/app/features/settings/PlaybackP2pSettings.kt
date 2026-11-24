@@ -18,6 +18,7 @@ import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.p2p.P2pTorrentProfile
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -44,41 +45,103 @@ internal fun PlaybackP2pSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_p2p_title),
-                    description = stringResource(Res.string.settings_p2p_subtitle),
-                    checked = p2pSettings.p2pEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = { enabled ->
-                        if (enabled && !p2pSettings.p2pEnabled) {
-                            showP2pConsentDialog = true
-                        } else {
-                            P2pSettingsRepository.setP2pEnabled(enabled)
-                        }
-                    },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_p2p_hide_stats_title),
-                    description = stringResource(Res.string.settings_p2p_hide_stats_subtitle),
-                    checked = p2pSettings.hideTorrentStats,
-                    isTablet = isTablet,
-                    onCheckedChange = P2pSettingsRepository::setHideTorrentStats,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_p2p_profile_title),
-                    description = p2pProfileLabel(p2pSettings.torrentProfile),
-                    isTablet = isTablet,
-                    onClick = { showP2pProfileDialog = true },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_p2p_cache_size_title),
-                    description = p2pCacheSizeLabel(p2pSettings.cacheSize),
-                    isTablet = isTablet,
-                    onClick = { showP2pCacheSizeDialog = true },
-                )
+                if (isDesktop) {
+                    SettingsToggleGrid(
+                        items = listOf(
+                            SettingsToggleGridItem(
+                                id = "p2pEnabled",
+                                title = stringResource(Res.string.settings_p2p_title),
+                                description = stringResource(Res.string.settings_p2p_subtitle),
+                                checked = p2pSettings.p2pEnabled,
+                                onCheckedChange = { enabled ->
+                                    if (enabled && !p2pSettings.p2pEnabled) {
+                                        showP2pConsentDialog = true
+                                    } else {
+                                        P2pSettingsRepository.setP2pEnabled(enabled)
+                                    }
+                                },
+                            ),
+                            SettingsToggleGridItem(
+                                id = "hideTorrentStats",
+                                title = stringResource(Res.string.settings_p2p_hide_stats_title),
+                                description = stringResource(Res.string.settings_p2p_hide_stats_subtitle),
+                                checked = p2pSettings.hideTorrentStats,
+                                onCheckedChange = P2pSettingsRepository::setHideTorrentStats,
+                            ),
+                        ),
+                        isTablet = isTablet,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_p2p_profile_title),
+                        description = p2pProfileDescription(p2pSettings.torrentProfile),
+                    ) {
+                        DesktopSegmentedControl(
+                            options = P2pTorrentProfile.entries.map { profile ->
+                                DesktopSegmentedOption(
+                                    value = profile,
+                                    label = p2pProfileLabel(profile),
+                                )
+                            },
+                            selected = p2pSettings.torrentProfile,
+                            onSelected = P2pSettingsRepository::setTorrentProfile,
+                        )
+                    }
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_p2p_cache_size_title),
+                    ) {
+                        DesktopSegmentedControl(
+                            options = P2pCacheSize.entries.map { size ->
+                                DesktopSegmentedOption(
+                                    value = size,
+                                    label = p2pCacheSizeLabel(size),
+                                )
+                            },
+                            selected = p2pSettings.cacheSize,
+                            onSelected = { size ->
+                                P2pSettingsRepository.setCacheSize(size)
+                                p2pCacheClearResult = null
+                            },
+                        )
+                    }
+                } else {
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_p2p_title),
+                        description = stringResource(Res.string.settings_p2p_subtitle),
+                        checked = p2pSettings.p2pEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = { enabled ->
+                            if (enabled && !p2pSettings.p2pEnabled) {
+                                showP2pConsentDialog = true
+                            } else {
+                                P2pSettingsRepository.setP2pEnabled(enabled)
+                            }
+                        },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_p2p_hide_stats_title),
+                        description = stringResource(Res.string.settings_p2p_hide_stats_subtitle),
+                        checked = p2pSettings.hideTorrentStats,
+                        isTablet = isTablet,
+                        onCheckedChange = P2pSettingsRepository::setHideTorrentStats,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_p2p_profile_title),
+                        description = p2pProfileLabel(p2pSettings.torrentProfile),
+                        isTablet = isTablet,
+                        onClick = { showP2pProfileDialog = true },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_p2p_cache_size_title),
+                        description = p2pCacheSizeLabel(p2pSettings.cacheSize),
+                        isTablet = isTablet,
+                        onClick = { showP2pCacheSizeDialog = true },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 val cacheClearAvailable = p2pStreamingState !is P2pStreamingState.Connecting &&
                     p2pStreamingState !is P2pStreamingState.Streaming &&
@@ -105,6 +168,7 @@ internal fun PlaybackP2pSettings(
                     },
                     enabled = cacheClearAvailable,
                     isTablet = isTablet,
+                    actionLabel = stringResource(Res.string.settings_action_clear),
                     onClick = {
                         p2pCacheClearResult = null
                         p2pCacheClearFailed = false
@@ -125,16 +189,7 @@ internal fun PlaybackP2pSettings(
             options = P2pTorrentProfile.entries,
             selected = p2pSettings.torrentProfile,
             label = { p2pProfileLabel(it) },
-            description = { profile ->
-                when (profile) {
-                    P2pTorrentProfile.SOFT ->
-                        stringResource(Res.string.settings_p2p_profile_soft_description)
-                    P2pTorrentProfile.BALANCED ->
-                        stringResource(Res.string.settings_p2p_profile_balanced_description)
-                    P2pTorrentProfile.FAST ->
-                        stringResource(Res.string.settings_p2p_profile_fast_description)
-                }
-            },
+            description = { p2pProfileDescription(it) },
             onSelect = { profile ->
                 P2pSettingsRepository.setTorrentProfile(profile)
                 showP2pProfileDialog = false
@@ -174,6 +229,13 @@ private fun p2pProfileLabel(profile: P2pTorrentProfile): String = when (profile)
     P2pTorrentProfile.SOFT -> stringResource(Res.string.settings_p2p_profile_soft)
     P2pTorrentProfile.BALANCED -> stringResource(Res.string.settings_p2p_profile_balanced)
     P2pTorrentProfile.FAST -> stringResource(Res.string.settings_p2p_profile_fast)
+}
+
+@Composable
+private fun p2pProfileDescription(profile: P2pTorrentProfile): String = when (profile) {
+    P2pTorrentProfile.SOFT -> stringResource(Res.string.settings_p2p_profile_soft_description)
+    P2pTorrentProfile.BALANCED -> stringResource(Res.string.settings_p2p_profile_balanced_description)
+    P2pTorrentProfile.FAST -> stringResource(Res.string.settings_p2p_profile_fast_description)
 }
 
 @Composable

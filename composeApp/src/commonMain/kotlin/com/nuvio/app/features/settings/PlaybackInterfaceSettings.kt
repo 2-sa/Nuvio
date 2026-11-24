@@ -34,7 +34,83 @@ internal fun PlaybackInterfaceSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                if (!isDesktop) {
+                if (isDesktop) {
+                    SettingsToggleGrid(
+                        items = listOf(
+                            SettingsToggleGridItem(
+                                id = "showLoadingOverlay",
+                                title = stringResource(Res.string.settings_playback_show_loading_overlay),
+                                description = stringResource(Res.string.settings_playback_show_loading_overlay_description),
+                                checked = settings.showLoadingOverlay,
+                                onCheckedChange = PlayerSettingsRepository::setShowLoadingOverlay,
+                            ),
+                            SettingsToggleGridItem(
+                                id = "showPlayerLoadingStatus",
+                                title = stringResource(Res.string.playback_show_loading_status),
+                                description = stringResource(Res.string.playback_show_loading_status_sub),
+                                checked = settings.showPlayerLoadingStatus,
+                                onCheckedChange = PlayerSettingsRepository::setShowPlayerLoadingStatus,
+                            ),
+                            SettingsToggleGridItem(
+                                id = "pauseOverlay",
+                                title = stringResource(Res.string.settings_playback_pause_overlay),
+                                description = stringResource(Res.string.settings_playback_pause_overlay_description),
+                                checked = settings.pauseOverlayEnabled,
+                                onCheckedChange = PlayerSettingsRepository::setPauseOverlayEnabled,
+                            ),
+                            SettingsToggleGridItem(
+                                id = "parentalGuide",
+                                title = stringResource(Res.string.settings_playback_parental_guide),
+                                description = stringResource(Res.string.settings_playback_parental_guide_description),
+                                checked = settings.showParentalGuide,
+                                onCheckedChange = PlayerSettingsRepository::setShowParentalGuide,
+                            ),
+                            SettingsToggleGridItem(
+                                id = "holdToSpeed",
+                                title = stringResource(Res.string.settings_playback_hold_to_speed),
+                                description = stringResource(Res.string.settings_playback_hold_to_speed_description),
+                                checked = settings.holdToSpeedEnabled,
+                                enabled = !settings.externalPlayerEnabled,
+                                onCheckedChange = PlayerSettingsRepository::setHoldToSpeedEnabled,
+                            ),
+                            SettingsToggleGridItem(
+                                id = "showChapters",
+                                title = stringResource(Res.string.settings_playback_exo_chapters),
+                                description = stringResource(Res.string.settings_playback_chapters_description),
+                                checked = settings.androidExoChaptersEnabled,
+                                enabled = !settings.externalPlayerEnabled,
+                                onCheckedChange = PlayerSettingsRepository::setAndroidExoChaptersEnabled,
+                            ),
+                            SettingsToggleGridItem(
+                                id = "chapterTitle",
+                                title = stringResource(Res.string.settings_playback_chapter_title),
+                                description = stringResource(Res.string.settings_playback_chapter_title_description),
+                                checked = settings.chapterTitleEnabled,
+                                enabled = !settings.externalPlayerEnabled && settings.androidExoChaptersEnabled,
+                                onCheckedChange = PlayerSettingsRepository::setChapterTitleEnabled,
+                            ),
+                        ),
+                        isTablet = isTablet,
+                    )
+                    if (settings.holdToSpeedEnabled && !settings.externalPlayerEnabled) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        val holdSpeedOptions = listOf(1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f)
+                        DesktopSettingRow(
+                            title = stringResource(Res.string.settings_playback_hold_speed),
+                        ) {
+                            DesktopSegmentedControl(
+                                options = holdSpeedOptions.map { speed ->
+                                    DesktopSegmentedOption(
+                                        value = speed,
+                                        label = formatPlaybackSpeedLabel(speed),
+                                    )
+                                },
+                                selected = settings.holdToSpeedValue,
+                                onSelected = PlayerSettingsRepository::setHoldToSpeedValue,
+                            )
+                        }
+                    }
+                } else {
                     SettingsSwitchRow(
                         title = stringResource(Res.string.settings_playback_legacy_layout),
                         description = stringResource(Res.string.settings_playback_legacy_layout_description),
@@ -43,39 +119,37 @@ internal fun PlaybackInterfaceSettings(
                         onCheckedChange = PlayerSettingsRepository::setUseLegacyPlayerLayout,
                     )
                     SettingsGroupDivider(isTablet = isTablet)
-                }
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_show_loading_overlay),
-                    description = stringResource(Res.string.settings_playback_show_loading_overlay_description),
-                    checked = settings.showLoadingOverlay,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setShowLoadingOverlay,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.playback_show_loading_status),
-                    description = stringResource(Res.string.playback_show_loading_status_sub),
-                    checked = settings.showPlayerLoadingStatus,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setShowPlayerLoadingStatus,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_pause_overlay),
-                    description = stringResource(Res.string.settings_playback_pause_overlay_description),
-                    checked = settings.pauseOverlayEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setPauseOverlayEnabled,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_parental_guide),
-                    description = stringResource(Res.string.settings_playback_parental_guide_description),
-                    checked = settings.showParentalGuide,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setShowParentalGuide,
-                )
-                if (!isDesktop) {
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_show_loading_overlay),
+                        description = stringResource(Res.string.settings_playback_show_loading_overlay_description),
+                        checked = settings.showLoadingOverlay,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setShowLoadingOverlay,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.playback_show_loading_status),
+                        description = stringResource(Res.string.playback_show_loading_status_sub),
+                        checked = settings.showPlayerLoadingStatus,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setShowPlayerLoadingStatus,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_pause_overlay),
+                        description = stringResource(Res.string.settings_playback_pause_overlay_description),
+                        checked = settings.pauseOverlayEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setPauseOverlayEnabled,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_parental_guide),
+                        description = stringResource(Res.string.settings_playback_parental_guide_description),
+                        checked = settings.showParentalGuide,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setShowParentalGuide,
+                    )
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsSwitchRow(
                         title = stringResource(Res.string.settings_playback_touch_gestures),
@@ -85,45 +159,43 @@ internal fun PlaybackInterfaceSettings(
                         isTablet = isTablet,
                         onCheckedChange = PlayerSettingsRepository::setTouchGesturesEnabled,
                     )
-                }
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_hold_to_speed),
-                    description = stringResource(Res.string.settings_playback_hold_to_speed_description),
-                    checked = settings.holdToSpeedEnabled,
-                    enabled = !settings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setHoldToSpeedEnabled,
-                )
-                if (settings.holdToSpeedEnabled && !settings.externalPlayerEnabled) {
                     SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_hold_speed),
-                        description = formatPlaybackSpeedLabel(settings.holdToSpeedValue),
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_hold_to_speed),
+                        description = stringResource(Res.string.settings_playback_hold_to_speed_description),
+                        checked = settings.holdToSpeedEnabled,
+                        enabled = !settings.externalPlayerEnabled,
                         isTablet = isTablet,
-                        onClick = { showHoldToSpeedValueDialog = true },
+                        onCheckedChange = PlayerSettingsRepository::setHoldToSpeedEnabled,
+                    )
+                    if (settings.holdToSpeedEnabled && !settings.externalPlayerEnabled) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_hold_speed),
+                            description = formatPlaybackSpeedLabel(settings.holdToSpeedValue),
+                            isTablet = isTablet,
+                            onClick = { showHoldToSpeedValueDialog = true },
+                        )
+                    }
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_exo_chapters),
+                        description = stringResource(Res.string.settings_playback_exo_chapters_description),
+                        checked = settings.androidExoChaptersEnabled,
+                        enabled = !settings.externalPlayerEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setAndroidExoChaptersEnabled,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_chapter_title),
+                        description = stringResource(Res.string.settings_playback_chapter_title_description),
+                        checked = settings.chapterTitleEnabled,
+                        enabled = !settings.externalPlayerEnabled && settings.androidExoChaptersEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setChapterTitleEnabled,
                     )
                 }
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_exo_chapters),
-                    description = stringResource(
-                        if (isDesktop) Res.string.settings_playback_chapters_description else Res.string.settings_playback_exo_chapters_description,
-                    ),
-                    checked = settings.androidExoChaptersEnabled,
-                    enabled = !settings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setAndroidExoChaptersEnabled,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_chapter_title),
-                    description = stringResource(Res.string.settings_playback_chapter_title_description),
-                    checked = settings.chapterTitleEnabled,
-                    enabled = !settings.externalPlayerEnabled && settings.androidExoChaptersEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setChapterTitleEnabled,
-                )
             }
         }
     }

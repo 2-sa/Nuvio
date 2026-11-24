@@ -1307,13 +1307,9 @@ private fun DesktopSettingsScreen(
 ) {
     val tokens = MaterialTheme.nuvio
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val desktopSidebarTopOffset = if (topChromePadding != null) {
-        max(topChromePadding - 28.dp, NuvioTokens.Space.s24)
-    } else {
-        max(statusBarPadding + NuvioTokens.Space.s16, NuvioTokens.Space.s24)
-    }
+    val desktopSidebarTopOffset = max(statusBarPadding + NuvioTokens.Space.s16, NuvioTokens.Space.s24)
     val detailTopOffset = if (topChromePadding != null) {
-        max(topChromePadding - 16.dp, NuvioTokens.Space.s28)
+        40.dp
     } else {
         NuvioTokens.Space.s28
     }
@@ -1583,7 +1579,7 @@ private fun DesktopSettingsScreen(
                         ),
                 )
                 val edgePadding = 32.dp
-                val maxReadableWidth = 1520.dp
+                val maxReadableWidth = 1280.dp
                 val trailingPadding = if (maxWidth > maxReadableWidth + edgePadding * 2) {
                     maxWidth - maxReadableWidth - edgePadding
                 } else {

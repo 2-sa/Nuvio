@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -30,6 +31,7 @@ import com.nuvio.app.core.ui.MinHoverPreviewOpenDelayMillis
 import com.nuvio.app.core.ui.MinHoverPreviewTrailerStartSeconds
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleUiState
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_hover_preview_delay
 import nuvio.composeapp.generated.resources.settings_hover_preview_delay_description
@@ -81,25 +83,51 @@ internal fun LazyListScope.hoverPreviewSettingsContent(
                 isTablet = isTablet,
             ) {
                 SettingsGroup(isTablet = isTablet) {
-                    SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_hover_preview_trailer_enabled),
-                        description = stringResource(Res.string.settings_hover_preview_trailer_enabled_description),
-                        checked = uiState.hoverPreviewTrailerEnabled,
-                        enabled = uiState.hoverPreviewEnabled,
-                        isTablet = isTablet,
-                        onCheckedChange = PosterCardStyleRepository::setHoverPreviewTrailerEnabled,
-                    )
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_hover_preview_trailer_sound_enabled),
-                        description = stringResource(
-                            Res.string.settings_hover_preview_trailer_sound_enabled_description,
-                        ),
-                        checked = uiState.hoverPreviewTrailerSoundEnabled,
-                        enabled = uiState.hoverPreviewEnabled && uiState.hoverPreviewTrailerEnabled,
-                        isTablet = isTablet,
-                        onCheckedChange = PosterCardStyleRepository::setHoverPreviewTrailerSoundEnabled,
-                    )
+                    if (isDesktop) {
+                        SettingsToggleGrid(
+                            items = listOf(
+                                SettingsToggleGridItem(
+                                    id = "hoverPreviewTrailerEnabled",
+                                    title = stringResource(Res.string.settings_hover_preview_trailer_enabled),
+                                    description = stringResource(Res.string.settings_hover_preview_trailer_enabled_description),
+                                    checked = uiState.hoverPreviewTrailerEnabled,
+                                    enabled = uiState.hoverPreviewEnabled,
+                                    onCheckedChange = PosterCardStyleRepository::setHoverPreviewTrailerEnabled,
+                                ),
+                                SettingsToggleGridItem(
+                                    id = "hoverPreviewTrailerSoundEnabled",
+                                    title = stringResource(Res.string.settings_hover_preview_trailer_sound_enabled),
+                                    description = stringResource(
+                                        Res.string.settings_hover_preview_trailer_sound_enabled_description,
+                                    ),
+                                    checked = uiState.hoverPreviewTrailerSoundEnabled,
+                                    enabled = uiState.hoverPreviewEnabled && uiState.hoverPreviewTrailerEnabled,
+                                    onCheckedChange = PosterCardStyleRepository::setHoverPreviewTrailerSoundEnabled,
+                                ),
+                            ),
+                            isTablet = isTablet,
+                        )
+                    } else {
+                        SettingsSwitchRow(
+                            title = stringResource(Res.string.settings_hover_preview_trailer_enabled),
+                            description = stringResource(Res.string.settings_hover_preview_trailer_enabled_description),
+                            checked = uiState.hoverPreviewTrailerEnabled,
+                            enabled = uiState.hoverPreviewEnabled,
+                            isTablet = isTablet,
+                            onCheckedChange = PosterCardStyleRepository::setHoverPreviewTrailerEnabled,
+                        )
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSwitchRow(
+                            title = stringResource(Res.string.settings_hover_preview_trailer_sound_enabled),
+                            description = stringResource(
+                                Res.string.settings_hover_preview_trailer_sound_enabled_description,
+                            ),
+                            checked = uiState.hoverPreviewTrailerSoundEnabled,
+                            enabled = uiState.hoverPreviewEnabled && uiState.hoverPreviewTrailerEnabled,
+                            isTablet = isTablet,
+                            onCheckedChange = PosterCardStyleRepository::setHoverPreviewTrailerSoundEnabled,
+                        )
+                    }
                     SettingsGroupDivider(isTablet = isTablet)
                     HoverPreviewTrailerStartSlider(
                         isTablet = isTablet,
@@ -118,7 +146,7 @@ private fun HoverPreviewDelaySlider(
     enabled: Boolean,
     delayMillis: Int,
 ) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    val horizontalPadding = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp
     var sliderValue by remember(delayMillis) { mutableFloatStateOf(delayMillis.toFloat()) }
     val snappedDelayMillis = sliderValue.roundToInt()
     val delaySeconds = if (snappedDelayMillis % 1_000 == 0) {
@@ -129,6 +157,7 @@ private fun HoverPreviewDelaySlider(
 
     Column(
         modifier = Modifier
+            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = 14.dp)
             .alpha(if (enabled) 1f else 0.55f),
@@ -191,12 +220,13 @@ private fun HoverPreviewTrailerStartSlider(
     enabled: Boolean,
     startSeconds: Int,
 ) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    val horizontalPadding = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp
     var sliderValue by remember(startSeconds) { mutableFloatStateOf(startSeconds.toFloat()) }
     val snappedStartSeconds = sliderValue.roundToInt()
 
     Column(
         modifier = Modifier
+            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = 14.dp)
             .alpha(if (enabled) 1f else 0.55f),

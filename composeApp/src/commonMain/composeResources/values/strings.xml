@@ -2767,4 +2767,16 @@
     <string name="settings_action_change">Change</string>
     <string name="settings_action_clear">Clear</string>
     <string name="settings_action_trim">Trim Now</string>
+    <string name="addons_action_paste">Paste</string>
+    <string name="addons_cap_stream">Streaming</string>
+    <string name="addons_cap_meta">Metadata</string>
+    <string name="addons_cap_subtitles">Subtitles</string>
+    <string name="addons_type_movie">Movies</string>
+    <string name="addons_type_series">Series</string>
+    <string name="addons_type_anime">Anime</string>
+    <string name="addons_type_channel">Channels</string>
+    <string name="addons_type_other">Other</string>
+    <string name="addons_stats_installed_format">%1$d Addons</string>
+    <string name="addons_stats_active_format">%1$d Active</string>
+    <string name="addons_stats_catalogs_format">%1$d Catalogs</string>
 </resources>

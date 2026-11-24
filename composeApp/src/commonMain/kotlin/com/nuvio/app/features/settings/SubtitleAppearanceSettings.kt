@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,10 +39,14 @@ internal fun SubtitleAppearanceSettings(
     var colorTarget by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(
-            Modifier.fillMaxWidth().background(
-                Brush.linearGradient(listOf(Color(0xFF182A35), Color(0xFF53646B), Color(0xFF1C2934))),
-                RoundedCornerShape(16.dp),
-            ).padding(16.dp),
+            Modifier
+                .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(listOf(Color(0xFF182A35), Color(0xFF53646B), Color(0xFF1C2934))),
+                    RoundedCornerShape(16.dp),
+                )
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(stringResource(Res.string.subtitle_preview), color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
@@ -55,10 +60,11 @@ internal fun SubtitleAppearanceSettings(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SettingsGroup(isTablet) {
+            val fontLabel = subtitleFontLabel(style.appearance.fontId)
             SettingsNavigationRow(
                 title = stringResource(Res.string.subtitle_font),
-                description = subtitleFontLabel(style.appearance.fontId),
-                enabled = enabled, isTablet = isTablet, onClick = { showFonts = true },
+                description = fontLabel,
+                enabled = enabled, isTablet = isTablet, valueLabel = fontLabel, onClick = { showFonts = true },
             )
             SettingsGroupDivider(isTablet)
             SettingsSliderRow(
@@ -75,10 +81,11 @@ internal fun SubtitleAppearanceSettings(
                 onCheckedChange = { onStyleChanged(style.copy(bold = it)) },
             )
             SettingsGroupDivider(isTablet)
+            val textColorLabel = subtitleColorLabel(style.textColor)
             SettingsNavigationRow(
                 title = stringResource(Res.string.settings_playback_subtitle_text_color),
-                description = subtitleColorLabel(style.textColor),
-                enabled = enabled, isTablet = isTablet, onClick = { colorTarget = "text" },
+                description = textColorLabel,
+                enabled = enabled, isTablet = isTablet, valueLabel = textColorLabel, onClick = { colorTarget = "text" },
             )
             SettingsSliderRow(
                 title = stringResource(Res.string.compose_player_text_opacity),
@@ -88,10 +95,11 @@ internal fun SubtitleAppearanceSettings(
             )
         }
         SettingsGroup(isTablet) {
+            val backgroundColorLabel = subtitleColorLabel(style.backgroundColor.copy(alpha = 1f))
             SettingsNavigationRow(
                 title = stringResource(Res.string.settings_playback_subtitle_background_color),
-                description = subtitleColorLabel(style.backgroundColor.copy(alpha = 1f)),
-                enabled = enabled, isTablet = isTablet, onClick = { colorTarget = "background" },
+                description = backgroundColorLabel,
+                enabled = enabled, isTablet = isTablet, valueLabel = backgroundColorLabel, onClick = { colorTarget = "background" },
             )
             SettingsSliderRow(
                 title = stringResource(Res.string.subtitle_background_opacity),
@@ -113,10 +121,11 @@ internal fun SubtitleAppearanceSettings(
                 onCheckedChange = { onStyleChanged(style.copy(outlineEnabled = it)) },
             )
             if (style.outlineEnabled) {
+                val outlineColorLabel = subtitleColorLabel(style.outlineColor)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_subtitle_outline_color),
-                    description = subtitleColorLabel(style.outlineColor),
-                    enabled = enabled, isTablet = isTablet, onClick = { colorTarget = "outline" },
+                    description = outlineColorLabel,
+                    enabled = enabled, isTablet = isTablet, valueLabel = outlineColorLabel, onClick = { colorTarget = "outline" },
                 )
                 SettingsSliderRow(
                     title = stringResource(Res.string.subtitle_outline_width),

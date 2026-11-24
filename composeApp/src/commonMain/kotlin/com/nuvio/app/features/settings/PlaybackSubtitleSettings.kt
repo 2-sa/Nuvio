@@ -48,24 +48,28 @@ internal fun PlaybackSubtitleSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                val preferredSubtitleLabel = when (settings.preferredSubtitleLanguage) {
+                    SubtitleLanguageOption.NONE -> stringResource(Res.string.settings_playback_option_none)
+                    SubtitleLanguageOption.DEVICE -> stringResource(Res.string.settings_playback_option_device_language)
+                    SubtitleLanguageOption.FORCED -> stringResource(Res.string.settings_playback_option_forced)
+                    else -> languageLabelForCode(settings.preferredSubtitleLanguage)
+                }
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_preferred_subtitle_language),
-                    description = when (settings.preferredSubtitleLanguage) {
-                        SubtitleLanguageOption.NONE -> stringResource(Res.string.settings_playback_option_none)
-                        SubtitleLanguageOption.DEVICE -> stringResource(Res.string.settings_playback_option_device_language)
-                        SubtitleLanguageOption.FORCED -> stringResource(Res.string.settings_playback_option_forced)
-                        else -> languageLabelForCode(settings.preferredSubtitleLanguage)
-                    },
+                    description = preferredSubtitleLabel,
                     enabled = !settings.externalPlayerEnabled || settings.externalPlayerForwardSubtitles,
                     isTablet = isTablet,
+                    valueLabel = preferredSubtitleLabel,
                     onClick = { showPreferredSubtitleDialog = true },
                 )
                 SettingsGroupDivider(isTablet = isTablet)
+                val secondarySubtitleLabel = languageLabelForCode(settings.secondaryPreferredSubtitleLanguage)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_secondary_subtitle_language),
-                    description = languageLabelForCode(settings.secondaryPreferredSubtitleLanguage),
+                    description = secondarySubtitleLabel,
                     enabled = !settings.externalPlayerEnabled || settings.externalPlayerForwardSubtitles,
                     isTablet = isTablet,
+                    valueLabel = secondarySubtitleLabel,
                     onClick = { showSecondarySubtitleDialog = true },
                 )
                 SettingsGroupDivider(isTablet = isTablet)
@@ -74,44 +78,88 @@ internal fun PlaybackSubtitleSettings(
                     enabled = !settings.externalPlayerEnabled,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_subtitle_strip_sdh),
-                    description = stringResource(Res.string.settings_playback_subtitle_strip_sdh_description),
-                    checked = settings.subtitleStyle.stripSdh,
-                    enabled = !settings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = { enabled ->
-                        PlayerSettingsRepository.setSubtitleStyle(
-                            settings.subtitleStyle.copy(stripSdh = enabled),
-                        )
-                    },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_subtitle_use_forced),
-                    description = stringResource(Res.string.settings_playback_subtitle_use_forced_description),
-                    checked = settings.subtitleStyle.useForcedSubtitles,
-                    enabled = !settings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = { enabled ->
-                        PlayerSettingsRepository.setSubtitleStyle(
-                            settings.subtitleStyle.copy(useForcedSubtitles = enabled),
-                        )
-                    },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_subtitle_show_preferred_only),
-                    description = stringResource(Res.string.settings_playback_subtitle_show_preferred_only_description),
-                    checked = settings.subtitleStyle.showOnlyPreferredLanguages,
-                    enabled = !settings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = { enabled ->
-                        PlayerSettingsRepository.setSubtitleStyle(
-                            settings.subtitleStyle.copy(showOnlyPreferredLanguages = enabled),
-                        )
-                    },
-                )
+                if (isDesktop) {
+                    SettingsToggleGrid(
+                        items = listOf(
+                            SettingsToggleGridItem(
+                                id = "stripSdh",
+                                title = stringResource(Res.string.settings_playback_subtitle_strip_sdh),
+                                description = stringResource(Res.string.settings_playback_subtitle_strip_sdh_description),
+                                checked = settings.subtitleStyle.stripSdh,
+                                enabled = !settings.externalPlayerEnabled,
+                                onCheckedChange = { enabled ->
+                                    PlayerSettingsRepository.setSubtitleStyle(
+                                        settings.subtitleStyle.copy(stripSdh = enabled),
+                                    )
+                                },
+                            ),
+                            SettingsToggleGridItem(
+                                id = "useForcedSubtitles",
+                                title = stringResource(Res.string.settings_playback_subtitle_use_forced),
+                                description = stringResource(Res.string.settings_playback_subtitle_use_forced_description),
+                                checked = settings.subtitleStyle.useForcedSubtitles,
+                                enabled = !settings.externalPlayerEnabled,
+                                onCheckedChange = { enabled ->
+                                    PlayerSettingsRepository.setSubtitleStyle(
+                                        settings.subtitleStyle.copy(useForcedSubtitles = enabled),
+                                    )
+                                },
+                            ),
+                            SettingsToggleGridItem(
+                                id = "showOnlyPreferredLanguages",
+                                title = stringResource(Res.string.settings_playback_subtitle_show_preferred_only),
+                                description = stringResource(Res.string.settings_playback_subtitle_show_preferred_only_description),
+                                checked = settings.subtitleStyle.showOnlyPreferredLanguages,
+                                enabled = !settings.externalPlayerEnabled,
+                                onCheckedChange = { enabled ->
+                                    PlayerSettingsRepository.setSubtitleStyle(
+                                        settings.subtitleStyle.copy(showOnlyPreferredLanguages = enabled),
+                                    )
+                                },
+                            ),
+                        ),
+                        isTablet = isTablet,
+                    )
+                } else {
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_subtitle_strip_sdh),
+                        description = stringResource(Res.string.settings_playback_subtitle_strip_sdh_description),
+                        checked = settings.subtitleStyle.stripSdh,
+                        enabled = !settings.externalPlayerEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = { enabled ->
+                            PlayerSettingsRepository.setSubtitleStyle(
+                                settings.subtitleStyle.copy(stripSdh = enabled),
+                            )
+                        },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_subtitle_use_forced),
+                        description = stringResource(Res.string.settings_playback_subtitle_use_forced_description),
+                        checked = settings.subtitleStyle.useForcedSubtitles,
+                        enabled = !settings.externalPlayerEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = { enabled ->
+                            PlayerSettingsRepository.setSubtitleStyle(
+                                settings.subtitleStyle.copy(useForcedSubtitles = enabled),
+                            )
+                        },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_subtitle_show_preferred_only),
+                        description = stringResource(Res.string.settings_playback_subtitle_show_preferred_only_description),
+                        checked = settings.subtitleStyle.showOnlyPreferredLanguages,
+                        enabled = !settings.externalPlayerEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = { enabled ->
+                            PlayerSettingsRepository.setSubtitleStyle(
+                                settings.subtitleStyle.copy(showOnlyPreferredLanguages = enabled),
+                            )
+                        },
+                    )
+                }
             }
         }
 
