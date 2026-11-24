@@ -64,6 +64,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -143,6 +145,7 @@ fun <T> NuvioShelfSection(
                         viewAllPillSize = viewAllPillSize,
                     )
                 }
+                val rowViewportBounds = com.nuvio.app.controller.LocalControllerRowViewportBounds.current
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -152,6 +155,19 @@ fun <T> NuvioShelfSection(
                         state = state,
                         modifier = rowModifier
                             .nuvioHorizontalScrollBleed(LocalVerticalBarPadding.current)
+                            .then(
+                                if (isDesktop && rowViewportBounds != null) {
+                                    Modifier.onGloballyPositioned { coordinates ->
+                                        if (coordinates.isAttached) {
+                                            val pos = coordinates.positionInRoot()
+                                            rowViewportBounds.leftInRoot = pos.x
+                                            rowViewportBounds.rightInRoot = pos.x + coordinates.size.width
+                                        }
+                                    }
+                                } else {
+                                    Modifier
+                                },
+                            )
                             .nuvioDesktopDragScroll(state),
                         contentPadding = rowContentPadding.withVerticalBar(),
                         horizontalArrangement = Arrangement.spacedBy(itemSpacing),

@@ -50,7 +50,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.nuvio.app.controller.audio.ControllerSoundPlayer
@@ -109,6 +111,8 @@ internal class ControllerFocusNode(
     var onMoveLeft: (() -> Boolean)? = null,
     var onMoveRight: (() -> Boolean)? = null,
     var rowLazyListState: LazyListState? = null,
+    var rowViewportBounds: ControllerRowViewportBounds? = null,
+    var isRtl: Boolean = false,
     var rowItemIndex: Int = -1,
     var rowTotalCount: Int = 0,
     var coroutineScope: CoroutineScope? = null,
@@ -149,9 +153,15 @@ data class ControllerGlobalHandlers(
     val onExitNavigationZone: (() -> Unit)? = null,
 )
 
+class ControllerRowViewportBounds {
+    var leftInRoot: Float = Float.NaN
+    var rightInRoot: Float = Float.NaN
+}
+
 val LocalControllerVerticalListState = compositionLocalOf<LazyListState?> { null }
 val LocalControllerVerticalScrollState = compositionLocalOf<ScrollState?> { null }
 val LocalControllerRowLazyListState = compositionLocalOf<LazyListState?> { null }
+val LocalControllerRowViewportBounds = compositionLocalOf<ControllerRowViewportBounds?> { null }
 val LocalControllerGroupKey = compositionLocalOf<String?> { null }
 val LocalControllerFocusZone = compositionLocalOf { ControllerFocusZone.Content }
 
@@ -160,10 +170,99 @@ fun ProvideControllerRowLazyListState(
     state: LazyListState,
     content: @Composable () -> Unit,
 ) {
+    val viewportBounds = remember(state) { ControllerRowViewportBounds() }
     androidx.compose.runtime.CompositionLocalProvider(
         LocalControllerRowLazyListState provides state,
+        LocalControllerRowViewportBounds provides viewportBounds,
         content = content,
     )
+}
+
+internal sealed interface HorizontalRowScrollAction {
+    data object None : HorizontalRowScrollAction
+    data object ScrollToStart : HorizontalRowScrollAction
+    data class ScrollBy(val deltaPx: Float) : HorizontalRowScrollAction
+}
+
+internal fun shouldTriggerRouteRestoreScroll(isNavigationActive: Boolean): Boolean =
+    isNavigationActive
+
+internal fun computeHorizontalRowScrollAction(
+    cardLeft: Float,
+    cardRight: Float,
+    rowLeft: Float,
+    rowRight: Float,
+    beforeContentPadding: Float,
+    afterContentPadding: Float,
+    isRtl: Boolean,
+    canScrollForward: Boolean,
+    canScrollBackward: Boolean,
+    direction: ControllerDirection?,
+    isStartMostItem: Boolean,
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int,
+    revealMarginPx: Float = 24f,
+    edgeTolerancePx: Float = 2f,
+): HorizontalRowScrollAction {
+    if (cardRight <= 0f && cardLeft <= 0f) return HorizontalRowScrollAction.None
+    val leftPadding = if (isRtl) afterContentPadding else beforeContentPadding
+    val rightPadding = if (isRtl) beforeContentPadding else afterContentPadding
+    val safeLeft = rowLeft + leftPadding.coerceAtLeast(0f)
+    val safeRight = (rowRight - rightPadding.coerceAtLeast(0f)).coerceAtLeast(safeLeft + 120f)
+
+    fun revealPastRight(): HorizontalRowScrollAction {
+        val overflow = cardRight - safeRight
+        if (overflow <= edgeTolerancePx) return HorizontalRowScrollAction.None
+        return if (isRtl) {
+            if (!canScrollBackward) return HorizontalRowScrollAction.None
+            if (isStartMostItem) HorizontalRowScrollAction.ScrollToStart
+            else HorizontalRowScrollAction.ScrollBy(-(overflow + revealMarginPx))
+        } else {
+            if (!canScrollForward) return HorizontalRowScrollAction.None
+            HorizontalRowScrollAction.ScrollBy(overflow + revealMarginPx)
+        }
+    }
+
+    fun revealPastLeft(): HorizontalRowScrollAction {
+        val underflow = safeLeft - cardLeft
+        if (underflow <= edgeTolerancePx) return HorizontalRowScrollAction.None
+        return if (isRtl) {
+            if (!canScrollForward) return HorizontalRowScrollAction.None
+            HorizontalRowScrollAction.ScrollBy(underflow + revealMarginPx)
+        } else {
+            if (!canScrollBackward) return HorizontalRowScrollAction.None
+            if (isStartMostItem) HorizontalRowScrollAction.ScrollToStart
+            else HorizontalRowScrollAction.ScrollBy(-(underflow + revealMarginPx))
+        }
+    }
+
+    if (direction == ControllerDirection.Up || direction == ControllerDirection.Down || direction == null) {
+        if (cardLeft >= safeLeft - edgeTolerancePx && cardRight <= safeRight + edgeTolerancePx) {
+            return HorizontalRowScrollAction.None
+        }
+        return if (cardRight > safeRight + edgeTolerancePx) {
+            revealPastRight()
+        } else {
+            revealPastLeft()
+        }
+    }
+
+    val movingTowardStart =
+        (direction == ControllerDirection.Left && !isRtl) ||
+            (direction == ControllerDirection.Right && isRtl)
+    if (movingTowardStart && isStartMostItem) {
+        return if (canScrollBackward || firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset > 0) {
+            HorizontalRowScrollAction.ScrollToStart
+        } else {
+            HorizontalRowScrollAction.None
+        }
+    }
+
+    return if (direction == ControllerDirection.Left) {
+        revealPastLeft()
+    } else {
+        revealPastRight()
+    }
 }
 
 object ControllerFocusEngine {
@@ -363,11 +462,12 @@ object ControllerFocusEngine {
                 val existingNode = nodes[targetId]?.takeIf { it.isVisibleAndValid }
                 if (existingNode != null) {
                     pendingRestoredNodeId = null
+                    val shouldScrollOnRestore = shouldTriggerRouteRestoreScroll(ControllerManager.isNavigationActive.value)
                     focusNodeInternal(
                         existingNode,
-                        triggerScroll = true,
+                        triggerScroll = shouldScrollOnRestore,
                         suppressVerticalScroll = true,
-                        suppressHorizontalScroll = false,
+                        suppressHorizontalScroll = !shouldScrollOnRestore,
                     )
                     updateInteractiveContentStatus()
                     return
@@ -382,11 +482,12 @@ object ControllerFocusEngine {
                             val lateNode = nodes[targetId]?.takeIf { it.isVisibleAndValid }
                             pendingRestoredNodeId = null
                             if (lateNode != null) {
+                                val shouldScrollOnRestore = shouldTriggerRouteRestoreScroll(ControllerManager.isNavigationActive.value)
                                 focusNodeInternal(
                                     lateNode,
-                                    triggerScroll = true,
+                                    triggerScroll = shouldScrollOnRestore,
                                     suppressVerticalScroll = true,
-                                    suppressHorizontalScroll = false,
+                                    suppressHorizontalScroll = !shouldScrollOnRestore,
                                 )
                             } else {
                                 ensureValidFocus()
@@ -442,11 +543,12 @@ object ControllerFocusEngine {
                 pendingRestoreFallbackJob?.cancel()
                 pendingRestoredNodeId = null
                 _isNavigationZoneExpanded.value = false
+                val shouldScrollOnRestore = shouldTriggerRouteRestoreScroll(ControllerManager.isNavigationActive.value)
                 focusNodeInternal(
                     node,
-                    triggerScroll = true,
+                    triggerScroll = shouldScrollOnRestore,
                     suppressVerticalScroll = true,
-                    suppressHorizontalScroll = false,
+                    suppressHorizontalScroll = !shouldScrollOnRestore,
                 )
                 return
             }
@@ -577,11 +679,12 @@ object ControllerFocusEngine {
             if (pendingNode != null) {
                 pendingRestoreFallbackJob?.cancel()
                 pendingRestoredNodeId = null
+                val shouldScrollOnRestore = shouldTriggerRouteRestoreScroll(ControllerManager.isNavigationActive.value)
                 focusNodeInternal(
                     pendingNode,
-                    triggerScroll = true,
+                    triggerScroll = shouldScrollOnRestore,
                     suppressVerticalScroll = true,
-                    suppressHorizontalScroll = false,
+                    suppressHorizontalScroll = !shouldScrollOnRestore,
                 )
                 return true
             }
@@ -872,91 +975,53 @@ object ControllerFocusEngine {
         val viewportWidth = layoutInfo.viewportSize.width.toFloat().takeIf { it > 100f }
             ?: (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat().takeIf { it > 100f }
             ?: 1920f
+        val rowLeft = node.rowViewportBounds?.leftInRoot?.takeIf { it.isFinite() } ?: 0f
+        val rowRight = node.rowViewportBounds?.rightInRoot
+            ?.takeIf { it.isFinite() && it > rowLeft + 100f }
+            ?: (rowLeft + viewportWidth)
 
         val unclipped = if (node.unclippedBoundsInRoot.width > 2f) node.unclippedBoundsInRoot else node.boundsInRoot
-        val cardLeft = unclipped.left
-        val cardRight = unclipped.right
-        if (cardRight <= 0f && cardLeft <= 0f) return
-
-        val safeLeft = max(layoutInfo.beforeContentPadding.toFloat(), 64f)
-        val safeRight = (viewportWidth - max(layoutInfo.afterContentPadding.toFloat(), 64f)).coerceAtLeast(safeLeft + 120f)
-
-        // 1. Vertical navigation (Up / Down) or focus restoration:
-        // Keep horizontal offset stationary if card is already fully inside safe bounds; otherwise reveal it completely.
-        if (direction == ControllerDirection.Up || direction == ControllerDirection.Down || direction == null) {
-            if (cardLeft >= safeLeft && cardRight <= safeRight) {
-                return
-            }
-            if (cardRight > safeRight && rowState.canScrollForward) {
-                val delta = (cardRight - safeRight + 24f).coerceAtLeast(0f)
-                if (delta > 2f) {
-                    activeHorizontalScrollJob?.cancel()
-                    activeHorizontalScrollJob = scope.launch {
-                        runCatching { rowState.animateScrollBy(delta, tween(170, easing = SnappyEaseOut)) }
-                    }
-                }
-            } else if (cardLeft < safeLeft && rowState.canScrollBackward) {
-                if (node.rowItemIndex == 0) {
-                    activeHorizontalScrollJob?.cancel()
-                    activeHorizontalScrollJob = scope.launch {
-                        runCatching { rowState.animateScrollToItem(0, 0) }
-                    }
-                } else {
-                    val delta = (cardLeft - safeLeft - 24f).coerceAtMost(0f)
-                    if (delta < -2f) {
-                        activeHorizontalScrollJob?.cancel()
-                        activeHorizontalScrollJob = scope.launch {
-                            runCatching { rowState.animateScrollBy(delta, tween(170, easing = SnappyEaseOut)) }
-                        }
-                    }
-                }
-            }
-            return
+        val isRtl = node.isRtl
+        val rowNodes = nodes.values.filter {
+            it.rowLazyListState === rowState && it.isVisibleAndValid && !it.id.startsWith("view_all_pill_")
+        }.sortedBy {
+            val b = if (it.unclippedBoundsInRoot.width > 2f) it.unclippedBoundsInRoot else it.boundsInRoot
+            if (isRtl) -b.right else b.left
         }
+        val isVisualStartNode = rowNodes.firstOrNull()?.id == node.id
+        val isStartMostItem = node.rowItemIndex == 0 ||
+            (isVisualStartNode && rowState.firstVisibleItemIndex == 0)
 
-        // 2. Horizontal Left navigation:
-        // Bring the target card 100% into view on a single Left press.
-        if (direction == ControllerDirection.Left) {
-            val rowNodes = nodes.values.filter {
-                it.rowLazyListState === rowState && it.isVisibleAndValid && !it.id.startsWith("view_all_pill_")
-            }.sortedBy {
-                val b = if (it.unclippedBoundsInRoot.width > 2f) it.unclippedBoundsInRoot else it.boundsInRoot
-                b.left
-            }
-            val isLeftmostNode = rowNodes.firstOrNull()?.id == node.id
-            val isFirstItemInRow = node.rowItemIndex == 0 ||
-                (isLeftmostNode && rowState.firstVisibleItemIndex == 0)
-
-            if (isFirstItemInRow) {
-                if (rowState.canScrollBackward || rowState.firstVisibleItemScrollOffset > 0) {
-                    activeHorizontalScrollJob?.cancel()
-                    activeHorizontalScrollJob = scope.launch {
-                        runCatching { rowState.animateScrollToItem(0, 0) }
-                    }
-                }
-                return
-            }
-
-            if (cardLeft < safeLeft && rowState.canScrollBackward) {
-                val delta = (cardLeft - safeLeft - 24f).coerceAtMost(0f)
-                if (delta < -2f) {
-                    activeHorizontalScrollJob?.cancel()
-                    activeHorizontalScrollJob = scope.launch {
-                        runCatching { rowState.animateScrollBy(delta, tween(170, easing = SnappyEaseOut)) }
-                    }
-                }
-            }
-            return
-        }
-
-        // 3. Horizontal Right navigation:
-        // Calculate using full UNCLIPPED right edge so any partially off-screen poster snaps 100% into view on the first press.
-        if (cardRight > safeRight && rowState.canScrollForward) {
-            val delta = (cardRight - safeRight + 24f).coerceAtLeast(0f)
-            if (delta > 2f) {
+        when (
+            val action = computeHorizontalRowScrollAction(
+                cardLeft = unclipped.left,
+                cardRight = unclipped.right,
+                rowLeft = rowLeft,
+                rowRight = rowRight,
+                beforeContentPadding = layoutInfo.beforeContentPadding.toFloat(),
+                afterContentPadding = layoutInfo.afterContentPadding.toFloat(),
+                isRtl = isRtl,
+                canScrollForward = rowState.canScrollForward,
+                canScrollBackward = rowState.canScrollBackward,
+                direction = direction,
+                isStartMostItem = isStartMostItem,
+                firstVisibleItemIndex = rowState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = rowState.firstVisibleItemScrollOffset,
+            )
+        ) {
+            HorizontalRowScrollAction.None -> return
+            HorizontalRowScrollAction.ScrollToStart -> {
                 activeHorizontalScrollJob?.cancel()
                 activeHorizontalScrollJob = scope.launch {
-                    runCatching { rowState.animateScrollBy(delta, tween(170, easing = SnappyEaseOut)) }
+                    runCatching { rowState.animateScrollToItem(0, 0) }
+                }
+            }
+            is HorizontalRowScrollAction.ScrollBy -> {
+                if (abs(action.deltaPx) > 2f) {
+                    activeHorizontalScrollJob?.cancel()
+                    activeHorizontalScrollJob = scope.launch {
+                        runCatching { rowState.animateScrollBy(action.deltaPx, tween(170, easing = SnappyEaseOut)) }
+                    }
                 }
             }
         }
@@ -1270,7 +1335,8 @@ object ControllerFocusEngine {
             val current = _focusedNodeId.value?.let { nodes[it] }
             val rowState = current?.rowLazyListState
             if (rowState != null) {
-                val pixels = dx * 24f
+                val directionSign = if (current.isRtl) -1f else 1f
+                val pixels = dx * 24f * directionSign
                 scope.launch { runCatching { rowState.scrollBy(pixels) } }
                 return true
             }
@@ -1860,7 +1926,10 @@ object ControllerFocusEngine {
             current.rowLazyListState != null
         ) {
             val rowState = current.rowLazyListState!!
-            val canScroll = if (direction == ControllerDirection.Right) {
+            val isRtl = current.isRtl
+            val movingForward = (direction == ControllerDirection.Right && !isRtl) ||
+                (direction == ControllerDirection.Left && isRtl)
+            val canScroll = if (movingForward) {
                 rowState.canScrollForward
             } else {
                 rowState.canScrollBackward
@@ -1868,7 +1937,7 @@ object ControllerFocusEngine {
             if (canScroll) {
                 val scope = current.coroutineScope ?: activeCoroutineScope
                 if (scope != null) {
-                    if (direction == ControllerDirection.Left && (rowState.firstVisibleItemIndex == 0 || rowState.layoutInfo.visibleItemsInfo.firstOrNull()?.index == 0)) {
+                    if (!movingForward && (rowState.firstVisibleItemIndex == 0 || rowState.layoutInfo.visibleItemsInfo.firstOrNull()?.index == 0)) {
                         scope.launch {
                             runCatching { rowState.animateScrollToItem(0, 0) }
                         }
@@ -1879,18 +1948,27 @@ object ControllerFocusEngine {
                     val viewportWidth = layoutInfo.viewportSize.width.toFloat().takeIf { it > 100f }
                         ?: (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat().takeIf { it > 100f }
                         ?: 1920f
-                    val safeLeft = max(layoutInfo.beforeContentPadding.toFloat(), 64f)
-                    val safeRight = (viewportWidth - max(layoutInfo.afterContentPadding.toFloat(), 64f)).coerceAtLeast(safeLeft + 120f)
+                    val rowLeft = current.rowViewportBounds?.leftInRoot?.takeIf { it.isFinite() } ?: 0f
+                    val rowRight = current.rowViewportBounds?.rightInRoot
+                        ?.takeIf { it.isFinite() && it > rowLeft + 100f }
+                        ?: (rowLeft + viewportWidth)
+                    val leftPadding = if (isRtl) layoutInfo.afterContentPadding.toFloat() else layoutInfo.beforeContentPadding.toFloat()
+                    val rightPadding = if (isRtl) layoutInfo.beforeContentPadding.toFloat() else layoutInfo.afterContentPadding.toFloat()
+                    val safeLeft = rowLeft + leftPadding.coerceAtLeast(0f)
+                    val safeRight = (rowRight - rightPadding.coerceAtLeast(0f)).coerceAtLeast(safeLeft + 120f)
                     val unclippedCurrent = if (current.unclippedBoundsInRoot.width > 2f) current.unclippedBoundsInRoot else current.boundsInRoot
 
-                    val scrollDelta = if (direction == ControllerDirection.Right) {
+                    val scrollDelta = if (movingForward) {
                         val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()
                         val cardWidth = lastVisible?.size?.toFloat()
                             ?: unclippedCurrent.width.takeIf { it > 50f }
                             ?: 240f
                         val gap = 16f
-                        val lastEnd = unclippedCurrent.right.coerceAtLeast(safeRight)
-                        val overflow = (lastEnd - safeRight).coerceAtLeast(0f)
+                        val overflow = if (isRtl) {
+                            (safeLeft - unclippedCurrent.left).coerceAtLeast(0f)
+                        } else {
+                            (unclippedCurrent.right - safeRight).coerceAtLeast(0f)
+                        }
                         (overflow + cardWidth + gap + 24f)
                     } else {
                         val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull()
@@ -1898,8 +1976,11 @@ object ControllerFocusEngine {
                             ?: unclippedCurrent.width.takeIf { it > 50f }
                             ?: 240f
                         val gap = 16f
-                        val firstStart = unclippedCurrent.left.coerceAtMost(safeLeft)
-                        val underflow = (safeLeft - firstStart).coerceAtLeast(0f)
+                        val underflow = if (isRtl) {
+                            (unclippedCurrent.right - safeRight).coerceAtLeast(0f)
+                        } else {
+                            (safeLeft - unclippedCurrent.left).coerceAtLeast(0f)
+                        }
                         -(underflow + cardWidth + gap + 24f)
                     }
 
@@ -2352,6 +2433,8 @@ fun Modifier.controllerFocusable(
     val ambientZone = LocalControllerFocusZone.current
     val ambientGroupKey = LocalControllerGroupKey.current
     val ambientRowState = LocalControllerRowLazyListState.current
+    val ambientRowViewportBounds = LocalControllerRowViewportBounds.current
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val effectiveZone = zone ?: ambientZone
     val effectiveGroupKey = groupKey ?: ambientGroupKey
 
@@ -2393,6 +2476,8 @@ fun Modifier.controllerFocusable(
     node.onMoveLeft = latestMoveLeft
     node.onMoveRight = latestMoveRight
     node.rowLazyListState = ambientRowState
+    node.rowViewportBounds = ambientRowViewportBounds
+    node.isRtl = isRtl
     node.coroutineScope = coroutineScope
     node.onFocusedWithOption = { _ ->
         latestOnFocused?.invoke()
