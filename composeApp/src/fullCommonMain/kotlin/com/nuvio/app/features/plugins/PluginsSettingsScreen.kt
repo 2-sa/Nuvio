@@ -94,7 +94,7 @@ import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.addons_action_paste
-import nuvio.composeapp.generated.resources.addons_stats_active_format
+import nuvio.composeapp.generated.resources.addons_stats_active
 import nuvio.composeapp.generated.resources.addons_type_anime
 import nuvio.composeapp.generated.resources.addons_type_channel
 import nuvio.composeapp.generated.resources.addons_type_movie
@@ -133,6 +133,7 @@ import nuvio.composeapp.generated.resources.plugins_section_providers
 import nuvio.composeapp.generated.resources.plugins_test_error_title
 import nuvio.composeapp.generated.resources.plugins_test_failed
 import nuvio.composeapp.generated.resources.plugins_test_results_count
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -766,7 +767,7 @@ private fun DesktopPluginsStatsStrip(
             text = stringResource(Res.string.plugins_badge_repos, repoCount),
         )
         DesktopPluginStatPill(
-            text = stringResource(Res.string.addons_stats_active_format, activeProviderCount),
+            text = pluralStringResource(Res.plurals.addons_stats_active, activeProviderCount, activeProviderCount),
             dotColor = if (pluginsEnabled && activeProviderCount > 0) Color(0xFF34D399) else tokens.colors.textMuted,
             accentHighlight = pluginsEnabled && activeProviderCount > 0,
         )

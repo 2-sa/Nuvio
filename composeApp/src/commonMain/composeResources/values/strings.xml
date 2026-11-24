@@ -2776,7 +2776,16 @@
     <string name="addons_type_anime">Anime</string>
     <string name="addons_type_channel">Channels</string>
     <string name="addons_type_other">Other</string>
-    <string name="addons_stats_installed_format">%1$d Addons</string>
-    <string name="addons_stats_active_format">%1$d Active</string>
-    <string name="addons_stats_catalogs_format">%1$d Catalogs</string>
+    <plurals name="addons_stats_installed">
+        <item quantity="one">%1$d Addon</item>
+        <item quantity="other">%1$d Addons</item>
+    </plurals>
+    <plurals name="addons_stats_active">
+        <item quantity="one">%1$d Active</item>
+        <item quantity="other">%1$d Active</item>
+    </plurals>
+    <plurals name="addons_stats_catalogs">
+        <item quantity="one">%1$d Catalog</item>
+        <item quantity="other">%1$d Catalogs</item>
+    </plurals>
 </resources>

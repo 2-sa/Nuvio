@@ -94,6 +94,7 @@ import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -454,15 +455,15 @@ private fun DesktopAddonStatsStrip(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         DesktopAddonStatPill(
-            text = stringResource(Res.string.addons_stats_installed_format, overview.totalAddons),
+            text = pluralStringResource(Res.plurals.addons_stats_installed, overview.totalAddons, overview.totalAddons),
         )
         DesktopAddonStatPill(
-            text = stringResource(Res.string.addons_stats_active_format, overview.activeAddons),
+            text = pluralStringResource(Res.plurals.addons_stats_active, overview.activeAddons, overview.activeAddons),
             dotColor = if (overview.activeAddons > 0) Color(0xFF34D399) else tokens.colors.textMuted,
             accentHighlight = overview.activeAddons > 0,
         )
         DesktopAddonStatPill(
-            text = stringResource(Res.string.addons_stats_catalogs_format, overview.totalCatalogs),
+            text = pluralStringResource(Res.plurals.addons_stats_catalogs, overview.totalCatalogs, overview.totalCatalogs),
         )
     }
 }
@@ -1024,7 +1025,10 @@ private fun DesktopStudioAddonCard(
                 capabilityBadges.forEach { badge ->
                     val label = when (badge.kind) {
                         AddonCapabilityKind.STREAM -> stringResource(Res.string.addons_cap_stream)
-                        AddonCapabilityKind.CATALOGS -> stringResource(Res.string.addons_badge_catalogs, badge.count ?: 0)
+                        AddonCapabilityKind.CATALOGS -> {
+                            val count = badge.count ?: 0
+                            pluralStringResource(Res.plurals.addons_stats_catalogs, count, count)
+                        }
                         AddonCapabilityKind.META -> stringResource(Res.string.addons_cap_meta)
                         AddonCapabilityKind.SUBTITLES -> stringResource(Res.string.addons_cap_subtitles)
                     }
