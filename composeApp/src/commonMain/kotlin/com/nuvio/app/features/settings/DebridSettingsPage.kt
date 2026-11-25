@@ -719,7 +719,6 @@ private fun DebridLearnMoreFooter(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = 0.dp,
                 top = if (isTablet) 4.dp else 0.dp,
                 bottom = if (isTablet) 10.dp else 6.dp,
             ),
