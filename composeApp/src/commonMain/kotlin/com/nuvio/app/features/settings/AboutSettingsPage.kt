@@ -26,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -45,7 +44,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -66,19 +64,15 @@ import nuvio.composeapp.generated.resources.compose_about_based_on_version_forma
 import nuvio.composeapp.generated.resources.compose_about_made_with
 import nuvio.composeapp.generated.resources.compose_about_version_format
 import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
-import nuvio.composeapp.generated.resources.compose_settings_page_privacy_policy
 import nuvio.composeapp.generated.resources.compose_settings_page_supporters_contributors
 import nuvio.composeapp.generated.resources.compose_settings_root_about_section
 import nuvio.composeapp.generated.resources.compose_settings_root_check_updates_description
 import nuvio.composeapp.generated.resources.compose_settings_root_check_updates_title
-import nuvio.composeapp.generated.resources.compose_settings_root_privacy_policy_description
 import nuvio.composeapp.generated.resources.settings_about_copy_version
 import nuvio.composeapp.generated.resources.settings_about_version_copied
 import nuvio.composeapp.generated.resources.updates_debug_test_description
 import nuvio.composeapp.generated.resources.updates_debug_test_title
 import org.jetbrains.compose.resources.stringResource
-
-private const val PRIVACY_POLICY_URL = "https://nuvio.tv/privacy-policy"
 
 internal fun LazyListScope.aboutSettingsContent(
     isTablet: Boolean,
@@ -102,11 +96,8 @@ internal fun LazyListScope.aboutSettingsContent(
             }
         }
         item(key = "desktop-about-bento") {
-            val uriHandler = LocalUriHandler.current
             val supportersTitle = stringResource(Res.string.compose_settings_page_supporters_contributors)
             val supportersDesc = stringResource(Res.string.about_supporters_contributors_subtitle)
-            val privacyTitle = stringResource(Res.string.compose_settings_page_privacy_policy)
-            val privacyDesc = stringResource(Res.string.compose_settings_root_privacy_policy_description)
             val licensesTitle = stringResource(Res.string.compose_settings_page_licenses_attributions)
             val licensesDesc = stringResource(Res.string.about_licenses_attributions_subtitle)
             val debugTitle = stringResource(Res.string.updates_debug_test_title)
@@ -124,15 +115,6 @@ internal fun LazyListScope.aboutSettingsContent(
                         ),
                     )
                 }
-                add(
-                    SettingsBentoItem(
-                        id = "privacy-policy",
-                        title = privacyTitle,
-                        description = privacyDesc,
-                        icon = Icons.Rounded.Policy,
-                        onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
-                    ),
-                )
                 add(
                     SettingsBentoItem(
                         id = "licenses-attributions",
@@ -163,7 +145,6 @@ internal fun LazyListScope.aboutSettingsContent(
     }
 
     item {
-        val uriHandler = LocalUriHandler.current
         SettingsSection(
             title = stringResource(Res.string.compose_settings_root_about_section),
             isTablet = isTablet,
@@ -179,14 +160,6 @@ internal fun LazyListScope.aboutSettingsContent(
                     )
                     SettingsGroupDivider(isTablet = isTablet)
                 }
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.compose_settings_page_privacy_policy),
-                    description = stringResource(Res.string.compose_settings_root_privacy_policy_description),
-                    icon = Icons.Rounded.Policy,
-                    isTablet = isTablet,
-                    onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.compose_settings_page_licenses_attributions),
                     description = stringResource(Res.string.about_licenses_attributions_subtitle),

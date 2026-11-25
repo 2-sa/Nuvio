@@ -81,7 +81,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -120,8 +119,6 @@ import nuvio.composeapp.generated.resources.compose_auth_sign_up
 import nuvio.composeapp.generated.resources.compose_auth_sign_up_subtitle
 import nuvio.composeapp.generated.resources.compose_auth_store_locally
 import nuvio.composeapp.generated.resources.compose_auth_tagline
-import nuvio.composeapp.generated.resources.compose_auth_terms_link
-import nuvio.composeapp.generated.resources.compose_auth_terms_prefix
 import nuvio.composeapp.generated.resources.compose_auth_welcome_back
 import org.jetbrains.compose.resources.stringResource
 
@@ -672,7 +669,6 @@ private fun AuthForm(
     onPasswordBoundsChange: (Rect) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val uriHandler = LocalUriHandler.current
     Column(
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -725,14 +721,6 @@ private fun AuthForm(
                     fontSize = (13f * scale).sp,
                     lineHeight = (18f * scale).sp,
                 ),
-            )
-        }
-
-        if (isSignUp) {
-            Spacer(modifier = Modifier.height(14.dp * scale))
-            AuthTermsAcknowledgement(
-                scale = scale,
-                onTermsClick = { uriHandler.openUri("https://nuvio.tv/terms") },
             )
         }
 
@@ -795,42 +783,6 @@ private fun AuthForm(
                 fontWeight = FontWeight.Normal,
             ),
             textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun AuthTermsAcknowledgement(
-    scale: Float,
-    onTermsClick: () -> Unit,
-) {
-    val tokens = MaterialTheme.nuvio
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(Res.string.compose_auth_terms_prefix),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = tokens.colors.textSecondary,
-                fontSize = (13f * scale).sp,
-                lineHeight = (18f * scale).sp,
-                fontWeight = FontWeight.Normal,
-            ),
-        )
-        Spacer(modifier = Modifier.width(4.dp * scale))
-        Text(
-            text = stringResource(Res.string.compose_auth_terms_link),
-            modifier = Modifier
-                .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
-                .clickable(onClick = onTermsClick),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = tokens.colors.accent,
-                fontSize = (13f * scale).sp,
-                lineHeight = (18f * scale).sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
         )
     }
 }
