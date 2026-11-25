@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="https://nuvio.tv/assets/nuvio-app-logo-wordmark.webp" alt="Nuvio" width="320" />
+  <img src="./composeApp/src/commonMain/composeResources/drawable/app_logo_wordmark.png" alt="Nuvio" width="320" />
 
   <p>
     A free, open-source media app for Windows, macOS, and Linux.
@@ -8,7 +8,7 @@
     Bring your own sources. Nuvio turns them into a library with artwork, ratings, subtitles, and your place saved on every screen.
   </p>
 
-  [Website](https://nuvio.tv) · [GitHub Releases](https://github.com/2-sa/Nuvio/releases/latest) · [Support Nuvio](https://nuvio.tv/support)
+  [GitHub Releases](https://github.com/2-sa/Nuvio/releases/latest) · [Issues](https://github.com/2-sa/Nuvio/issues) · [Upstream](https://github.com/NuvioMedia/NuvioDesktop)
 
 </div>
 
