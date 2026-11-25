@@ -56,6 +56,7 @@ import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.membership.MembershipOverviewRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -71,6 +72,14 @@ private enum class CommunityTab {
 }
 
 private const val PatreonMembershipUrl = "https://www.patreon.com/settings/memberships"
+private const val DefaultContributorsApiUrl = "https://api.github.com/repos/2-sa/Nuvio/contributors?per_page=100"
+
+private val ForkOwnerContributor = CommunityContributor(
+    login = "2-sa",
+    avatarUrl = "https://avatars.githubusercontent.com/u/46811082?v=4",
+    profileUrl = "https://github.com/2-sa",
+    totalContributions = 74,
+)
 
 private data class CommunityUiState(
     val selectedTab: CommunityTab = CommunityTab.Contributors,
@@ -96,6 +105,15 @@ private data class ContributionDto(
     val avatar: String? = null,
     val profile: String? = null,
     val total: Int? = null,
+)
+
+@Serializable
+private data class GitHubContributorDto(
+    val login: String? = null,
+    val avatar_url: String? = null,
+    val html_url: String? = null,
+    val contributions: Int? = null,
+    val type: String? = null,
 )
 
 @Serializable
@@ -156,27 +174,30 @@ private object SupportersContributorsRepository {
 
     suspend fun getContributors(): Result<List<CommunityContributor>> = runCatching {
         val contributionsUrl = CommunityConfig.CONTRIBUTIONS_URL.trim()
-        check(contributionsUrl.isNotBlank()) {
-            getString(Res.string.community_error_unable_load_contributors)
-        }
+            .ifBlank { DefaultContributorsApiUrl }
 
-        val response = httpRequestRaw(
-            method = "GET",
-            url = contributionsUrl,
-            headers = emptyMap(),
-            body = "",
-        )
-        if (response.status !in 200..299) {
-            error(getString(Res.string.community_error_contributors_request_failed))
-        }
-
-        json.decodeFromString<ContributionsResponseDto>(response.body)
-            .contributors
-            .mapNotNull(::normalizeContributor)
-            .sortedWith(
-                compareByDescending<CommunityContributor> { it.totalContributions }
-                    .thenBy { it.login.lowercase() },
+        val parsed = try {
+            val response = httpRequestRaw(
+                method = "GET",
+                url = contributionsUrl,
+                headers = mapOf(
+                    "Accept" to "application/vnd.github+json",
+                    "User-Agent" to "NuvioDesktop",
+                ),
+                body = "",
             )
+            if (response.status in 200..299) {
+                parseContributorsPayload(response.body, json)
+            } else {
+                emptyList()
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            emptyList()
+        }
+
+        mergeContributorsWithForkOwner(parsed)
     }
 
     suspend fun getSupporters(): Result<SupportersResult> = runCatching {
@@ -240,19 +261,6 @@ private object SupportersContributorsRepository {
             ?.let { percent -> DonationProgress(progressPercent = percent) }
     }.getOrNull()
 
-    private fun normalizeContributor(dto: ContributionDto): CommunityContributor? {
-        val login = dto.name?.trim().orEmpty()
-        val contributions = dto.total ?: 0
-        if (login.isBlank() || contributions <= 0) return null
-
-        return CommunityContributor(
-            login = login,
-            avatarUrl = dto.avatar?.trim()?.takeIf { it.isNotBlank() },
-            profileUrl = dto.profile?.trim()?.takeIf { it.isNotBlank() },
-            totalContributions = contributions,
-        )
-    }
-
     private fun Double.toDonationProgressPercent(): Int? {
         if (isNaN()) return null
         return when {
@@ -261,6 +269,85 @@ private object SupportersContributorsRepository {
             else -> roundToInt().coerceIn(0, 99)
         }
     }
+}
+
+internal fun parseContributorsPayload(
+    body: String,
+    json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
+): List<CommunityContributor> {
+    val trimmed = body.trim()
+    if (trimmed.isBlank()) return emptyList()
+    return if (trimmed.startsWith("[")) {
+        json.decodeFromString<List<GitHubContributorDto>>(trimmed)
+            .mapNotNull(::normalizeGitHubContributor)
+    } else {
+        json.decodeFromString<ContributionsResponseDto>(trimmed)
+            .contributors
+            .mapNotNull(::normalizeContributor)
+    }
+}
+
+private fun normalizeContributor(dto: ContributionDto): CommunityContributor? {
+    val login = dto.name?.trim().orEmpty()
+    val contributions = dto.total ?: 0
+    if (login.isBlank() || contributions <= 0) return null
+
+    return CommunityContributor(
+        login = login,
+        avatarUrl = dto.avatar?.trim()?.takeIf { it.isNotBlank() },
+        profileUrl = dto.profile?.trim()?.takeIf { it.isNotBlank() },
+        totalContributions = contributions,
+    )
+}
+
+private fun normalizeGitHubContributor(dto: GitHubContributorDto): CommunityContributor? {
+    val login = dto.login?.trim().orEmpty()
+    val contributions = dto.contributions ?: 0
+    if (
+        login.isBlank() ||
+        contributions <= 0 ||
+        dto.type.equals("Bot", ignoreCase = true) ||
+        login.endsWith("[bot]", ignoreCase = true)
+    ) {
+        return null
+    }
+
+    return CommunityContributor(
+        login = login,
+        avatarUrl = dto.avatar_url?.trim()?.takeIf { it.isNotBlank() },
+        profileUrl = dto.html_url?.trim()?.takeIf { it.isNotBlank() },
+        totalContributions = contributions,
+    )
+}
+
+internal fun mergeContributorsWithForkOwner(
+    contributors: List<CommunityContributor>,
+): List<CommunityContributor> {
+    val merged = contributors
+        .distinctBy { it.login.lowercase() }
+        .map { contributor ->
+            if (contributor.login.equals(ForkOwnerContributor.login, ignoreCase = true)) {
+                contributor.copy(
+                    avatarUrl = contributor.avatarUrl ?: ForkOwnerContributor.avatarUrl,
+                    profileUrl = contributor.profileUrl ?: ForkOwnerContributor.profileUrl,
+                )
+            } else {
+                contributor
+            }
+        }
+        .toMutableList()
+
+    if (merged.none { it.login.equals(ForkOwnerContributor.login, ignoreCase = true) }) {
+        merged.add(ForkOwnerContributor)
+    }
+
+    return merged.sortedWith(
+        compareByDescending<CommunityContributor> {
+            it.login.equals(ForkOwnerContributor.login, ignoreCase = true)
+        }
+            .thenByDescending { it.totalContributions }
+            .thenBy { it.login.lowercase() },
+    )
 }
 
 @Composable
