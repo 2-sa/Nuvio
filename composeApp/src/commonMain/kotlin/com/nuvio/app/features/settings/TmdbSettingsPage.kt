@@ -1,26 +1,51 @@
 package com.nuvio.app.features.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
@@ -294,66 +319,155 @@ private fun TmdbLanguageRow(
     val tokens = MaterialTheme.nuvio
     var draft by rememberSaveable(value) { mutableStateOf(value) }
     val normalizedDraft = normalizeLanguage(draft)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
-                vertical = if (isDesktop) NuvioTokens.Space.s14 else if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s14,
-            ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = stringResource(Res.string.settings_tmdb_preferred_language),
-                style = MaterialTheme.typography.bodyLarge,
-                color = tokens.colors.textPrimary,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = stringResource(Res.string.settings_tmdb_preferred_language_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = tokens.colors.textSecondary,
-            )
+    val canSave = enabled && normalizedDraft != value
+    val commitLanguage: () -> Unit = {
+        if (canSave) {
+            draft = normalizedDraft
+            onLanguageCommitted(normalizedDraft)
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+    }
+
+    if (isDesktop) {
+        var isFocused by remember { mutableStateOf(false) }
+        val pillShape = RoundedCornerShape(8.dp)
+        DesktopSettingRow(
+            title = stringResource(Res.string.settings_tmdb_preferred_language),
+            description = stringResource(Res.string.settings_tmdb_preferred_language_description),
+            enabled = enabled,
         ) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                enabled = enabled,
-                singleLine = true,
-                shape = RoundedCornerShape(10.dp),
-                label = { Text(stringResource(Res.string.settings_tmdb_language_code_label)) },
-                modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = tokens.colors.accent.copy(alpha = 0.78f),
-                    unfocusedBorderColor = tokens.colors.borderSubtle,
-                    focusedContainerColor = tokens.colors.surfaceElevated,
-                    unfocusedContainerColor = tokens.colors.surfaceElevated,
-                    disabledContainerColor = tokens.colors.surfaceElevated,
-                    cursorColor = tokens.colors.accent,
-                ),
-            )
-            Button(
-                onClick = {
-                    draft = normalizedDraft
-                    onLanguageCommitted(normalizedDraft)
-                },
-                enabled = enabled && normalizedDraft != value,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = tokens.colors.accent,
-                    contentColor = tokens.colors.onAccent,
-                    disabledContainerColor = tokens.colors.surfaceElevated,
-                    disabledContentColor = tokens.colors.textMuted,
-                ),
-                modifier = Modifier.padding(top = 6.dp),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(stringResource(Res.string.action_save))
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Surface(
+                        modifier = Modifier
+                            .width(132.dp)
+                            .height(34.dp),
+                        shape = pillShape,
+                        color = Color.White.copy(alpha = 0.055f),
+                        border = BorderStroke(
+                            tokens.borders.thin,
+                            if (isFocused) tokens.colors.accent.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.13f),
+                        ),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 10.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            if (draft.isEmpty()) {
+                                Text(
+                                    text = stringResource(Res.string.settings_tmdb_language_code_label),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                                    color = tokens.colors.textMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            BasicTextField(
+                                value = draft,
+                                onValueChange = { draft = it },
+                                enabled = enabled,
+                                singleLine = true,
+                                cursorBrush = SolidColor(tokens.colors.accent),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = if (enabled) tokens.colors.textPrimary else tokens.colors.textMuted,
+                                    textDirection = TextDirection.Ltr,
+                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                keyboardActions = KeyboardActions(onDone = { commitLanguage() }),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { isFocused = it.isFocused },
+                            )
+                        }
+                    }
+                }
+                Button(
+                    onClick = commitLanguage,
+                    enabled = canSave,
+                    shape = pillShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = tokens.colors.accent,
+                        contentColor = tokens.colors.onAccent,
+                        disabledContainerColor = tokens.colors.surfaceElevated,
+                        disabledContentColor = tokens.colors.textMuted,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                    modifier = Modifier
+                        .height(34.dp)
+                        .then(if (canSave) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.action_save),
+                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.5.sp),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                    vertical = if (isTablet) NuvioTokens.Space.s16 else NuvioTokens.Space.s14,
+                ),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(Res.string.settings_tmdb_preferred_language),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = tokens.colors.textPrimary,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = stringResource(Res.string.settings_tmdb_preferred_language_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = tokens.colors.textSecondary,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    enabled = enabled,
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    label = { Text(stringResource(Res.string.settings_tmdb_language_code_label)) },
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = tokens.colors.accent.copy(alpha = 0.78f),
+                        unfocusedBorderColor = tokens.colors.borderSubtle,
+                        focusedContainerColor = tokens.colors.surfaceElevated,
+                        unfocusedContainerColor = tokens.colors.surfaceElevated,
+                        disabledContainerColor = tokens.colors.surfaceElevated,
+                        cursorColor = tokens.colors.accent,
+                    ),
+                )
+                Button(
+                    onClick = commitLanguage,
+                    enabled = canSave,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = tokens.colors.accent,
+                        contentColor = tokens.colors.onAccent,
+                        disabledContainerColor = tokens.colors.surfaceElevated,
+                        disabledContentColor = tokens.colors.textMuted,
+                    ),
+                    modifier = Modifier.padding(top = 6.dp),
+                ) {
+                    Text(stringResource(Res.string.action_save))
+                }
             }
         }
     }

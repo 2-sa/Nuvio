@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -21,9 +22,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -225,6 +229,103 @@ private fun HeroSourcesDropdown(
         label = "heroSourcesDropdownBg",
     )
 
+    if (isDesktop) {
+        val cardShape = RoundedCornerShape(12.dp)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(cardShape),
+            shape = cardShape,
+            color = tokens.colors.surfaceCard,
+            border = BorderStroke(tokens.borders.thin, tokens.colors.borderSubtle),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(headerBg)
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                        ) { onExpandedChange(!expanded) }
+                        .padding(horizontal = 16.dp, vertical = 13.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
+                    ) {
+                        Text(
+                            text = stringResource(
+                                Res.string.settings_homescreen_selected_count,
+                                selectedHeroSourceCount,
+                                HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT,
+                            ),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = tokens.colors.textPrimary,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = items.filter { it.heroSourceEnabled }
+                                .joinToString(separator = ", ") { it.displayTitle }
+                                .ifBlank { noSourcesSelected },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = tokens.colors.textMuted,
+                        )
+                    }
+                    Icon(
+                        imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = if (isHovered) tokens.colors.accent else tokens.colors.textMuted,
+                    )
+                }
+
+                AnimatedVisibility(visible = expanded) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        HorizontalDivider(
+                            thickness = tokens.borders.hairline,
+                            color = Color.White.copy(alpha = 0.065f),
+                        )
+                        items.forEachIndexed { index, item ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    thickness = tokens.borders.hairline,
+                                    color = Color.White.copy(alpha = 0.065f),
+                                )
+                            }
+                            SettingsSwitchRow(
+                                title = item.displayTitle,
+                                description = if (!item.heroSourceEnabled &&
+                                    selectedHeroSourceCount >= HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT
+                                ) {
+                                    stringResource(
+                                        Res.string.settings_homescreen_limit_reached,
+                                        item.addonName,
+                                        HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT,
+                                    )
+                                } else {
+                                    item.addonName
+                                },
+                                checked = item.heroSourceEnabled,
+                                enabled = item.heroSourceEnabled ||
+                                    selectedHeroSourceCount < HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT,
+                                isTablet = isTablet,
+                                horizontalPadding = 16.dp,
+                                constrainWidth = false,
+                                onCheckedChange = { HomeCatalogSettingsRepository.setHeroSourceEnabled(item.key, it) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+
     SettingsGroup(isTablet = isTablet) {
         Row(
             modifier = Modifier
@@ -322,8 +423,8 @@ private fun HomescreenSummaryCard(
     SettingsGroup(isTablet = isTablet) {
         Column(
             modifier = Modifier.padding(
-                horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
-                vertical = NuvioTokens.Space.s16,
+                horizontal = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,
+                vertical = if (isDesktop) NuvioTokens.Space.s4 else NuvioTokens.Space.s16,
             ),
             verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
         ) {
@@ -391,7 +492,7 @@ private fun HomescreenCatalogList(
 
                     Surface(
                         shadowElevation = elevation,
-                        color = if (isDragging) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
+                        color = if (isDesktop && !isDragging) Color.Transparent else if (isDragging) tokens.colors.surfaceElevated else tokens.colors.surfaceCard,
                     ) {
                         Column {
                             if (index > 0) {

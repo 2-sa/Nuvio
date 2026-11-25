@@ -37,7 +37,6 @@ import nuvio.composeapp.generated.resources.cd_selected
 import nuvio.composeapp.generated.resources.compose_settings_page_hover_preview
 import nuvio.composeapp.generated.resources.settings_appearance_desktop_navigation
 import nuvio.composeapp.generated.resources.settings_appearance_desktop_navigation_sheet_title
-import nuvio.composeapp.generated.resources.settings_appearance_desktop_navigation_top_bar
 import nuvio.composeapp.generated.resources.settings_appearance_hover_preview_description
 import nuvio.composeapp.generated.resources.settings_appearance_nav_bar_style_sheet_title
 import nuvio.composeapp.generated.resources.settings_appearance_sidebar_style
@@ -262,10 +261,7 @@ internal fun LayoutNavigationBarSection(
                 }
                 DesktopSettingRow(
                     title = stringResource(Res.string.settings_appearance_desktop_navigation),
-                    description = stringResource(
-                        if (isTablet) desktopNavigationLayout.labelRes
-                        else Res.string.settings_appearance_desktop_navigation_top_bar,
-                    ),
+                    description = null,
                 ) {
                     DesktopSegmentedControl(
                         options = navOptions,
@@ -288,7 +284,7 @@ internal fun LayoutNavigationBarSection(
                             Res.string.settings_appearance_top_bar_style
                         },
                     ),
-                    description = stringResource(selectedNavBarStyle.labelRes),
+                    description = null,
                 ) {
                     DesktopSegmentedControl(
                         options = desktopBarStyles.map { style ->

@@ -1446,6 +1446,14 @@
     <string name="trakt_cw_window_subtitle">اختر مقدار نشاط Trakt الذي يظهر في متابعة المشاهدة.</string>
     <string name="trakt_all_history">كل السجل</string>
     <string name="trakt_days_format">%1$d أيام</string>
+    <plurals name="trakt_days">
+        <item quantity="zero">%1$d يوم</item>
+        <item quantity="one">يوم واحد</item>
+        <item quantity="two">يومان</item>
+        <item quantity="few">%1$d أيام</item>
+        <item quantity="many">%1$d يومًا</item>
+        <item quantity="other">%1$d يوم</item>
+    </plurals>
     <string name="source_audience_score">درجة الجمهور</string>
     <string name="source_imdb">IMDb</string>
     <string name="source_letterboxd">Letterboxd</string>

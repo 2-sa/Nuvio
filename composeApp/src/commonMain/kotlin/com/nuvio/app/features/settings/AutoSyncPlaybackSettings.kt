@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.autosync.AutoSyncPreferencesRepository
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_playback_auto_sync_mode_aggressive
 import nuvio.composeapp.generated.resources.settings_playback_auto_sync_mode_aggressive_description
@@ -69,24 +70,53 @@ internal fun AutoSyncPlaybackSettingsRows(
         onCheckedChange = AutoSyncPreferencesRepository::setAggressiveMode,
     )
     SettingsGroupDivider(isTablet = isTablet)
-    SettingsNavigationRow(
-        title = stringResource(
-            Res.string.settings_playback_auto_sync_tolerance,
-            if (syncToleranceMs > 0) {
-                stringResource(Res.string.settings_playback_auto_sync_tolerance_value, syncToleranceMs)
-            } else {
-                stringResource(Res.string.settings_playback_auto_sync_tolerance_off)
+    val toleranceLabel = if (syncToleranceMs > 0) {
+        stringResource(Res.string.settings_playback_auto_sync_tolerance_value, syncToleranceMs)
+    } else {
+        stringResource(Res.string.settings_playback_auto_sync_tolerance_off)
+    }
+    if (isDesktop) {
+        val toleranceTitle = stringResource(Res.string.settings_playback_auto_sync_tolerance, "")
+            .trimEnd { it.isWhitespace() || it == '\u00A0' || it == ':' || it == '：' }
+        val toleranceOptions = AutoSyncPreferencesRepository.syncToleranceOptionsMs.map { optionMs ->
+            DesktopDropdownOption(
+                value = optionMs,
+                label = if (optionMs > 0) {
+                    stringResource(Res.string.settings_playback_auto_sync_tolerance_value, optionMs)
+                } else {
+                    stringResource(Res.string.settings_playback_auto_sync_tolerance_off)
+                },
+            )
+        }
+        DesktopSettingRow(
+            title = toleranceTitle,
+            description = stringResource(Res.string.settings_playback_auto_sync_tolerance_description),
+            enabled = enabled,
+        ) {
+            DesktopDropdownSelect(
+                label = toleranceLabel,
+                options = toleranceOptions,
+                selectedValue = syncToleranceMs,
+                onSelected = AutoSyncPreferencesRepository::setSyncToleranceMs,
+                enabled = enabled,
+            )
+        }
+    } else {
+        SettingsNavigationRow(
+            title = stringResource(
+                Res.string.settings_playback_auto_sync_tolerance,
+                toleranceLabel,
+            ),
+            description = stringResource(
+                Res.string.settings_playback_auto_sync_tolerance_description,
+            ),
+            enabled = enabled,
+            isTablet = isTablet,
+            onClick = {
+                val options = AutoSyncPreferencesRepository.syncToleranceOptionsMs
+                val next = options[(options.indexOf(syncToleranceMs) + 1) % options.size]
+                AutoSyncPreferencesRepository.setSyncToleranceMs(next)
             },
-        ),
-        description = stringResource(
-            Res.string.settings_playback_auto_sync_tolerance_description,
-        ),
-        enabled = enabled,
-        isTablet = isTablet,
-        onClick = {
-            val options = AutoSyncPreferencesRepository.syncToleranceOptionsMs
-            val next = options[(options.indexOf(syncToleranceMs) + 1) % options.size]
-            AutoSyncPreferencesRepository.setSyncToleranceMs(next)
-        },
-    )
+        )
+    }
 }

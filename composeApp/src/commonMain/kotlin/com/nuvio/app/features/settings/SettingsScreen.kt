@@ -1579,7 +1579,7 @@ private fun DesktopSettingsScreen(
                         ),
                 )
                 val edgePadding = 32.dp
-                val maxReadableWidth = 1280.dp
+                val maxReadableWidth = desktopSettingsMaxReadableWidthDp(route.workspace, isSearchActive).dp
                 val trailingPadding = if (maxWidth > maxReadableWidth + edgePadding * 2) {
                     maxWidth - maxReadableWidth - edgePadding
                 } else {
@@ -1733,6 +1733,11 @@ private fun DesktopSettingsScreen(
         }
     }
 }
+
+internal fun desktopSettingsMaxReadableWidthDp(
+    workspace: DesktopSettingsWorkspace,
+    isSearchActive: Boolean,
+): Int = if (workspace == DesktopSettingsWorkspace.AddonsAndPlugins && !isSearchActive) 1040 else 920
 
 private fun LazyListScope.desktopSettingsWorkspaceContent(
     route: DesktopSettingsWorkspaceRoute,

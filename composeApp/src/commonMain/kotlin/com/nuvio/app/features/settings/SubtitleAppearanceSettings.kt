@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -76,7 +75,6 @@ internal fun SubtitleAppearanceSettings(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(
             Modifier
-                .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
                 .fillMaxWidth()
                 .background(
                     Brush.linearGradient(listOf(Color(0xFF182A35), Color(0xFF53646B), Color(0xFF1C2934))),

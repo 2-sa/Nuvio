@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import com.nuvio.app.core.ui.Slider
 import com.nuvio.app.core.ui.DialogButton
@@ -182,7 +181,6 @@ internal fun PlaybackUpNextSettings(
                         val thresholdPercent = settings.nextEpisodeThresholdPercent
                         Column(
                             modifier = Modifier
-                                .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
                                 .fillMaxWidth()
                                 .padding(
                                     horizontal = if (isDesktop) 0.dp else if (isTablet) 18.dp else 16.dp,
@@ -235,7 +233,6 @@ internal fun PlaybackUpNextSettings(
                         val thresholdMinutes = settings.nextEpisodeThresholdMinutesBeforeEnd
                         Column(
                             modifier = Modifier
-                                .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
                                 .fillMaxWidth()
                                 .padding(
                                     horizontal = if (isDesktop) 0.dp else if (isTablet) 18.dp else 16.dp,

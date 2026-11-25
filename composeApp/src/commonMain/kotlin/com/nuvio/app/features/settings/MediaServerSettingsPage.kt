@@ -39,6 +39,7 @@ import com.nuvio.app.features.servers.ServerRepository
 import com.nuvio.app.features.servers.message
 import com.nuvio.app.features.servers.serverFailure
 import com.nuvio.app.features.servers.supports
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -101,7 +102,7 @@ private fun MediaServerSettingsBody(
     var refreshing by remember(connection.id) { mutableStateOf(false) }
     var signIn by remember { mutableStateOf<ServerSignInRequest?>(null) }
     var confirmRemove by remember { mutableStateOf(false) }
-    val rowPadding = if (isTablet) 20.dp else 16.dp
+    val rowPadding = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp
     val provider = ServerRepository.provider(connection)
 
     Column(verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap)) {

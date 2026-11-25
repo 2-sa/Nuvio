@@ -249,7 +249,7 @@ private fun LinkedPlainRow(
     onOpen: () -> Unit,
 ) {
     val verticalPadding = if (isTablet) 18.dp else 16.dp
-    val horizontalPadding = if (isTablet) 4.dp else 0.dp
+    val horizontalPadding = if (isDesktop) 0.dp else if (isTablet) 4.dp else 0.dp
 
     Row(
         modifier = Modifier

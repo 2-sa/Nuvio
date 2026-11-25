@@ -31,8 +31,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Tune
@@ -63,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -81,6 +84,7 @@ import com.nuvio.app.core.ui.Chip
 import com.nuvio.app.core.ui.DefaultCardDepthEdgeCoverage
 import com.nuvio.app.core.ui.DefaultCardDepthEdgeStrength
 import com.nuvio.app.core.ui.DefaultCardDepthSheenStrength
+import com.nuvio.app.core.ui.DialogSurface
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
@@ -606,18 +610,14 @@ private fun CardDepthFineTuneSheet(
         CardDepthStyleRepository.setEdgeCoverage(draftCoverage.roundToInt())
     }
 
-    NuvioModalBottomSheet(
-        onDismissRequest = {
-            commitDraft()
-            onDismiss()
-        },
-        sheetState = sheetState,
-        fullHeight = true,
-    ) {
+    val dismissWithCommit: () -> Unit = {
+        commitDraft()
+        onDismiss()
+    }
+
+    val fineTuneContent: @Composable (Modifier) -> Unit = { containerModifier ->
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+            modifier = containerModifier,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(
@@ -691,6 +691,28 @@ private fun CardDepthFineTuneSheet(
                 },
                 valueRange = 0f..100f,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+
+    if (isDesktop) {
+        DialogSurface(onDismissRequest = dismissWithCommit) {
+            fineTuneContent(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            )
+        }
+    } else {
+        NuvioModalBottomSheet(
+            onDismissRequest = dismissWithCommit,
+            sheetState = sheetState,
+            fullHeight = true,
+        ) {
+            fineTuneContent(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
             )
         }
     }
@@ -1050,12 +1072,13 @@ private fun PosterToggleRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            modifier = Modifier.then(if (isDesktop) Modifier.scale(0.84f) else Modifier),
             colors = SwitchDefaults.colors(
                 checkedThumbColor = tokens.colors.onAccent,
                 checkedTrackColor = tokens.colors.accent,
-                uncheckedThumbColor = tokens.colors.textSecondary,
-                uncheckedTrackColor = tokens.colors.surfaceElevated,
-                uncheckedBorderColor = tokens.colors.borderDefault,
+                uncheckedThumbColor = if (isDesktop) Color(0xFFE2E8F0) else tokens.colors.textSecondary,
+                uncheckedTrackColor = if (isDesktop) Color.White.copy(alpha = 0.12f) else tokens.colors.surfaceElevated,
+                uncheckedBorderColor = if (isDesktop) Color.White.copy(alpha = 0.18f) else tokens.colors.borderDefault,
             ),
         )
     }

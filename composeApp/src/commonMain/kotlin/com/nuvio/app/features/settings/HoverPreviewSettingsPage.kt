@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -157,7 +156,6 @@ private fun HoverPreviewDelaySlider(
 
     Column(
         modifier = Modifier
-            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = 14.dp)
             .alpha(if (enabled) 1f else 0.55f),
@@ -226,7 +224,6 @@ private fun HoverPreviewTrailerStartSlider(
 
     Column(
         modifier = Modifier
-            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = 14.dp)
             .alpha(if (enabled) 1f else 0.55f),

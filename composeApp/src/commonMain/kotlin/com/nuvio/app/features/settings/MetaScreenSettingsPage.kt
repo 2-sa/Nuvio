@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -149,18 +148,36 @@ internal fun LazyListScope.metaScreenSettingsContent(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                SettingsChipRow(
-                    title = stringResource(Res.string.settings_meta_background_mode),
-                    description = stringResource(Res.string.settings_meta_background_mode_description),
-                    isTablet = isTablet,
-                    footer = stringResource(uiState.backgroundMode.descriptionRes),
-                ) {
-                    MetaScreenBackgroundMode.entries.forEach { mode ->
-                        Chip(
-                            label = stringResource(mode.labelRes),
-                            selected = uiState.backgroundMode == mode,
-                            onClick = { MetaScreenSettingsRepository.setBackgroundMode(mode) },
+                if (isDesktop) {
+                    DesktopSettingRow(
+                        title = stringResource(Res.string.settings_meta_background_mode),
+                        description = stringResource(uiState.backgroundMode.descriptionRes),
+                    ) {
+                        DesktopSegmentedControl(
+                            options = MetaScreenBackgroundMode.entries.map { mode ->
+                                DesktopSegmentedOption(
+                                    value = mode,
+                                    label = stringResource(mode.labelRes),
+                                )
+                            },
+                            selected = uiState.backgroundMode,
+                            onSelected = MetaScreenSettingsRepository::setBackgroundMode,
                         )
+                    }
+                } else {
+                    SettingsChipRow(
+                        title = stringResource(Res.string.settings_meta_background_mode),
+                        description = stringResource(Res.string.settings_meta_background_mode_description),
+                        isTablet = isTablet,
+                        footer = stringResource(uiState.backgroundMode.descriptionRes),
+                    ) {
+                        MetaScreenBackgroundMode.entries.forEach { mode ->
+                            Chip(
+                                label = stringResource(mode.labelRes),
+                                selected = uiState.backgroundMode == mode,
+                                onClick = { MetaScreenSettingsRepository.setBackgroundMode(mode) },
+                            )
+                        }
                     }
                 }
                 val shuffleProfile by remember {
@@ -341,7 +358,6 @@ private fun MetaSectionReorderableList(
 
     LazyColumn(
         modifier = Modifier
-            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .heightIn(max = if (isTablet) 820.dp else 640.dp),
         state = lazyListState,
@@ -545,7 +561,6 @@ private fun MetaEpisodeCardStyleSelector(
     val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
-            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(
                 horizontal = if (isDesktop) 0.dp else if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16,

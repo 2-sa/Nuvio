@@ -5,6 +5,7 @@ import com.nuvio.app.core.ui.Chip
 import com.nuvio.app.features.details.EpisodeRatingsVisibility
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.layout_episode_ratings
 import nuvio.composeapp.generated.resources.layout_episode_ratings_sub
@@ -32,23 +33,47 @@ internal fun RatingsSettings(
         onCheckedChange = MetaScreenSettingsRepository::setShowOverallRatings,
     )
     SettingsGroupDivider(isTablet = isTablet)
-    SettingsChipRow(
-        title = stringResource(Res.string.layout_episode_ratings),
-        description = stringResource(Res.string.layout_episode_ratings_sub),
-        isTablet = isTablet,
-    ) {
-        EpisodeRatingsVisibility.entries.forEach { visibility ->
-            Chip(
-                label = stringResource(
-                    when (visibility) {
-                        EpisodeRatingsVisibility.SHOW_ALL -> Res.string.layout_ratings_show
-                        EpisodeRatingsVisibility.HIDE_EPISODES -> Res.string.layout_ratings_hide
-                        EpisodeRatingsVisibility.HIDE_UNWATCHED_EPISODES -> Res.string.layout_ratings_hide_unwatched
-                    },
-                ),
-                selected = uiState.episodeRatingsVisibility == visibility,
-                onClick = { MetaScreenSettingsRepository.setEpisodeRatingsVisibility(visibility) },
+    if (isDesktop) {
+        DesktopSettingRow(
+            title = stringResource(Res.string.layout_episode_ratings),
+            description = stringResource(Res.string.layout_episode_ratings_sub),
+        ) {
+            DesktopSegmentedControl(
+                options = EpisodeRatingsVisibility.entries.map { visibility ->
+                    DesktopSegmentedOption(
+                        value = visibility,
+                        label = stringResource(
+                            when (visibility) {
+                                EpisodeRatingsVisibility.SHOW_ALL -> Res.string.layout_ratings_show
+                                EpisodeRatingsVisibility.HIDE_EPISODES -> Res.string.layout_ratings_hide
+                                EpisodeRatingsVisibility.HIDE_UNWATCHED_EPISODES -> Res.string.layout_ratings_hide_unwatched
+                            },
+                        ),
+                    )
+                },
+                selected = uiState.episodeRatingsVisibility,
+                onSelected = MetaScreenSettingsRepository::setEpisodeRatingsVisibility,
             )
+        }
+    } else {
+        SettingsChipRow(
+            title = stringResource(Res.string.layout_episode_ratings),
+            description = stringResource(Res.string.layout_episode_ratings_sub),
+            isTablet = isTablet,
+        ) {
+            EpisodeRatingsVisibility.entries.forEach { visibility ->
+                Chip(
+                    label = stringResource(
+                        when (visibility) {
+                            EpisodeRatingsVisibility.SHOW_ALL -> Res.string.layout_ratings_show
+                            EpisodeRatingsVisibility.HIDE_EPISODES -> Res.string.layout_ratings_hide
+                            EpisodeRatingsVisibility.HIDE_UNWATCHED_EPISODES -> Res.string.layout_ratings_hide_unwatched
+                        },
+                    ),
+                    selected = uiState.episodeRatingsVisibility == visibility,
+                    onClick = { MetaScreenSettingsRepository.setEpisodeRatingsVisibility(visibility) },
+                )
+            }
         }
     }
 }

@@ -184,7 +184,7 @@ private fun MdbListInfoRow(
     isTablet: Boolean,
     text: String,
 ) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    val horizontalPadding = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp
     val verticalPadding = if (isTablet) 14.dp else 12.dp
 
     Text(

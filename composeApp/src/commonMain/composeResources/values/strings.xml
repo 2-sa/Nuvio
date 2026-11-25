@@ -1529,6 +1529,10 @@
     <string name="trakt_cw_window_subtitle">Choose how much Trakt activity should appear in continue watching.</string>
     <string name="trakt_all_history">All history</string>
     <string name="trakt_days_format">%1$d days</string>
+    <plurals name="trakt_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
     <string name="source_audience_score">Audience Score</string>
     <string name="source_imdb">IMDb</string>
     <string name="source_letterboxd">Letterboxd</string>

@@ -120,7 +120,7 @@ internal fun LazyListScope.appearanceSettingsContent(
                     }
                     DesktopSettingRow(
                         title = stringResource(Res.string.settings_appearance_app_language),
-                        description = stringResource(selectedAppLanguage.labelRes),
+                        description = null,
                     ) {
                         DesktopDropdownSelect(
                             label = stringResource(selectedAppLanguage.labelRes),

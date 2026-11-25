@@ -12,7 +12,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -165,9 +164,7 @@ internal fun SettingsGroupDivider(
     val tokens = MaterialTheme.nuvio
     HorizontalDivider(
         modifier = if (isDesktop) {
-            Modifier
-                .then(if (fullWidth) Modifier else Modifier.widthIn(max = 880.dp))
-                .fillMaxWidth()
+            Modifier.fillMaxWidth()
         } else {
             Modifier.padding(horizontal = if (isTablet) NuvioTokens.Space.s20 else NuvioTokens.Space.s16)
         },
@@ -381,6 +378,7 @@ internal fun SettingsNavigationRow(
     isTablet: Boolean,
     actionLabel: String? = null,
     valueLabel: String? = null,
+    showValueChevron: Boolean = true,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
@@ -388,7 +386,6 @@ internal fun SettingsNavigationRow(
     if (isDesktop) {
         Row(
             modifier = Modifier
-                .widthIn(max = 880.dp)
                 .fillMaxWidth()
                 .padding(vertical = 13.dp)
                 .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),
@@ -443,7 +440,7 @@ internal fun SettingsNavigationRow(
                 DesktopSelectChip(
                     label = valueLabel,
                     enabled = enabled,
-                    showChevron = true,
+                    showChevron = showValueChevron,
                     onClick = onClick,
                 )
             } else {
@@ -482,7 +479,7 @@ internal fun SettingsNavigationRow(
             modifier = Modifier
                 .weight(1f)
                 .padding(end = NuvioTokens.Space.s12)
-                .widthIn(max = if (isTablet) 560.dp else Dp.Unspecified),
+                .widthIn(max = if (isTablet && !isDesktop) 560.dp else Dp.Unspecified),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null || iconPainter != null) {
@@ -560,7 +557,6 @@ internal fun SettingsSwitchRow(
     if (isDesktop) {
         Row(
             modifier = Modifier
-                .then(if (constrainWidth) Modifier.widthIn(max = 880.dp) else Modifier)
                 .fillMaxWidth()
                 .padding(horizontal = horizontalPadding, vertical = 13.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -632,7 +628,7 @@ internal fun SettingsSwitchRow(
             modifier = Modifier
                 .weight(1f)
                 .padding(end = NuvioTokens.Space.s12)
-                .widthIn(max = if (isTablet) 560.dp else Dp.Unspecified)
+                .widthIn(max = if (isTablet && !isDesktop) 560.dp else Dp.Unspecified)
                 .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),
             verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
         ) {
@@ -683,7 +679,6 @@ internal fun SettingsChipRow(
     val tokens = MaterialTheme.nuvio
     Column(
         modifier = Modifier
-            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(
                 horizontal = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp,
@@ -738,7 +733,6 @@ internal fun HomescreenCatalogRow(
 
     Column(
         modifier = Modifier
-            .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1447,53 +1441,18 @@ internal fun SettingsToggleGrid(
     modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty()) return
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        if (isDesktop && maxWidth >= 680.dp) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val rows = items.chunked(2)
-                rows.forEachIndexed { rowIndex, rowItems ->
-                    if (rowIndex > 0) {
-                        SettingsGroupDivider(isTablet = true, fullWidth = true)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(36.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        rowItems.forEach { item ->
-                            Box(modifier = Modifier.weight(1f)) {
-                                SettingsSwitchRow(
-                                    title = item.title,
-                                    description = item.description,
-                                    checked = item.checked,
-                                    enabled = item.enabled,
-                                    isTablet = true,
-                                    horizontalPadding = 0.dp,
-                                    constrainWidth = false,
-                                    onCheckedChange = item.onCheckedChange,
-                                )
-                            }
-                        }
-                        if (rowItems.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        } else {
-            SettingsGroup(isTablet = isTablet) {
-                items.forEachIndexed { index, item ->
-                    if (index > 0) SettingsGroupDivider(isTablet = isTablet)
-                    SettingsSwitchRow(
-                        title = item.title,
-                        description = item.description,
-                        checked = item.checked,
-                        enabled = item.enabled,
-                        isTablet = isTablet,
-                        onCheckedChange = item.onCheckedChange,
-                    )
-                }
-            }
+    SettingsGroup(isTablet = isTablet, modifier = modifier) {
+        items.forEachIndexed { index, item ->
+            if (index > 0) SettingsGroupDivider(isTablet = isTablet)
+            SettingsSwitchRow(
+                title = item.title,
+                description = item.description,
+                checked = item.checked,
+                enabled = item.enabled,
+                isTablet = isTablet,
+                horizontalPadding = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp,
+                onCheckedChange = item.onCheckedChange,
+            )
         }
     }
 }
@@ -1510,7 +1469,6 @@ internal fun DesktopSettingRow(
     val tokens = MaterialTheme.nuvio
     Row(
         modifier = modifier
-            .then(if (constrainWidth) Modifier.widthIn(max = 880.dp) else Modifier)
             .fillMaxWidth()
             .padding(vertical = 13.dp)
             .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),

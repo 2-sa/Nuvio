@@ -2,20 +2,27 @@ package com.nuvio.app.features.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsUiState
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_notifications_disabled_in_app
 import nuvio.composeapp.generated.resources.settings_notifications_episode_release_alerts
@@ -71,12 +78,11 @@ private fun NotificationTestCard(
     isTablet: Boolean,
     uiState: EpisodeReleaseNotificationsUiState,
 ) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalPadding = if (isTablet) 18.dp else 16.dp
+    val tokens = MaterialTheme.nuvio
+    val canSend = !uiState.isSendingTest && !uiState.isLoading && uiState.testTargetTitle != null
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(
@@ -115,19 +121,41 @@ private fun NotificationTestCard(
 
             Button(
                 onClick = EpisodeReleaseNotificationsRepository::sendTestNotification,
-                enabled = !uiState.isSendingTest && !uiState.isLoading && uiState.testTargetTitle != null,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+                enabled = canSend,
+                shape = if (isDesktop) RoundedCornerShape(8.dp) else ButtonDefaults.shape,
+                contentPadding = if (isDesktop) {
+                    PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                } else {
+                    ButtonDefaults.ContentPadding
+                },
+                modifier = if (isDesktop) {
+                    Modifier
+                        .heightIn(min = 36.dp)
+                        .then(if (canSend) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                } else {
+                    Modifier.fillMaxWidth()
+                },
+                colors = if (isDesktop) {
+                    ButtonDefaults.buttonColors(
+                        containerColor = tokens.colors.accent,
+                        contentColor = tokens.colors.onAccent,
+                        disabledContainerColor = tokens.colors.surfaceElevated,
+                        disabledContentColor = tokens.colors.textMuted,
+                    )
+                } else {
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    )
+                },
             ) {
                 Text(
-                    if (uiState.isSendingTest) {
+                    text = if (uiState.isSendingTest) {
                         stringResource(Res.string.settings_notifications_sending_test)
                     } else {
                         stringResource(Res.string.settings_notifications_send_test)
                     },
+                    fontWeight = if (isDesktop) FontWeight.SemiBold else null,
                 )
             }
 

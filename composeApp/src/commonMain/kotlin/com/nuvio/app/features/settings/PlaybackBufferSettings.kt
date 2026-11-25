@@ -17,6 +17,7 @@ import com.nuvio.app.features.player.isExoNativeMemorySupported
 import com.nuvio.app.features.player.playbackCacheUsableSpaceBytes
 import com.nuvio.app.features.player.AndroidPlaybackEngine
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import com.nuvio.app.features.player.PlayerSettingsUiState
@@ -60,7 +61,7 @@ internal fun PlaybackBufferSettings(
                         ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp, vertical = 4.dp),
                     )
                 }
                 SettingsGroupDivider(isTablet = isTablet)
@@ -92,7 +93,7 @@ internal fun PlaybackBufferSettings(
                         text = stringResource(Res.string.settings_playback_buffer_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp, vertical = 8.dp),
                     )
                     SettingsSliderRow(
                         title = stringResource(Res.string.settings_playback_buffer_min),
@@ -193,7 +194,7 @@ internal fun PlaybackBufferSettings(
                             ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp, vertical = 4.dp),
                         )
                     }
                 }
@@ -246,7 +247,7 @@ internal fun PlaybackBufferSettings(
                         text = stringResource(Res.string.settings_playback_vod_cache_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp, vertical = 8.dp),
                     )
                 }
             }

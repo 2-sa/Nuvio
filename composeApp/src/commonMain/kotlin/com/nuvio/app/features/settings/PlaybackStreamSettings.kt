@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.items
 import com.nuvio.app.core.ui.DialogButton
@@ -157,6 +156,7 @@ internal fun PlaybackStreamSettings(
                         description = regexLabel,
                         isTablet = isTablet,
                         valueLabel = regexLabel,
+                        showValueChevron = false,
                         onClick = { showAutoPlayRegexDialog = true },
                     )
                 }
@@ -214,7 +214,6 @@ internal fun PlaybackStreamSettings(
                 }
                 Column(
                     modifier = Modifier
-                        .then(if (isDesktop) Modifier.widthIn(max = 880.dp) else Modifier)
                         .fillMaxWidth()
                         .padding(
                             horizontal = if (isDesktop) 0.dp else if (isTablet) 18.dp else 16.dp,

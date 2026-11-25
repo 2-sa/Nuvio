@@ -94,7 +94,10 @@ internal fun LazyListScope.mediaServersSettingsContent(
                         text = stringResource(Res.string.servers_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.nuvio.colors.textMuted,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        modifier = Modifier.padding(
+                            horizontal = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp,
+                            vertical = 14.dp,
+                        ),
                     )
                 }
                 uiState.connections.forEachIndexed { index, connection ->

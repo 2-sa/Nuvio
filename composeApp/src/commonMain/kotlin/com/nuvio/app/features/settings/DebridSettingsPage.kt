@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -717,11 +718,24 @@ private fun DebridLearnMoreFooter(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = if (isTablet) 4.dp else 0.dp, bottom = if (isTablet) 10.dp else 6.dp),
-        contentAlignment = Alignment.Center,
+            .padding(
+                horizontal = 0.dp,
+                top = if (isTablet) 4.dp else 0.dp,
+                bottom = if (isTablet) 10.dp else 6.dp,
+            ),
+        contentAlignment = if (isDesktop) Alignment.CenterStart else Alignment.Center,
     ) {
-        TextButton(onClick = onClick) {
-            Text(stringResource(Res.string.settings_debrid_learn_more))
+        if (isDesktop) {
+            TextButton(
+                onClick = onClick,
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp),
+            ) {
+                Text(stringResource(Res.string.settings_debrid_learn_more))
+            }
+        } else {
+            TextButton(onClick = onClick) {
+                Text(stringResource(Res.string.settings_debrid_learn_more))
+            }
         }
     }
 }
@@ -854,6 +868,21 @@ private fun DebridPreferenceRow(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
+    if (isDesktop) {
+        DesktopSettingRow(
+            title = title,
+            description = description,
+            enabled = enabled,
+        ) {
+            DesktopSelectChip(
+                label = value,
+                enabled = enabled,
+                showChevron = false,
+                onClick = onClick,
+            )
+        }
+        return
+    }
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
     val verticalPadding = if (isTablet) 16.dp else 14.dp
     Row(
@@ -2149,11 +2178,12 @@ private fun DebridInfoRow(
     isTablet: Boolean,
     text: String,
 ) {
+    val horizontalPadding = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp
     Text(
         text = text,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = if (isTablet) 14.dp else 12.dp),
+            .padding(horizontal = horizontalPadding, vertical = if (isTablet) 14.dp else 12.dp),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

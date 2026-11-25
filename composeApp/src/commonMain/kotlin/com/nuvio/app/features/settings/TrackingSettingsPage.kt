@@ -100,7 +100,7 @@ import nuvio.composeapp.generated.resources.trakt_continue_watching_subtitle
 import nuvio.composeapp.generated.resources.trakt_continue_watching_window
 import nuvio.composeapp.generated.resources.trakt_cw_window_subtitle
 import nuvio.composeapp.generated.resources.trakt_cw_window_title
-import nuvio.composeapp.generated.resources.trakt_days_format
+import nuvio.composeapp.generated.resources.trakt_days
 import nuvio.composeapp.generated.resources.trakt_library_source_dialog_subtitle
 import nuvio.composeapp.generated.resources.trakt_library_source_dialog_title
 import nuvio.composeapp.generated.resources.trakt_library_source_nuvio
@@ -119,6 +119,7 @@ import nuvio.composeapp.generated.resources.trakt_watch_progress_source_nuvio
 import nuvio.composeapp.generated.resources.trakt_watch_progress_source_trakt
 import nuvio.composeapp.generated.resources.trakt_watch_progress_subtitle
 import nuvio.composeapp.generated.resources.trakt_watch_progress_title
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.trackingSettingsContent(
@@ -706,7 +707,7 @@ private fun TrackingInlineErrorRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = if (isTablet) 20.dp else 16.dp,
+                horizontal = if (isDesktop) 0.dp else if (isTablet) 20.dp else 16.dp,
                 vertical = if (isTablet) 14.dp else 12.dp,
             ),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -911,7 +912,7 @@ private fun continueWatchingDaysCapLabel(daysCap: Int): String {
     return if (normalized == TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL) {
         stringResource(Res.string.trakt_all_history)
     } else {
-        stringResource(Res.string.trakt_days_format, normalized)
+        pluralStringResource(Res.plurals.trakt_days, normalized, normalized)
     }
 }
 

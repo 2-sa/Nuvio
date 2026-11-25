@@ -119,6 +119,7 @@ internal fun PlaybackSkipSettings(
                         description = clientIdValue,
                         isTablet = isTablet,
                         valueLabel = clientIdValue,
+                        showValueChevron = false,
                         onClick = { showAnimeSkipClientIdDialog = true },
                     )
                     if (showAnimeSkipClientIdDialog) {
@@ -150,6 +151,7 @@ internal fun PlaybackSkipSettings(
                         description = apiKeyValue,
                         isTablet = isTablet,
                         valueLabel = apiKeyValue,
+                        showValueChevron = false,
                         onClick = { showIntroDbApiKeyDialog = true },
                     )
                     if (showIntroDbApiKeyDialog) {
