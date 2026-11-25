@@ -12,7 +12,7 @@
 
 </div>
 
-## ⚠️ Alpha Software - Testers Only
+## Alpha Software
 
 Nuvio Desktop is currently in alpha and is intended only for testers. It is under active development and is not suitable for daily use.
 
