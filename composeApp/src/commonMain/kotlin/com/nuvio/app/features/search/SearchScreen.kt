@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -334,7 +336,11 @@ fun SearchScreen(
                             topPadding = topChromePadding,
                         )
                         Spacer(modifier = Modifier.height(NuvioTokens.Space.s8))
-                        Box(modifier = Modifier.padding(horizontal = contentPadding)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = contentPadding),
+                        ) {
                             ObsidianSearchBar(
                                 value = query,
                                 onValueChange = {
@@ -350,6 +356,7 @@ fun SearchScreen(
                                     isSearchFocused = it.isFocused
                                     if (query.isNotBlank()) focusRequester.captureFocus()
                                 },
+                                modifier = if (isDesktop) Modifier.widthIn(max = 560.dp) else Modifier,
                             )
                         }
                         Spacer(modifier = Modifier.height(NuvioTokens.Space.s12))
@@ -933,31 +940,128 @@ private fun SearchRecentSection(
         NuvioSectionLabel(
             text = stringResource(Res.string.compose_search_recent_searches),
         )
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = cardShape,
-            color = tokens.colors.surfaceCard,
-            border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = NuvioTokens.Space.s4),
+        if (isDesktop) {
+            FlowRow(
+                modifier = Modifier.widthIn(max = 560.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                recentSearches.forEachIndexed { index, recentQuery ->
-                    SearchRecentRow(
+                recentSearches.forEach { recentQuery ->
+                    DesktopSearchRecentChip(
                         query = recentQuery,
                         onSearchPress = { onSearchPress(recentQuery) },
                         onRemovePress = { onRemoveSearch(recentQuery) },
                     )
-                    if (index != recentSearches.lastIndex) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = NuvioTokens.Space.s12),
-                            thickness = NuvioTokens.Border.thin,
-                            color = tokens.colors.borderSubtle,
+                }
+            }
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = cardShape,
+                color = tokens.colors.surfaceCard,
+                border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = NuvioTokens.Space.s4),
+                ) {
+                    recentSearches.forEachIndexed { index, recentQuery ->
+                        SearchRecentRow(
+                            query = recentQuery,
+                            onSearchPress = { onSearchPress(recentQuery) },
+                            onRemovePress = { onRemoveSearch(recentQuery) },
                         )
+                        if (index != recentSearches.lastIndex) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = NuvioTokens.Space.s12),
+                                thickness = NuvioTokens.Border.thin,
+                                color = tokens.colors.borderSubtle,
+                            )
+                        }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopSearchRecentChip(
+    query: String,
+    onSearchPress: () -> Unit,
+    onRemovePress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val chipInteraction = remember { MutableInteractionSource() }
+    val isHovered by chipInteraction.collectIsHoveredAsState()
+    val removeInteraction = remember { MutableInteractionSource() }
+    val isRemoveHovered by removeInteraction.collectIsHoveredAsState()
+
+    Surface(
+        onClick = onSearchPress,
+        modifier = modifier.pointerHoverIcon(PointerIcon.Hand),
+        shape = CircleShape,
+        color = if (isHovered) tokens.colors.surfaceCard else tokens.colors.surfaceElevated,
+        border = BorderStroke(
+            width = NuvioTokens.Border.thin,
+            color = if (isHovered) tokens.colors.borderStrong else tokens.colors.borderSubtle,
+        ),
+        interactionSource = chipInteraction,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                start = NuvioTokens.Space.s10,
+                end = NuvioTokens.Space.s6,
+                top = NuvioTokens.Space.s6,
+                bottom = NuvioTokens.Space.s6,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.History,
+                contentDescription = null,
+                tint = if (isHovered) tokens.colors.textSecondary else tokens.colors.textMuted,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                text = query,
+                modifier = Modifier.weight(1f, fill = false),
+                style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+                color = tokens.colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isRemoveHovered) {
+                            tokens.colors.overlayHover
+                        } else {
+                            tokens.colors.overlayHover.copy(alpha = 0f)
+                        },
+                    )
+                    .hoverable(removeInteraction)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .clickable(
+                        interactionSource = removeInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = stringResource(Res.string.compose_search_remove_recent_search),
+                        onClick = onRemovePress,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(Res.string.compose_search_remove_recent_search),
+                    tint = if (isRemoveHovered) tokens.colors.textPrimary else tokens.colors.textMuted,
+                    modifier = Modifier.size(NuvioTokens.Icon.xs),
+                )
             }
         }
     }
