@@ -68,6 +68,7 @@ import com.nuvio.app.core.ui.toDesktopAnimation
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.isDesktop
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.poster_logo_content_description
@@ -427,10 +428,15 @@ internal fun BoxScope.HomePosterRatingPill(
 internal fun resolvedPosterCornerRadius(cornerRadiusDp: Int): Dp =
     if (cornerRadiusDp == DefaultPosterCardCornerRadiusDp) 14.dp else cornerRadiusDp.dp
 
-internal fun normalizedPosterRating(rawRating: String?): String? =
-    rawRating
-        ?.trim()
-        ?.takeIf { it.isNotBlank() && it != "0" && it != "0.0" && !it.equals("N/A", ignoreCase = true) }
+internal fun normalizedPosterRating(rawRating: String?): String? {
+    val trimmed = rawRating?.trim()?.takeIf { it.isNotEmpty() && !it.equals("N/A", ignoreCase = true) }
+        ?: return null
+    val parsed = trimmed.toDoubleOrNull() ?: return trimmed
+    if (!parsed.isFinite() || parsed <= 0.0) return null
+    val tenths = (parsed * 10.0).roundToInt()
+    if (tenths <= 0) return null
+    return "${tenths / 10}.${tenths % 10}"
+}
 
 private fun PosterShape.posterAspectRatio(): Float = when (this) {
     PosterShape.Poster -> 0.675f

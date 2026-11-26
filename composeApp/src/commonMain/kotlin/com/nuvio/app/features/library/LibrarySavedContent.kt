@@ -26,6 +26,7 @@ import com.nuvio.app.core.ui.NuvioDropdownOption
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.PosterGridRow
 import com.nuvio.app.features.home.components.PosterGridSkeletonRow
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.library_filter_all_types
 import nuvio.composeapp.generated.resources.library_filter_genre
@@ -140,7 +141,7 @@ internal fun LibrarySavedControls(
                             selectedKey = verticalProjection.selectedGenre.orEmpty(),
                             options = libraryFacetOptions(allLabel, verticalProjection.availableGenres),
                             onSelected = { option -> onGenreSelected(option.key.ifBlank { null }) },
-                            fillWidth = true,
+                            fillWidth = !isDesktop,
                         )
                     }
                 }
@@ -153,7 +154,7 @@ internal fun LibrarySavedControls(
                             selectedKey = verticalProjection.selectedYear.orEmpty(),
                             options = libraryFacetOptions(allLabel, verticalProjection.availableYears),
                             onSelected = { option -> onYearSelected(option.key.ifBlank { null }) },
-                            fillWidth = true,
+                            fillWidth = !isDesktop,
                         )
                     }
                 }
@@ -171,7 +172,7 @@ internal fun LibrarySavedControls(
                                 .firstOrNull { it.name == option.key }
                                 ?.let(onWatchedFilterSelected)
                         },
-                        fillWidth = true,
+                        fillWidth = !isDesktop,
                     )
                 }
             }
@@ -279,6 +280,7 @@ private fun LibraryFilterRow(
             val equalShare = if (count > 0) (viewportWidth - totalSpacing) / count else 0
             val widths = when {
                 count == 0 -> emptyList()
+                isDesktop -> naturalWidths
                 naturalWidths.all { it <= equalShare } -> List(count) { index ->
                     if (index == count - 1) viewportWidth - totalSpacing - equalShare * (count - 1) else equalShare
                 }

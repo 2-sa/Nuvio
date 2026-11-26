@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,6 +70,7 @@ import nuvio.composeapp.generated.resources.compose_settings_root_downloads_titl
 import nuvio.composeapp.generated.resources.downloads_delete_message
 import nuvio.composeapp.generated.resources.downloads_delete_title
 import nuvio.composeapp.generated.resources.downloads_empty_message
+import nuvio.composeapp.generated.resources.downloads_empty_message_desktop
 import nuvio.composeapp.generated.resources.downloads_empty_title
 import nuvio.composeapp.generated.resources.downloads_episodes
 import nuvio.composeapp.generated.resources.downloads_open_directory
@@ -232,7 +234,9 @@ private fun LazyListScope.downloadsRootContent(
         item(key = "empty") {
             DownloadsEmptyState(
                 title = stringResource(Res.string.downloads_empty_title),
-                message = stringResource(Res.string.downloads_empty_message),
+                message = stringResource(
+                    if (isDesktop) Res.string.downloads_empty_message_desktop else Res.string.downloads_empty_message,
+                ),
             )
         }
         return
@@ -546,46 +550,58 @@ private fun DownloadsEmptyState(
 ) {
     val tokens = MaterialTheme.nuvio
     val cardShape = RoundedCornerShape(16.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(cardShape)
-            .background(tokens.colors.surfaceCard)
-            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, cardShape)
-            .padding(horizontal = NuvioTokens.Space.s24, vertical = NuvioTokens.Space.s48),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
-    ) {
-        Box(
-            modifier = Modifier
-                .padding(bottom = NuvioTokens.Space.s8)
-                .size(NuvioTokens.Space.s64)
-                .clip(tokens.shapes.avatar)
-                .background(tokens.colors.surfaceElevated)
-                .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, tokens.shapes.avatar),
-            contentAlignment = Alignment.Center,
+    val card: @Composable (Modifier) -> Unit = { widthModifier ->
+        Column(
+            modifier = widthModifier
+                .fillMaxWidth()
+                .clip(cardShape)
+                .background(tokens.colors.surfaceCard)
+                .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, cardShape)
+                .padding(horizontal = NuvioTokens.Space.s24, vertical = NuvioTokens.Space.s48),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
         ) {
-            Icon(
-                imageVector = Icons.Rounded.Download,
-                contentDescription = null,
-                tint = tokens.colors.textMuted,
-                modifier = Modifier.size(NuvioTokens.Icon.xl),
-            )
-        }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = tokens.colors.textPrimary,
-            textAlign = TextAlign.Center,
-        )
-        if (message != null) {
+            Box(
+                modifier = Modifier
+                    .padding(bottom = NuvioTokens.Space.s8)
+                    .size(NuvioTokens.Space.s64)
+                    .clip(tokens.shapes.avatar)
+                    .background(tokens.colors.surfaceElevated)
+                    .border(NuvioTokens.Border.thin, tokens.colors.borderDefault, tokens.shapes.avatar),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Download,
+                    contentDescription = null,
+                    tint = tokens.colors.textMuted,
+                    modifier = Modifier.size(NuvioTokens.Icon.xl),
+                )
+            }
             Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = tokens.colors.textMuted,
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = tokens.colors.textPrimary,
                 textAlign = TextAlign.Center,
             )
+            if (message != null) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = tokens.colors.textMuted,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
+    }
+    if (isDesktop) {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            card(Modifier.widthIn(max = 520.dp))
+        }
+    } else {
+        card(Modifier)
     }
 }
 

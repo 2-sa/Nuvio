@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -810,8 +811,8 @@ private fun LazyListScope.cloudLibraryContent(
 
         !uiState.isEnabled -> {
             item {
-                HomeEmptyStateCard(
-                    modifier = Modifier.padding(horizontal = horizontalPadding),
+                CloudLibraryEmptyStateCard(
+                    horizontalPadding = horizontalPadding,
                     title = stringResource(Res.string.cloud_library_disabled_title),
                     message = stringResource(Res.string.cloud_library_disabled_message),
                     actionLabel = stringResource(Res.string.cloud_library_disabled_action),
@@ -822,8 +823,8 @@ private fun LazyListScope.cloudLibraryContent(
 
         !uiState.hasConnectedProvider -> {
             item {
-                HomeEmptyStateCard(
-                    modifier = Modifier.padding(horizontal = horizontalPadding),
+                CloudLibraryEmptyStateCard(
+                    horizontalPadding = horizontalPadding,
                     title = stringResource(Res.string.cloud_library_connect_title),
                     message = stringResource(Res.string.cloud_library_connect_message),
                     actionLabel = stringResource(Res.string.cloud_library_connect_action),
@@ -943,6 +944,40 @@ private fun LazyListScope.cloudLibraryContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CloudLibraryEmptyStateCard(
+    horizontalPadding: Dp,
+    title: String,
+    message: String,
+    actionLabel: String?,
+    onActionClick: (() -> Unit)?,
+) {
+    if (isDesktop) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = horizontalPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            HomeEmptyStateCard(
+                modifier = Modifier.widthIn(max = 520.dp),
+                title = title,
+                message = message,
+                actionLabel = actionLabel,
+                onActionClick = onActionClick,
+            )
+        }
+    } else {
+        HomeEmptyStateCard(
+            modifier = Modifier.padding(horizontal = horizontalPadding),
+            title = title,
+            message = message,
+            actionLabel = actionLabel,
+            onActionClick = onActionClick,
+        )
     }
 }
 
