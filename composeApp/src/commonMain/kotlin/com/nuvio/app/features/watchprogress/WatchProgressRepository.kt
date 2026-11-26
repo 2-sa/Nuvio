@@ -20,6 +20,7 @@ import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.tracking.effectiveWatchProgressSource
+import com.nuvio.app.features.tracking.mergeDualWatchProgress
 import com.nuvio.app.features.tracking.providerId
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.sync.ProgressDeltaEvent
@@ -284,7 +285,10 @@ object WatchProgressRepository {
         TrackingProviderRegistry.progressProviders().forEach { provider ->
             syncScope.launch {
                 provider.changes.collectLatest {
-                    if (activeSource.providerId == provider.providerId) {
+                    val dualAniListActive = provider.providerId == TrackingProviderId.ANILIST &&
+                        TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+                        activeSource != WatchProgressSource.ANILIST
+                    if (activeSource.providerId == provider.providerId || dualAniListActive) {
                         publish()
                         if (hasLoaded && !provider.providesCompleteMetadata) {
                             resolveRemoteMetadata()
@@ -478,20 +482,32 @@ object WatchProgressRepository {
         }
 
         activateSource(source)
-        activeProgressProvider()?.let { provider ->
-            return refreshProviderSource(
+        val primarySucceeded = activeProgressProvider()?.let { provider ->
+            refreshProviderSource(
                 provider = provider,
                 profileId = profileId,
                 operationGeneration = operationGeneration,
                 sourceChanged = sourceChanged,
                 force = force,
             )
-        }
-        return refreshNuvioSource(
+        } ?: refreshNuvioSource(
             profileId = profileId,
             operationGeneration = operationGeneration,
             force = force,
         )
+        if (
+            TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+            source != WatchProgressSource.ANILIST &&
+            isProgressProviderAvailable(TrackingProviderId.ANILIST)
+        ) {
+            TrackingProviderRegistry.progressProvider(TrackingProviderId.ANILIST)?.let { anilistProvider ->
+                runCatching {
+                    anilistProvider.refresh(force = force, sourceChanged = sourceChanged)
+                    if (isActiveOperation(profileId, operationGeneration)) publish()
+                }
+            }
+        }
+        return primarySucceeded
     }
 
     private suspend fun refreshProviderSource(
@@ -1646,10 +1662,28 @@ object WatchProgressRepository {
             nuvioEntries = localEntriesSnapshot(),
             providerEntries = providerEntries,
         )
-        return if (activeSource.providerId == null) {
-            projectedEntries
+        val dualAniListEntries = if (
+            TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+            activeSource != WatchProgressSource.ANILIST &&
+            isProgressProviderAvailable(TrackingProviderId.ANILIST)
+        ) {
+            TrackingProviderRegistry.progressProvider(TrackingProviderId.ANILIST)
+                ?.snapshot()
+                ?.entries
+                .orEmpty()
         } else {
-            providerMetadataOverlay.project(source = activeSource, entries = projectedEntries)
+            emptyList()
+        }
+        val mergedEntries = mergeDualWatchProgress(
+            primarySource = activeSource,
+            primaryEntries = projectedEntries,
+            anilistEntries = dualAniListEntries,
+            useAniListForAnime = TrackingSettingsRepository.uiState.value.useAniListForAnime,
+        )
+        return if (activeSource.providerId == null && dualAniListEntries.isEmpty()) {
+            mergedEntries
+        } else {
+            providerMetadataOverlay.project(source = activeSource, entries = mergedEntries)
         }
     }
 

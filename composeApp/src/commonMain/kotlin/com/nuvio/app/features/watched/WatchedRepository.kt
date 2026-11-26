@@ -8,6 +8,7 @@ import com.nuvio.app.features.addons.ADDON_LIBRARY_RESOURCE
 import com.nuvio.app.features.addons.AddonEventDispatcher
 import com.nuvio.app.features.addons.AddonLibraryAction
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import com.nuvio.app.features.anilist.AniListTracker
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.profiles.ProfileRepository
@@ -17,6 +18,8 @@ import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.tracking.effectiveWatchProgressSource
+import com.nuvio.app.features.tracking.isAnimeTrackingTarget
+import com.nuvio.app.features.tracking.mergeDualWatchedItems
 import com.nuvio.app.features.tracking.providerId
 import com.nuvio.app.features.watching.domain.isSeriesLikeWatchingContentType
 import com.nuvio.app.features.watching.sync.SupabaseWatchedSyncAdapter
@@ -398,7 +401,7 @@ object WatchedRepository {
             }
         }
         return try {
-            effectiveSource.providerId?.let { providerId ->
+            val primaryResult = effectiveSource.providerId?.let { providerId ->
                 val provider = TrackingProviderRegistry.watchedProvider(providerId)
                     ?: run {
                         log.w { "Watched provider missing provider=${providerId.storageId} source=$effectiveSource" }
@@ -421,6 +424,23 @@ object WatchedRepository {
                     profileId = profileId,
                 )
             }
+            if (
+                TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+                effectiveSource != WatchProgressSource.ANILIST &&
+                TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST)
+            ) {
+                TrackingProviderRegistry.watchedProvider(TrackingProviderId.ANILIST)?.let { anilistAdapter ->
+                    runCatching {
+                        pullSnapshotFromAdapter(
+                            adapter = anilistAdapter,
+                            operation = operation,
+                            profileId = profileId,
+                            resetDeltaState = false,
+                        )
+                    }
+                }
+            }
+            primaryResult
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
@@ -1139,20 +1159,33 @@ object WatchedRepository {
                 itemsByKey.values.toList()
             }
         }
-        val items = watchedItemsForSource(
+        val baseItems = watchedItemsForSource(
             source = activeSource,
             nuvioItems = nuvioItems,
             providerItems = providerItems,
         )
+        val dualAniListActive = TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+            activeSource != WatchProgressSource.ANILIST &&
+            TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST)
+        val items = mergeDualWatchedItems(
+            primarySource = activeSource,
+            primaryItems = baseItems,
+            anilistItems = if (dualAniListActive) providerItems[TrackingProviderId.ANILIST].orEmpty() else emptyList(),
+            useAniListForAnime = TrackingSettingsRepository.uiState.value.useAniListForAnime,
+        )
             .map(WatchedItem::normalizedMarkedAt)
             .sortedByDescending { it.markedAtEpochMs }
-        val fullyWatchedSeriesKeys = fullyWatchedSeriesKeysForSource(activeSource)
+        val fullyWatchedSeriesKeys = fullyWatchedSeriesKeysForSource(activeSource) +
+            if (dualAniListActive) providerFullyWatchedSeriesKeys[TrackingProviderId.ANILIST].orEmpty() else emptySet()
         val watchedKeys = items.mapTo(linkedSetOf()) {
             watchedItemKey(it.type, it.id, it.season, it.episode)
         }
         // Merge extra watched keys from providers (e.g. Simkl anime alternate IDs)
         activeSource.providerId?.let { providerId ->
             providerExtraWatchedKeys[providerId]?.let { extraKeys -> watchedKeys += extraKeys }
+        }
+        if (dualAniListActive) {
+            providerExtraWatchedKeys[TrackingProviderId.ANILIST]?.let { extraKeys -> watchedKeys += extraKeys }
         }
         val isLoaded = hasLoadedSource(activeSource)
         val hasLoadedRemoteItems = activeSource.providerId
@@ -1336,9 +1369,19 @@ object WatchedRepository {
         }
 
         if (trackerHistorySync == WatchedTrackerHistorySync.Mirror) {
+            val useDualAniList = TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+                TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST)
             TrackingProviderRegistry.connectedWatchedProviders().forEach { provider ->
+                val providerItems = if (!useDualAniList) {
+                    items
+                } else if (provider.providerId == TrackingProviderId.ANILIST) {
+                    items.filter { isAnimeTrackingTarget(it.id, isKnownInAniList = AniListTracker.hasKnownMedia(it.id, it.name)) }
+                } else {
+                    items.filterNot { isAnimeTrackingTarget(it.id, isKnownInAniList = AniListTracker.hasKnownMedia(it.id, it.name)) }
+                }
+                if (providerItems.isEmpty()) return@forEach
                 try {
-                    provider.push(profileId = profileId, items = items)
+                    provider.push(profileId = profileId, items = providerItems)
                     succeededTrackerProviderIds += provider.providerId
                 } catch (error: CancellationException) {
                     throw error
@@ -1371,9 +1414,19 @@ object WatchedRepository {
             }
         }
 
+        val useDualAniList = TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+            TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST)
         TrackingProviderRegistry.connectedWatchedProviders().forEach { provider ->
+            val providerItems = if (!useDualAniList) {
+                items
+            } else if (provider.providerId == TrackingProviderId.ANILIST) {
+                items.filter { isAnimeTrackingTarget(it.id, isKnownInAniList = AniListTracker.hasKnownMedia(it.id, it.name)) }
+            } else {
+                items.filterNot { isAnimeTrackingTarget(it.id, isKnownInAniList = AniListTracker.hasKnownMedia(it.id, it.name)) }
+            }
+            if (providerItems.isEmpty()) return@forEach
             try {
-                provider.delete(profileId = profileId, items = items)
+                provider.delete(profileId = profileId, items = providerItems)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {

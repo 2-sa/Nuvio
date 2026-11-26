@@ -160,6 +160,19 @@ object AniListTracker : TrackingAuthProvider {
         return true
     }
 
+    fun hasKnownMedia(contentId: String?, title: String? = null): Boolean {
+        val entries = _syncState.value.snapshot?.entries.orEmpty()
+        if (entries.isEmpty()) return false
+        val parsed = contentId?.let(::parseTrackingExternalIds)
+        if (parsed?.anilist?.toIntOrNull()?.let { id -> entries.any { it.mediaId == id } } == true) return true
+        if (parsed?.mal?.toIntOrNull()?.let { id -> entries.any { it.malId == id } } == true) return true
+        val normalizedTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        return entries.any {
+            it.titleEnglish.equals(normalizedTitle, ignoreCase = true) ||
+                it.titleRomaji.equals(normalizedTitle, ignoreCase = true)
+        }
+    }
+
     fun setClientId(clientId: String) {
         ensureLoaded()
         val profileId = activeProfile.value

@@ -1,6 +1,7 @@
 package com.nuvio.app.features.tracking
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.features.anilist.AniListTracker
 import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -22,8 +23,9 @@ object TrackingScrobbleCoordinator {
     ): List<TrackingScrobbleFailure> {
         if (profileId != ProfileRepository.activeProfileId) return emptyList()
         TrackingProviderRegistry.ensureLoaded()
+        val scrobblers = selectScrobblersForEvent(event)
         val failures = dispatchTrackingScrobble(
-            scrobblers = TrackingProviderRegistry.connectedScrobblers(),
+            scrobblers = scrobblers,
             profileId = profileId,
             action = action,
             event = event,
@@ -43,8 +45,9 @@ object TrackingScrobbleCoordinator {
     ): List<TrackingScrobbleFailure> {
         if (profileId != ProfileRepository.activeProfileId) return emptyList()
         TrackingProviderRegistry.ensureLoaded()
+        val scrobblers = selectScrobblersForEvent(event)
         val failures = dispatchTrackingSeekScrobble(
-            scrobblers = TrackingProviderRegistry.connectedScrobblers(),
+            scrobblers = scrobblers,
             profileId = profileId,
             action = action,
             event = event,
@@ -55,6 +58,29 @@ object TrackingScrobbleCoordinator {
             }
         }
         return failures
+    }
+
+    private fun selectScrobblersForEvent(event: TrackingScrobbleEvent): Collection<TrackingScrobbler> {
+        val connected = TrackingProviderRegistry.connectedScrobblers()
+        TrackingSettingsRepository.ensureLoaded()
+        val useDualAniList = TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+            TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST)
+        if (!useDualAniList) return connected
+
+        val isAnime = event.media.kind == TrackingMediaKind.ANIME ||
+            event.media.ids.anilist != null ||
+            event.media.ids.mal != null ||
+            event.media.ids.kitsu != null ||
+            event.media.ids.anidb != null ||
+            isAnimeTrackingTarget(
+                contentId = null,
+                isKnownInAniList = AniListTracker.hasKnownMedia(null, event.media.title),
+            )
+        return if (isAnime) {
+            connected.filter { it.providerId == TrackingProviderId.ANILIST }
+        } else {
+            connected.filter { it.providerId != TrackingProviderId.ANILIST }
+        }
     }
 }
 
