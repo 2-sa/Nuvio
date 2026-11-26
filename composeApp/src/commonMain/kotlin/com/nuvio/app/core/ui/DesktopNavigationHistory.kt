@@ -52,6 +52,7 @@ internal class DesktopNavigationHistory(
     }
 
     fun syncRoutePop(newRoute: AppRoute?, activeTab: AppScreenTab) {
+        if (newRoute is PlayerRoute || newRoute is StreamRoute) return
         val normalizedNewRoute = if (newRoute is TabsRoute) null else newRoute
         if (current.route != normalizedNewRoute) {
             val currentRoute = current.route

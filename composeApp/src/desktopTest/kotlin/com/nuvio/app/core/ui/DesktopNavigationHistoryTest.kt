@@ -91,4 +91,18 @@ class DesktopNavigationHistoryTest {
         assertTrue(history.canGoForward)
         assertEquals(DesktopNavEntry(AppScreenTab.Home, detail), history.goForward())
     }
+
+    @Test
+    fun syncRoutePopIgnoresPlayerAndStreamRoutes() {
+        val history = DesktopNavigationHistory(AppScreenTab.Home)
+        val detail = DetailRoute(type = "movie", id = "tt99")
+
+        history.recordRoutePush(detail, AppScreenTab.Home)
+        history.syncRoutePop(newRoute = StreamRoute(launchId = 1L), activeTab = AppScreenTab.Home)
+        history.syncRoutePop(newRoute = PlayerRoute(launchId = 2L), activeTab = AppScreenTab.Home)
+
+        assertEquals(DesktopNavEntry(AppScreenTab.Home, detail), history.current)
+        assertTrue(history.canGoBack)
+        assertFalse(history.canGoForward)
+    }
 }
