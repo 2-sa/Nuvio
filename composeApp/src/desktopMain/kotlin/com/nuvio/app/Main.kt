@@ -110,27 +110,22 @@ fun main(args: Array<String>) {
             }
             else -> WindowPlacement.Floating
         }
-        val isStartingMaximizedOrFullscreen =
-            initialPlacement == WindowPlacement.Maximized || initialPlacement == WindowPlacement.Fullscreen
         val maxScreenBounds = remember {
             runCatching {
                 java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
             }.getOrNull()
         }
-        val initialWidth = when {
-            isStartingMaximizedOrFullscreen && maxScreenBounds != null -> maxScreenBounds.width.dp
-            savedGeometry != null -> savedGeometry.width.dp
-            else -> 1280.dp
+        val validSavedGeometry = savedGeometry?.takeIf { geometry ->
+            maxScreenBounds == null ||
+                geometry.width < maxScreenBounds.width - 24f ||
+                geometry.height < maxScreenBounds.height - 24f
         }
-        val initialHeight = when {
-            isStartingMaximizedOrFullscreen && maxScreenBounds != null -> maxScreenBounds.height.dp
-            savedGeometry != null -> savedGeometry.height.dp
-            else -> 820.dp
-        }
+        val initialWidth = validSavedGeometry?.width?.dp ?: 1280.dp
+        val initialHeight = validSavedGeometry?.height?.dp ?: 820.dp
         val windowState = rememberWindowState(
             width = initialWidth,
             height = initialHeight,
-            position = savedGeometry?.let { WindowPosition.Absolute(x = it.x.dp, y = it.y.dp) }
+            position = validSavedGeometry?.let { WindowPosition.Absolute(x = it.x.dp, y = it.y.dp) }
                 ?: WindowPosition.PlatformDefault,
             // Windows fullscreen is emulated natively (see DesktopAppFullscreenController)
             // rather than driven by WindowPlacement, so it's restored separately below.
