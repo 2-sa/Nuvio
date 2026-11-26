@@ -34,7 +34,7 @@ internal fun mergeDualWatchProgress(
     anilistEntries: List<WatchProgressEntry>,
     useAniListForAnime: Boolean,
 ): List<WatchProgressEntry> {
-    if (!useAniListForAnime || primarySource == WatchProgressSource.ANILIST || anilistEntries.isEmpty()) {
+    if (!useAniListForAnime || primarySource == WatchProgressSource.ANILIST) {
         return primaryEntries
     }
     val anilistTitleKeys = anilistEntries
@@ -45,7 +45,7 @@ internal fun mergeDualWatchProgress(
 
     val filteredPrimary = primaryEntries.filterNot { entry ->
         isAnimeTrackingTarget(entry.parentMetaId) ||
-            normalizeTitleKey(entry.title) in anilistTitleKeys
+            (anilistTitleKeys.isNotEmpty() && normalizeTitleKey(entry.title) in anilistTitleKeys)
     }
     return (anilistEntries + filteredPrimary)
         .sortedByDescending { it.lastUpdatedEpochMs }
@@ -57,7 +57,7 @@ internal fun mergeDualWatchedItems(
     anilistItems: Collection<WatchedItem>,
     useAniListForAnime: Boolean,
 ): List<WatchedItem> {
-    if (!useAniListForAnime || primarySource == WatchProgressSource.ANILIST || anilistItems.isEmpty()) {
+    if (!useAniListForAnime || primarySource == WatchProgressSource.ANILIST) {
         return primaryItems.toList()
     }
     val anilistTitleKeys = anilistItems
@@ -68,7 +68,7 @@ internal fun mergeDualWatchedItems(
 
     val filteredPrimary = primaryItems.filterNot { item ->
         isAnimeTrackingTarget(item.id) ||
-            normalizeTitleKey(item.name) in anilistTitleKeys
+            (anilistTitleKeys.isNotEmpty() && normalizeTitleKey(item.name) in anilistTitleKeys)
     }
     return anilistItems.toList() + filteredPrimary
 }
@@ -77,5 +77,5 @@ private fun normalizeTitleKey(raw: String?): String =
     raw
         ?.trim()
         ?.lowercase()
-        ?.replace(Regex("[^a-z0-9]+"), "")
+        ?.filter { it.isLetterOrDigit() }
         .orEmpty()

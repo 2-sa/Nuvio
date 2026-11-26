@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.tracking.ensureTrackingProvidersRegistered
+import com.nuvio.app.features.anilist.AniListTracker
 import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.AddonsUiState
@@ -20,6 +21,7 @@ import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.tracking.effectiveWatchProgressSource
+import com.nuvio.app.features.tracking.isAnimeTrackingTarget
 import com.nuvio.app.features.tracking.mergeDualWatchProgress
 import com.nuvio.app.features.tracking.providerId
 import com.nuvio.app.features.watching.application.WatchingActions
@@ -1214,18 +1216,40 @@ object WatchProgressRepository {
         ensureLoaded()
         if (videoIds.isEmpty()) return
 
-        activeProgressProvider()?.let { provider ->
+        val dualAniListActive = TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+            activeSource != WatchProgressSource.ANILIST &&
+            isProgressProviderAvailable(TrackingProviderId.ANILIST)
+        val primaryProvider = activeProgressProvider()
+        val anilistProvider = if (dualAniListActive) {
+            TrackingProviderRegistry.progressProvider(TrackingProviderId.ANILIST)
+        } else {
+            null
+        }
+        if (primaryProvider != null || anilistProvider != null) {
             val entriesToRemove = currentEntries().filter { entry ->
                 entry.videoId in videoIds &&
                     (parentMetaId == null || entry.parentMetaId == parentMetaId)
             }
             val locallyRemovedEntries = removeStoredLocalEntries(entriesToRemove)
-            provider.applyOptimisticRemoval(entriesToRemove)
+            val (animeEntries, primaryEntries) = if (anilistProvider != null) {
+                entriesToRemove.partition { entry ->
+                    isAnimeTrackingTarget(entry.parentMetaId, isKnownInAniList = AniListTracker.hasKnownMedia(entry.parentMetaId, entry.title))
+                }
+            } else {
+                emptyList<WatchProgressEntry>() to entriesToRemove
+            }
+            if (primaryEntries.isNotEmpty()) primaryProvider?.applyOptimisticRemoval(primaryEntries)
+            if (animeEntries.isNotEmpty()) anilistProvider?.applyOptimisticRemoval(animeEntries)
             if (locallyRemovedEntries.isNotEmpty()) persist()
             publish()
             if (entriesToRemove.isNotEmpty()) {
                 syncScope.launch {
-                    removeProviderProgress(provider, entriesToRemove, "clear playback progress")
+                    if (primaryEntries.isNotEmpty() && primaryProvider != null) {
+                        removeProviderProgress(primaryProvider, primaryEntries, "clear playback progress")
+                    }
+                    if (animeEntries.isNotEmpty() && anilistProvider != null) {
+                        removeProviderProgress(anilistProvider, animeEntries, "clear playback progress")
+                    }
                 }
             }
             return
@@ -1262,13 +1286,35 @@ object WatchProgressRepository {
         }
         if (entriesToRemove.isEmpty()) return
 
-        activeProgressProvider()?.let { provider ->
+        val dualAniListActive = TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+            activeSource != WatchProgressSource.ANILIST &&
+            isProgressProviderAvailable(TrackingProviderId.ANILIST)
+        val primaryProvider = activeProgressProvider()
+        val anilistProvider = if (dualAniListActive) {
+            TrackingProviderRegistry.progressProvider(TrackingProviderId.ANILIST)
+        } else {
+            null
+        }
+        if (primaryProvider != null || anilistProvider != null) {
             val locallyRemovedEntries = removeStoredLocalEntries(entriesToRemove)
-            provider.applyOptimisticRemoval(entriesToRemove)
+            val (animeEntries, primaryEntries) = if (anilistProvider != null) {
+                entriesToRemove.partition { entry ->
+                    isAnimeTrackingTarget(entry.parentMetaId, isKnownInAniList = AniListTracker.hasKnownMedia(entry.parentMetaId, entry.title))
+                }
+            } else {
+                emptyList<WatchProgressEntry>() to entriesToRemove
+            }
+            if (primaryEntries.isNotEmpty()) primaryProvider?.applyOptimisticRemoval(primaryEntries)
+            if (animeEntries.isNotEmpty()) anilistProvider?.applyOptimisticRemoval(animeEntries)
             if (locallyRemovedEntries.isNotEmpty()) persist()
             publish()
             syncScope.launch {
-                removeProviderProgress(provider, entriesToRemove, "remove playback progress")
+                if (primaryEntries.isNotEmpty() && primaryProvider != null) {
+                    removeProviderProgress(primaryProvider, primaryEntries, "remove playback progress")
+                }
+                if (animeEntries.isNotEmpty() && anilistProvider != null) {
+                    removeProviderProgress(anilistProvider, animeEntries, "remove playback progress")
+                }
             }
             return
         }

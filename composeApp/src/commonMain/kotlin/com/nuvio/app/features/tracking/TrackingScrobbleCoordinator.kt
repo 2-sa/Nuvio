@@ -73,8 +73,8 @@ object TrackingScrobbleCoordinator {
             event.media.ids.kitsu != null ||
             event.media.ids.anidb != null ||
             isAnimeTrackingTarget(
-                contentId = null,
-                isKnownInAniList = AniListTracker.hasKnownMedia(null, event.media.title),
+                contentId = event.media.catalog?.contentId,
+                isKnownInAniList = AniListTracker.hasKnownMedia(event.media.catalog?.contentId, event.media.title),
             )
         return if (isAnime) {
             connected.filter { it.providerId == TrackingProviderId.ANILIST }

@@ -431,11 +431,10 @@ object WatchedRepository {
             ) {
                 TrackingProviderRegistry.watchedProvider(TrackingProviderId.ANILIST)?.let { anilistAdapter ->
                     runCatching {
-                        pullSnapshotFromAdapter(
+                        pullSecondaryAniListWatched(
                             adapter = anilistAdapter,
                             operation = operation,
                             profileId = profileId,
-                            resetDeltaState = false,
                         )
                     }
                 }
@@ -549,6 +548,44 @@ object WatchedRepository {
         publish()
         persist()
         return true
+    }
+
+    private suspend fun pullSecondaryAniListWatched(
+        adapter: com.nuvio.app.features.tracking.TrackingWatchedProvider,
+        operation: RefreshOperation,
+        profileId: Int,
+    ) {
+        val serverItems = adapter.pull(profileId = profileId, pageSize = watchedItemsPageSize)
+        val fullyWatchedSeriesKeys = adapter.pullFullyWatchedSeriesKeys(profileId)
+        val extraWatchedKeys = adapter.pullExtraWatchedKeys(profileId)
+        if (!isActiveOperation(operation)) return
+
+        itemsStore.update { nuvioItems, providerItems, _, dirtyProviderKeys ->
+            val anilistMap = providerItems.getOrPut(TrackingProviderId.ANILIST, ::mutableMapOf)
+            val dirtyKeys = dirtyProviderKeys.getOrPut(TrackingProviderId.ANILIST, ::mutableSetOf)
+            val merged = mergeWatchedSnapshot(
+                serverItems = serverItems,
+                localItems = anilistMap.values.toList(),
+                dirtyKeys = dirtyKeys,
+                acknowledgeDirtyByPresence = true,
+            )
+            replaceWatchedItemsForSource(
+                source = WatchProgressSource.ANILIST,
+                nuvioItems = nuvioItems,
+                providerItems = providerItems,
+                replacement = merged.items,
+            )
+            dirtyKeys.clear()
+            dirtyKeys += merged.dirtyKeys
+        }
+        fullyWatchedSeriesKeys?.let { keys ->
+            setFullyWatchedSeriesKeysForSource(WatchProgressSource.ANILIST, keys)
+        }
+        providerExtraWatchedKeys[TrackingProviderId.ANILIST] = extraWatchedKeys
+        loadedProviders += TrackingProviderId.ANILIST
+        providersLoadedFromRemote += TrackingProviderId.ANILIST
+        publish()
+        persist()
     }
 
     private suspend fun pullSupabaseDeltaFromServer(

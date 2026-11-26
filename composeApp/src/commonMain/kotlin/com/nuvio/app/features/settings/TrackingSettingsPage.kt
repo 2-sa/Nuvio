@@ -47,6 +47,7 @@ import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.trakt.TraktContinueWatchingDaysOptions
 import com.nuvio.app.features.trakt.normalizeTraktContinueWatchingDaysCap
+import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache
 import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -370,13 +371,15 @@ private fun TrackingDataSources(
             }
             if (anilistConnected && effectiveProgressSource != WatchProgressSource.ANILIST) {
                 SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_tracking_anilist_for_anime_title),
-                    description = stringResource(Res.string.settings_tracking_anilist_for_anime_description),
+                AniListForAnimeSwitchRow(
                     checked = settingsUiState.useAniListForAnime,
                     isTablet = isTablet,
                     onCheckedChange = { enabled ->
                         TrackingSettingsRepository.setUseAniListForAnime(enabled)
+                        ContinueWatchingEnrichmentCache.invalidate(
+                            ProfileRepository.activeProfileId,
+                            effectiveProgressSource,
+                        )
                         scope.launch {
                             WatchProgressSourceCoordinator.refreshActiveSource(ProfileRepository.activeProfileId)
                         }
@@ -504,13 +507,15 @@ private fun TrackingDataSources(
             )
             if (anilistConnected && effectiveProgressSource != WatchProgressSource.ANILIST) {
                 SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_tracking_anilist_for_anime_title),
-                    description = stringResource(Res.string.settings_tracking_anilist_for_anime_description),
+                AniListForAnimeSwitchRow(
                     checked = settingsUiState.useAniListForAnime,
                     isTablet = isTablet,
                     onCheckedChange = { enabled ->
                         TrackingSettingsRepository.setUseAniListForAnime(enabled)
+                        ContinueWatchingEnrichmentCache.invalidate(
+                            ProfileRepository.activeProfileId,
+                            effectiveProgressSource,
+                        )
                         scope.launch {
                             WatchProgressSourceCoordinator.refreshActiveSource(ProfileRepository.activeProfileId)
                         }
@@ -1141,4 +1146,19 @@ private fun animeIdPreferenceLabel(preference: SimklAnimeIdPreference): String =
     SimklAnimeIdPreference.MAL -> stringResource(Res.string.settings_tracking_anime_id_mal)
     SimklAnimeIdPreference.KITSU -> stringResource(Res.string.settings_tracking_anime_id_kitsu)
     SimklAnimeIdPreference.TVDB -> stringResource(Res.string.settings_tracking_anime_id_tvdb)
+}
+
+@Composable
+private fun AniListForAnimeSwitchRow(
+    checked: Boolean,
+    isTablet: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    SettingsSwitchRow(
+        title = stringResource(Res.string.settings_tracking_anilist_for_anime_title),
+        description = stringResource(Res.string.settings_tracking_anilist_for_anime_description),
+        checked = checked,
+        isTablet = isTablet,
+        onCheckedChange = onCheckedChange,
+    )
 }

@@ -68,10 +68,26 @@ internal object AniListEpisodeMapper {
     suspend fun resolveAddonEpisodes(
         contentId: String,
         contentType: String = "series",
-    ): List<SeasonEpisodeRef> {
-        synchronized(lock) { cache[contentId] }?.let { return it }
+    ): List<SeasonEpisodeRef> = resolveAddonEpisodes(listOf(contentId), contentType)
 
-        val existing = synchronized(lock) { inFlight[contentId] }
+    suspend fun resolveAddonEpisodes(
+        contentIds: List<String>,
+        contentType: String = "series",
+    ): List<SeasonEpisodeRef> {
+        val candidates = contentIds
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toList()
+        if (candidates.isEmpty()) return emptyList()
+
+        for (candidate in candidates) {
+            synchronized(lock) { cache[candidate] }?.let { return it }
+        }
+
+        val cacheKey = candidates.first()
+        val existing = synchronized(lock) { inFlight[cacheKey] }
         if (existing != null) {
             return try {
                 existing.await()
@@ -81,26 +97,35 @@ internal object AniListEpisodeMapper {
         }
 
         val deferred = CompletableDeferred<List<SeasonEpisodeRef>>()
-        synchronized(lock) { inFlight[contentId] = deferred }
+        synchronized(lock) { inFlight[cacheKey] = deferred }
 
         return try {
-            val raw = withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
-                TraktEpisodeMappingService.getAddonEpisodes(contentId, contentType)
-            }.orEmpty()
-            val mapped = orderedMainEpisodes(
-                raw.mapNotNull { entry ->
-                    val s = entry.season ?: return@mapNotNull null
-                    val e = entry.episode ?: return@mapNotNull null
-                    SeasonEpisodeRef(season = s, episode = e)
-                },
-            )
-            synchronized(lock) {
+            var resolved: List<SeasonEpisodeRef> = emptyList()
+            for (candidate in candidates) {
+                val raw = withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
+                    TraktEpisodeMappingService.getAddonEpisodes(candidate, contentType)
+                }.orEmpty()
+                val mapped = orderedMainEpisodes(
+                    raw.mapNotNull { entry ->
+                        val s = entry.season ?: return@mapNotNull null
+                        val e = entry.episode ?: return@mapNotNull null
+                        SeasonEpisodeRef(season = s, episode = e)
+                    },
+                )
                 if (mapped.isNotEmpty()) {
-                    cache[contentId] = mapped
+                    resolved = mapped
+                    break
                 }
             }
-            deferred.complete(mapped)
-            mapped
+            synchronized(lock) {
+                if (resolved.isNotEmpty()) {
+                    for (candidate in candidates) {
+                        cache[candidate] = resolved
+                    }
+                }
+            }
+            deferred.complete(resolved)
+            resolved
         } catch (error: CancellationException) {
             deferred.cancel(error)
             throw error
@@ -108,7 +133,11 @@ internal object AniListEpisodeMapper {
             deferred.complete(emptyList())
             emptyList()
         } finally {
-            synchronized(lock) { inFlight.remove(contentId, deferred) }
+            synchronized(lock) {
+                if (inFlight[cacheKey] === deferred) {
+                    inFlight.remove(cacheKey)
+                }
+            }
         }
     }
 

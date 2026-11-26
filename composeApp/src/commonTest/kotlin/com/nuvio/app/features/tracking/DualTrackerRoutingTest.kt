@@ -52,7 +52,7 @@ class DualTrackerRoutingTest {
     }
 
     @Test
-    fun `mergeDualWatchProgress combines Trakt movies-tv with AniList anime and deduplicates`() {
+    fun `mergeDualWatchProgress combines Trakt movies-tv with AniList anime and deduplicates including Unicode`() {
         val traktSopranos = WatchProgressEntry(
             contentType = "series",
             parentMetaId = "tt0141842",
@@ -61,6 +61,8 @@ class DualTrackerRoutingTest {
             title = "The Sopranos",
             seasonNumber = 1,
             episodeNumber = 2,
+            lastPositionMs = 0L,
+            durationMs = 3_000_000L,
             lastUpdatedEpochMs = 200L,
             source = "trakt",
         )
@@ -69,9 +71,11 @@ class DualTrackerRoutingTest {
             parentMetaId = "tt0131159",
             parentMetaType = "series",
             videoId = "tt0131159:1:5",
-            title = "Detective Conan",
+            title = "المحقق كونان",
             seasonNumber = 1,
             episodeNumber = 5,
+            lastPositionMs = 0L,
+            durationMs = 1_440_000L,
             lastUpdatedEpochMs = 100L,
             source = "trakt",
         )
@@ -80,9 +84,11 @@ class DualTrackerRoutingTest {
             parentMetaId = "anilist:235",
             parentMetaType = "series",
             videoId = "anilist:235:25:62",
-            title = "Detective Conan",
+            title = "المحقق كونان",
             seasonNumber = 25,
             episodeNumber = 62,
+            lastPositionMs = 0L,
+            durationMs = 1_440_000L,
             lastUpdatedEpochMs = 300L,
             source = "anilist",
         )
@@ -98,10 +104,70 @@ class DualTrackerRoutingTest {
     }
 
     @Test
+    fun `mergeDualWatchProgress filters anime prefixes from primary even when AniList entries are empty`() {
+        val traktSopranos = WatchProgressEntry(
+            contentType = "series",
+            parentMetaId = "tt0141842",
+            parentMetaType = "series",
+            videoId = "tt0141842:1:2",
+            title = "The Sopranos",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            lastPositionMs = 0L,
+            durationMs = 3_000_000L,
+            lastUpdatedEpochMs = 200L,
+            source = "trakt",
+        )
+        val traktMalEntry = WatchProgressEntry(
+            contentType = "series",
+            parentMetaId = "mal:235",
+            parentMetaType = "series",
+            videoId = "mal:235:1:2",
+            title = "Detective Conan",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            lastPositionMs = 0L,
+            durationMs = 1_440_000L,
+            lastUpdatedEpochMs = 100L,
+            source = "trakt",
+        )
+
+        val merged = mergeDualWatchProgress(
+            primarySource = WatchProgressSource.TRAKT,
+            primaryEntries = listOf(traktSopranos, traktMalEntry),
+            anilistEntries = emptyList(),
+            useAniListForAnime = true,
+        )
+
+        assertEquals(listOf("tt0141842"), merged.map { it.parentMetaId })
+    }
+
+    @Test
     fun `mergeDualWatchedItems preserves Trakt non-anime and prefers AniList for anime`() {
-        val traktShow = WatchedItem(id = "tt0141842", type = "series", name = "The Sopranos", season = 1, episode = 1)
-        val traktAnimeDup = WatchedItem(id = "tt0131159", type = "series", name = "Detective Conan", season = 1, episode = 1)
-        val anilistAnime = WatchedItem(id = "anilist:235", type = "series", name = "Detective Conan", season = 25, episode = 62)
+        val traktShow = WatchedItem(
+            id = "tt0141842",
+            type = "series",
+            name = "The Sopranos",
+            season = 1,
+            episode = 1,
+            markedAtEpochMs = 100L,
+        )
+        val traktAnimeDup = WatchedItem(
+            id = "tt0131159",
+            type = "series",
+            name = "Detective Conan",
+            season = 1,
+            episode = 1,
+            markedAtEpochMs = 100L,
+        )
+        val anilistAnime = WatchedItem(
+            id = "anilist:235",
+            type = "series",
+            name = "Detective Conan",
+            season = 25,
+            episode = 62,
+            markedAtEpochMs = 200L,
+        )
 
         val merged = mergeDualWatchedItems(
             primarySource = WatchProgressSource.TRAKT,
