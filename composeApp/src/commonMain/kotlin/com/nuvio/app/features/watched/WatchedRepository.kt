@@ -551,8 +551,8 @@ object WatchedRepository {
     }
 
     private suspend fun pullSecondaryAniListWatched(
-        adapter: com.nuvio.app.features.tracking.TrackingWatchedProvider,
-        operation: RefreshOperation,
+        adapter: WatchedSyncAdapter,
+        operation: WatchedRefreshOperation,
         profileId: Int,
     ) {
         val serverItems = adapter.pull(profileId = profileId, pageSize = watchedItemsPageSize)
