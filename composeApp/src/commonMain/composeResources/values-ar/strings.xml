@@ -2822,4 +2822,6 @@
     <string name="settings_anilist_library_description">استخدم قوائم الأنمي في AniList كمصدر للمكتبة.</string>
     <string name="settings_anilist_progress_description">استخدم تقدم الأنمي في AniList لقسم متابعة المشاهدة.</string>
     <string name="settings_tracking_ratings_anilist_description">عرض وإرسال تقييماتك للأنمي على AniList.</string>
+    <string name="settings_tracking_anilist_for_anime_title">استخدام AniList للأنمي</string>
+    <string name="settings_tracking_anilist_for_anime_description">تتبّع الأفلام والمسلسلات بالمتتبّع الرئيسي (مثل Trakt) مع مزامنة الأنمي عبر AniList في نفس الوقت.</string>
 </resources>

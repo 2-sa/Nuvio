@@ -90,6 +90,8 @@ import nuvio.composeapp.generated.resources.settings_tracking_mdblist_section
 import nuvio.composeapp.generated.resources.compose_action_off
 import nuvio.composeapp.generated.resources.settings_tracking_ratings
 import nuvio.composeapp.generated.resources.settings_tracking_ratings_anilist_description
+import nuvio.composeapp.generated.resources.settings_tracking_anilist_for_anime_title
+import nuvio.composeapp.generated.resources.settings_tracking_anilist_for_anime_description
 import nuvio.composeapp.generated.resources.settings_tracking_ratings_description
 import nuvio.composeapp.generated.resources.settings_tracking_ratings_mdblist_description
 import nuvio.composeapp.generated.resources.settings_tracking_ratings_off_description
@@ -366,6 +368,21 @@ private fun TrackingDataSources(
                     )
                 }
             }
+            if (anilistConnected && effectiveProgressSource != WatchProgressSource.ANILIST) {
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_tracking_anilist_for_anime_title),
+                    description = stringResource(Res.string.settings_tracking_anilist_for_anime_description),
+                    checked = settingsUiState.useAniListForAnime,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        TrackingSettingsRepository.setUseAniListForAnime(enabled)
+                        scope.launch {
+                            WatchProgressSourceCoordinator.refreshActiveSource(ProfileRepository.activeProfileId)
+                        }
+                    },
+                )
+            }
             if (transitionState.lastRefreshSucceeded == false && !transitionState.isRefreshing) {
                 SettingsGroupDivider(isTablet = isTablet)
                 TrackingInlineErrorRow(
@@ -485,6 +502,21 @@ private fun TrackingDataSources(
                 isTablet = isTablet,
                 onClick = { activePickerName = TrackingDataPicker.WATCH_PROGRESS.name },
             )
+            if (anilistConnected && effectiveProgressSource != WatchProgressSource.ANILIST) {
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_tracking_anilist_for_anime_title),
+                    description = stringResource(Res.string.settings_tracking_anilist_for_anime_description),
+                    checked = settingsUiState.useAniListForAnime,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        TrackingSettingsRepository.setUseAniListForAnime(enabled)
+                        scope.launch {
+                            WatchProgressSourceCoordinator.refreshActiveSource(ProfileRepository.activeProfileId)
+                        }
+                    },
+                )
+            }
             if (transitionState.lastRefreshSucceeded == false && !transitionState.isRefreshing) {
                 SettingsGroupDivider(isTablet = isTablet)
                 TrackingInlineErrorRow(

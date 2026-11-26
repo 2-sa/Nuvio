@@ -2818,4 +2818,6 @@
     <string name="settings_anilist_library_description">Use your AniList anime lists as the Library source.</string>
     <string name="settings_anilist_progress_description">Use your AniList anime progress for Continue Watching.</string>
     <string name="settings_tracking_ratings_anilist_description">Show and submit your AniList anime scores.</string>
+    <string name="settings_tracking_anilist_for_anime_title">Use AniList for Anime</string>
+    <string name="settings_tracking_anilist_for_anime_description">Track movies and TV shows with your primary tracker while syncing anime with AniList simultaneously.</string>
 </resources>
