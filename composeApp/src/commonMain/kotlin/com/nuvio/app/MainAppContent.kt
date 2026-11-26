@@ -29,7 +29,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
@@ -58,8 +58,10 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
-import androidx.navigationevent.DirectNavigationEventInput
-import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
+import com.nuvio.app.core.ui.DesktopHistoryActions
+import com.nuvio.app.core.ui.DesktopNavEntry
+import com.nuvio.app.core.ui.DesktopNavigationHistory
+import com.nuvio.app.core.ui.LocalDesktopHistoryActions
 import com.nuvio.app.core.ui.LocalPosterClickAnchor
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.collectMappedAsState
@@ -1345,38 +1347,119 @@ internal fun MainAppContent(
             selectedContinueWatchingForActions = item
         }
 
-        // Desktop has no system back, so mouse Back joins Esc in Compose's window back
-        // dispatcher; open dialogs then take it before screen-level handlers.
-        val mouseBackInput = remember { DirectNavigationEventInput() }
-        val forwardHistory = remember { mutableStateListOf<AppRoute>() }
-        var isNavigatingForward by remember { mutableStateOf(false) }
+        fun navigateBack() {
+            val routeAtRequest = navController.currentRoute
+            dispatchNavigationBack(
+                isPlayerRoute = routeAtRequest is PlayerRoute,
+                playerBack = registeredPlayerSystemBack
+                    ?.takeIf { (route, _) -> route == routeAtRequest }
+                    ?.second,
+                pop = {
+                    // A top-level tab has nothing to pop, so Back used to do nothing
+                    // there. Treat it as "return to Home" instead.
+                    if (!navController.popBackStack()) {
+                        selectedTab = AppScreenTab.Home
+                    }
+                },
+            )
+        }
+
+        val desktopHistory = remember { DesktopNavigationHistory(initialTab) }
+        var isApplyingDesktopHistory by remember { mutableStateOf(false) }
+        var desktopHistoryVersion by remember { mutableIntStateOf(0) }
         if (isDesktop) {
-            val navigationEventDispatcher = LocalNavigationEventDispatcherOwner.current?.navigationEventDispatcher
-            DisposableEffect(navigationEventDispatcher) {
-                navigationEventDispatcher?.addInput(mouseBackInput)
-                onDispose { navigationEventDispatcher?.removeInput(mouseBackInput) }
-            }
             LaunchedEffect(navBackStack) {
                 var previousStack = navBackStack.toList()
-                snapshotFlow { navBackStack.toList() }.collect { currentStack ->
-                    if (currentStack != previousStack) {
-                        if (isNavigatingForward) {
-                            isNavigatingForward = false
-                        } else if (
-                            currentStack.size == previousStack.size - 1 &&
-                            currentStack == previousStack.dropLast(1)
-                        ) {
-                            val popped = previousStack.lastOrNull() as? AppRoute
-                            if (popped != null && popped !is PlayerRoute && popped !is StreamRoute) {
-                                forwardHistory.add(popped)
+                var previousTab = selectedTab
+                snapshotFlow { navBackStack.toList() to selectedTab }.collect { (currentStack, currentTab) ->
+                    if (isApplyingDesktopHistory) {
+                        isApplyingDesktopHistory = false
+                        previousStack = currentStack
+                        previousTab = currentTab
+                    } else if (currentStack != previousStack || currentTab != previousTab) {
+                        val stackChanged = currentStack != previousStack
+                        val tabChanged = currentTab != previousTab
+                        val currentTop = currentStack.lastOrNull() as? AppRoute
+                        if (tabChanged && (currentTop == null || currentTop is TabsRoute)) {
+                            desktopHistory.recordTabChange(currentTab)
+                            desktopHistoryVersion++
+                        } else if (stackChanged) {
+                            if (
+                                currentStack.size == previousStack.size + 1 &&
+                                currentStack.dropLast(1) == previousStack
+                            ) {
+                                if (currentTop != null) {
+                                    desktopHistory.recordRoutePush(currentTop, currentTab)
+                                    desktopHistoryVersion++
+                                }
+                            } else if (currentStack.size < previousStack.size) {
+                                val newRoute = currentTop?.takeUnless { it is TabsRoute }
+                                desktopHistory.syncRoutePop(newRoute, currentTab)
+                                desktopHistoryVersion++
+                            } else if (currentTop != null && currentTop !is TabsRoute) {
+                                desktopHistory.recordRoutePush(currentTop, currentTab)
+                                desktopHistoryVersion++
+                            } else if (previousStack.lastOrNull() !is TabsRoute) {
+                                desktopHistory.syncRoutePop(null, currentTab)
+                                desktopHistoryVersion++
                             }
-                        } else {
-                            forwardHistory.clear()
                         }
                         previousStack = currentStack
+                        previousTab = currentTab
                     }
                 }
             }
+        }
+
+        fun applyDesktopHistoryEntry(target: DesktopNavEntry) {
+            val targetNavRoute: AppRoute = target.route ?: TabsRoute
+            val stackChanged = navController.currentRoute != targetNavRoute
+            val tabChanged = selectedTab != target.tab
+            if (stackChanged || tabChanged) {
+                isApplyingDesktopHistory = true
+            }
+            if (target.route == null) {
+                while (navController.currentRoute !is TabsRoute && navController.popBackStack()) { }
+                activateTab(target.tab)
+            } else {
+                if (tabChanged) {
+                    activateTab(target.tab)
+                }
+                if (navController.currentRoute != target.route) {
+                    while (navController.currentRoute !is TabsRoute && navController.popBackStack()) { }
+                    navController.navigate(target.route)
+                }
+            }
+        }
+
+        fun performDesktopBack() {
+            if (navController.currentRoute is PlayerRoute) {
+                navigateBack()
+                return
+            }
+            val target = desktopHistory.goBack() ?: return
+            desktopHistoryVersion++
+            applyDesktopHistoryEntry(target)
+        }
+
+        fun performDesktopForward() {
+            if (navController.currentRoute is PlayerRoute) return
+            val target = desktopHistory.goForward() ?: return
+            desktopHistoryVersion++
+            applyDesktopHistoryEntry(target)
+        }
+
+        val desktopHistoryActions = if (isDesktop) {
+            remember(desktopHistoryVersion, desktopHistory) {
+                DesktopHistoryActions(
+                    canGoBack = desktopHistory.canGoBack,
+                    canGoForward = desktopHistory.canGoForward,
+                    onNavigateBack = ::performDesktopBack,
+                    onNavigateForward = ::performDesktopForward,
+                )
+            }
+        } else {
+            DesktopHistoryActions()
         }
 
         AppUpdaterHost(
@@ -1390,6 +1473,19 @@ internal fun MainAppContent(
                     .onPreviewKeyEvent { keyEvent ->
                         if (!isDesktop || keyEvent.type != KeyEventType.KeyDown || currentRoute is PlayerRoute) {
                             return@onPreviewKeyEvent false
+                        }
+                        if (keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed) {
+                            return@onPreviewKeyEvent when (keyEvent.key) {
+                                Key.DirectionLeft -> {
+                                    performDesktopBack()
+                                    true
+                                }
+                                Key.DirectionRight -> {
+                                    performDesktopForward()
+                                    true
+                                }
+                                else -> false
+                            }
                         }
                         val hasPrimaryModifier = keyEvent.isCtrlPressed || keyEvent.isMetaPressed
                         if (!hasPrimaryModifier) return@onPreviewKeyEvent false
@@ -1418,17 +1514,13 @@ internal fun MainAppContent(
                                         if (event.button == PointerButton.Back) {
                                             event.changes.forEach { it.consume() }
                                             if (isDesktop) {
-                                                mouseBackInput.backCompleted()
+                                                performDesktopBack()
                                             } else {
                                                 navController.popBackStack()
                                             }
                                         } else if (isDesktop && event.button == PointerButton.Forward) {
                                             event.changes.forEach { it.consume() }
-                                            val nextRoute = forwardHistory.removeLastOrNull()
-                                            if (nextRoute != null && currentRoute != nextRoute) {
-                                                isNavigatingForward = true
-                                                navController.navigate(nextRoute)
-                                            }
+                                            performDesktopForward()
                                         }
                                     }
                                 }
@@ -1456,25 +1548,9 @@ internal fun MainAppContent(
                     LocalUseNativeNavigation provides useNativeNavigation,
                     LocalNativeNavigationBarHidden provides (currentRoute?.hidesNavigationBar == true),
                     LocalVerticalBarPadding provides if (drawsUnderVerticalBar) verticalBarPadding else PaddingValues(),
+                    LocalDesktopHistoryActions provides desktopHistoryActions,
                 ) {
-                val navigateBack = {
-                    val routeAtRequest = navController.currentRoute
-                    dispatchNavigationBack(
-                        isPlayerRoute = routeAtRequest is PlayerRoute,
-                        playerBack = registeredPlayerSystemBack
-                            ?.takeIf { (route, _) -> route == routeAtRequest }
-                            ?.second,
-                        pop = {
-                            // A top-level tab has nothing to pop, so Back used to do nothing
-                            // there. Treat it as "return to Home" instead.
-                            if (!navController.popBackStack()) {
-                                selectedTab = AppScreenTab.Home
-                            }
-                        },
-                    )
-                }
-
-                PlatformEscapeShortcut(navigateBack)
+                PlatformEscapeShortcut(::navigateBack)
 
                 ControllerNavigationHost(
                     currentRoute = currentRoute,
@@ -1490,7 +1566,7 @@ internal fun MainAppContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(if (drawsUnderVerticalBar) PaddingValues() else verticalBarPadding),
-                    onBack = navigateBack,
+                    onBack = ::navigateBack,
                     entryDecorators = listOf(
                         rememberSaveableStateHolderNavEntryDecorator<NavKey>(),
                         routeDisposalDecorator,
