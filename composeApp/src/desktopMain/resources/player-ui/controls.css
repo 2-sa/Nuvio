@@ -559,7 +559,7 @@ button:disabled {
 
 .parental-guide {
   position: absolute;
-  top: calc(var(--slider-bottom) + env(safe-area-inset-top));
+  top: calc(var(--slider-bottom) + env(safe-area-inset-top) + 48px);
   left: var(--hp);
   z-index: 5;
   display: flex;

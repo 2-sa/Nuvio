@@ -68,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.LocalDesktopFloatingTopBarActive
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.Chip
@@ -155,19 +156,22 @@ fun SearchScreen(
     externalQuery: String? = null,
     onExternalQueryChange: ((String) -> Unit)? = null,
 ) {
+    val desktopTopBarActive = LocalDesktopFloatingTopBarActive.current
     val focusRequester = remember { FocusRequester() }
     var isSearchFocused by remember { mutableStateOf(false) }
 
     ScreenActivityEffect(listState) { screenActive ->
         if (!screenActive) {
             isSearchFocused = false
-            focusRequester.freeFocus()
+            if (!desktopTopBarActive) {
+                focusRequester.freeFocus()
+            }
             listState.stopScroll()
         }
     }
 
     ScreenActivityEffect(searchFocusRequestCount) { screenActive ->
-        if (screenActive && searchFocusRequestCount > 0) {
+        if (screenActive && searchFocusRequestCount > 0 && !desktopTopBarActive) {
             focusRequester.requestFocus()
         }
     }
@@ -345,29 +349,31 @@ fun SearchScreen(
                             modifier = Modifier.padding(horizontal = contentPadding),
                             topPadding = topChromePadding,
                         )
-                        Spacer(modifier = Modifier.height(NuvioTokens.Space.s8))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = contentPadding),
-                        ) {
-                            ObsidianSearchBar(
-                                value = query,
-                                onValueChange = {
-                                    focusRequester.captureFocus()
-                                    updateQuery(it)
-                                },
-                                onClear = { updateQuery("") },
-                                placeholder = stringResource(Res.string.compose_search_placeholder),
-                                clearContentDescription = stringResource(Res.string.compose_search_clear),
-                                isFocused = isSearchFocused,
-                                focusRequester = focusRequester,
-                                onFocusChanged = {
-                                    isSearchFocused = it.isFocused
-                                    if (query.isNotBlank()) focusRequester.captureFocus()
-                                },
-                                modifier = if (isDesktop) Modifier.widthIn(max = 560.dp) else Modifier,
-                            )
+                        if (!desktopTopBarActive) {
+                            Spacer(modifier = Modifier.height(NuvioTokens.Space.s8))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = contentPadding),
+                            ) {
+                                ObsidianSearchBar(
+                                    value = query,
+                                    onValueChange = {
+                                        focusRequester.captureFocus()
+                                        updateQuery(it)
+                                    },
+                                    onClear = { updateQuery("") },
+                                    placeholder = stringResource(Res.string.compose_search_placeholder),
+                                    clearContentDescription = stringResource(Res.string.compose_search_clear),
+                                    isFocused = isSearchFocused,
+                                    focusRequester = focusRequester,
+                                    onFocusChanged = {
+                                        isSearchFocused = it.isFocused
+                                        if (query.isNotBlank()) focusRequester.captureFocus()
+                                    },
+                                    modifier = if (isDesktop) Modifier.widthIn(max = 560.dp) else Modifier,
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.height(NuvioTokens.Space.s12))
                         if (isDesktop) {

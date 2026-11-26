@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.LocalDesktopFloatingTopBarActive
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import nuvio.composeapp.generated.resources.Res
@@ -294,11 +295,13 @@ fun NuvioScreenHeader(
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FullscreenActionButton(
-                    buttonSize = 48.dp,
-                    iconSize = 24.dp,
-                    contentColor = tokens.colors.textPrimary,
-                )
+                if (!LocalDesktopFloatingTopBarActive.current) {
+                    FullscreenActionButton(
+                        buttonSize = 48.dp,
+                        iconSize = 24.dp,
+                        contentColor = tokens.colors.textPrimary,
+                    )
+                }
                 actions()
             }
         }

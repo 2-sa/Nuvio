@@ -60,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,13 +71,17 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.deeplink.handleAppUrl
@@ -1220,6 +1225,8 @@ private fun DesktopSidebarItem(
     }
 }
 
+internal val LocalDesktopFloatingTopBarActive = staticCompositionLocalOf { false }
+
 @Composable
 internal fun DesktopFloatingTopBar(
     searchQuery: String,
@@ -1277,36 +1284,43 @@ internal fun DesktopFloatingTopBar(
                 end = 24.dp,
             ),
     ) {
-        // Left: Back / Forward navigation buttons
         Row(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .height(40.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
         ) {
-            DesktopFloatingHistoryButton(
-                icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                contentDescription = "Back",
-                enabled = historyActions.canGoBack && historyActions.onNavigateBack != null,
-                onClick = { historyActions.onNavigateBack?.invoke() },
-            )
-            DesktopFloatingHistoryButton(
-                icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = "Forward",
-                enabled = historyActions.canGoForward && historyActions.onNavigateForward != null,
-                onClick = { historyActions.onNavigateForward?.invoke() },
-            )
-        }
+            // Left: Back / Forward navigation buttons
+            Row(
+                modifier = Modifier.height(40.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DesktopFloatingHistoryButton(
+                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                    contentDescription = "Back",
+                    enabled = historyActions.canGoBack && historyActions.onNavigateBack != null,
+                    onClick = { historyActions.onNavigateBack?.invoke() },
+                )
+                DesktopFloatingHistoryButton(
+                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = "Forward",
+                    enabled = historyActions.canGoForward && historyActions.onNavigateForward != null,
+                    onClick = { historyActions.onNavigateForward?.invoke() },
+                )
+            }
 
-        // Center: Translucent Floating Search Pill + recent searches dropdown
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .widthIn(max = 460.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Center: Translucent Floating Search Pill + recent searches dropdown
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 460.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
             val pillShape = RoundedCornerShape(50)
             val pillBorderColor by animateColorAsState(
                 targetValue = if (isSearchFocused) tokens.colors.borderDefault else tokens.colors.borderSubtle,
@@ -1410,93 +1424,103 @@ internal fun DesktopFloatingTopBar(
                     },
                 )
             }
-        }
-
-        // Right: Fullscreen toggle + active Profile avatar pill
-        Column(
-            modifier = Modifier.align(Alignment.TopEnd),
-            horizontalAlignment = Alignment.End,
-        ) {
-            Row(
-                modifier = Modifier.height(40.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (isFullscreenActionSupported) {
-                    Surface(
-                        shape = CircleShape,
-                        color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
-                        border = BorderStroke(1.dp, tokens.colors.borderSubtle),
-                        modifier = Modifier
-                            .size(36.dp)
-                            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
-                    ) {
-                        FullscreenActionButton(
-                            buttonSize = 36.dp,
-                            iconSize = 18.dp,
-                            containerColor = Color.Transparent,
-                            contentColor = tokens.colors.textPrimary,
-                        )
-                    }
-                }
-
-                val profilePillShape = RoundedCornerShape(50)
-                Surface(
-                    onClick = { isProfileMenuOpen = !isProfileMenuOpen },
-                    shape = profilePillShape,
-                    color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isProfileMenuOpen) tokens.colors.borderDefault else tokens.colors.borderSubtle,
-                    ),
-                    modifier = Modifier
-                        .height(36.dp)
-                        .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(start = 5.dp, end = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        ActiveProfileMiniAvatar(
-                            profile = activeProfile,
-                            avatars = avatars,
-                            selected = false,
-                            size = 26,
-                        )
-                        Text(
-                            text = activeProfileName,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = tokens.colors.textPrimary,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
                 }
             }
 
-            if (isProfileMenuOpen) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = tokens.colors.surfacePopover.copy(alpha = 0.96f),
-                    border = BorderStroke(1.dp, tokens.colors.borderDefault),
-                    shadowElevation = tokens.elevation.overlay,
-                    modifier = Modifier.width(216.dp),
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Right: Fullscreen toggle + active Profile avatar pill
+            Box(
+                contentAlignment = Alignment.TopEnd,
+            ) {
+                Row(
+                    modifier = Modifier.height(40.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    SidebarProfileSwitcherStack(
-                        onProfileSelected = { profile ->
-                            isProfileMenuOpen = false
-                            onProfileSelected(profile)
-                        },
-                        onAddProfileRequested = {
-                            isProfileMenuOpen = false
-                            onAddProfileRequested()
-                        },
+                    if (isFullscreenActionSupported) {
+                        Surface(
+                            shape = CircleShape,
+                            color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
+                            border = BorderStroke(1.dp, tokens.colors.borderSubtle),
+                            modifier = Modifier
+                                .size(36.dp)
+                                .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+                        ) {
+                            FullscreenActionButton(
+                                buttonSize = 36.dp,
+                                iconSize = 18.dp,
+                                containerColor = Color.Transparent,
+                                contentColor = tokens.colors.textPrimary,
+                            )
+                        }
+                    }
+
+                    val profilePillShape = RoundedCornerShape(50)
+                    Surface(
+                        onClick = { isProfileMenuOpen = !isProfileMenuOpen },
+                        shape = profilePillShape,
+                        color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isProfileMenuOpen) tokens.colors.borderDefault else tokens.colors.borderSubtle,
+                        ),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 5.dp, end = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            ActiveProfileMiniAvatar(
+                                profile = activeProfile,
+                                avatars = avatars,
+                                selected = false,
+                                size = 26,
+                            )
+                            Text(
+                                text = activeProfileName,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = tokens.colors.textPrimary,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+
+                if (isProfileMenuOpen) {
+                    val popupOffsetY = with(LocalDensity.current) { 46.dp.roundToPx() }
+                    Popup(
+                        alignment = Alignment.TopEnd,
+                        offset = IntOffset(0, popupOffsetY),
+                        properties = PopupProperties(focusable = true),
                         onDismissRequest = { isProfileMenuOpen = false },
-                        modifier = Modifier.padding(6.dp),
-                    )
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = tokens.colors.surfacePopover.copy(alpha = 0.96f),
+                            border = BorderStroke(1.dp, tokens.colors.borderDefault),
+                            shadowElevation = tokens.elevation.overlay,
+                            modifier = Modifier.width(216.dp),
+                        ) {
+                            SidebarProfileSwitcherStack(
+                                onProfileSelected = { profile ->
+                                    isProfileMenuOpen = false
+                                    onProfileSelected(profile)
+                                },
+                                onAddProfileRequested = {
+                                    isProfileMenuOpen = false
+                                    onAddProfileRequested()
+                                },
+                                onDismissRequest = { isProfileMenuOpen = false },
+                                modifier = Modifier.padding(6.dp),
+                            )
+                        }
+                    }
                 }
             }
         }

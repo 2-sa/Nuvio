@@ -1427,14 +1427,18 @@ internal fun MainAppContent(
                     activateTab(target.tab)
                 }
                 if (navController.currentRoute != target.route) {
-                    while (navController.currentRoute !is TabsRoute && navController.popBackStack()) { }
-                    navController.navigate(target.route)
+                    if (navBackStack.contains(target.route)) {
+                        while (navController.currentRoute != target.route && navController.popBackStack()) { }
+                    } else {
+                        while (navController.currentRoute !is TabsRoute && navController.popBackStack()) { }
+                        navController.navigate(target.route)
+                    }
                 }
             }
         }
 
         fun performDesktopBack() {
-            if (navController.currentRoute is PlayerRoute) {
+            if (navController.currentRoute is PlayerRoute || navController.currentRoute is StreamRoute) {
                 navigateBack()
                 return
             }
@@ -1444,7 +1448,7 @@ internal fun MainAppContent(
         }
 
         fun performDesktopForward() {
-            if (navController.currentRoute is PlayerRoute) return
+            if (navController.currentRoute is PlayerRoute || navController.currentRoute is StreamRoute) return
             val target = desktopHistory.goForward() ?: return
             desktopHistoryVersion++
             applyDesktopHistoryEntry(target)
@@ -1472,7 +1476,12 @@ internal fun MainAppContent(
                     .fillMaxSize()
                     .background(MaterialTheme.nuvio.colors.background)
                     .onPreviewKeyEvent { keyEvent ->
-                        if (!isDesktop || keyEvent.type != KeyEventType.KeyDown || currentRoute is PlayerRoute) {
+                        if (
+                            !isDesktop ||
+                            keyEvent.type != KeyEventType.KeyDown ||
+                            currentRoute is PlayerRoute ||
+                            currentRoute is StreamRoute
+                        ) {
                             return@onPreviewKeyEvent false
                         }
                         if (keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed) {

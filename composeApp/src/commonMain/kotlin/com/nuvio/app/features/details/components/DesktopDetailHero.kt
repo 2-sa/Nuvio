@@ -94,6 +94,7 @@ import com.nuvio.app.core.ui.secondaryClick
 import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.formatRuntimeForDisplay
+import com.nuvio.app.features.home.components.normalizedPosterRating
 import com.nuvio.app.features.tmdb.originalTmdbImageUrl
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.detail_logo_content_description
@@ -704,8 +705,7 @@ private fun DesktopHeroMetaRow(meta: MetaDetails, showOverallRatings: Boolean) {
         desktopSeasonCountLabel(meta)?.let(::add)
         formatRuntimeForDisplay(meta.runtime)?.let(::add)
     }
-    val validImdbRating = meta.imdbRating
-        ?.takeIf { raw -> raw.toDoubleOrNull()?.let { it > 0.0 } == true }
+    val validImdbRating = normalizedPosterRating(meta.imdbRating)
     val ratingMedia = remember(meta) { meta.ratingReference() }
     val ratingState by rememberRatingState(ratingMedia)
     FlowRow(

@@ -618,9 +618,7 @@ private fun MetaPreview.previewMetadataLine(): String =
             ?.let(::formatReleaseDateForDisplay)
             ?.takeIf { it.isNotBlank() }
             ?.let(::add)
-        imdbRating
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
+        normalizedPosterRating(imdbRating)
             ?.let { add("IMDb $it") }
     }.joinToString(" • ")
 

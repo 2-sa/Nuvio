@@ -239,6 +239,7 @@ internal fun MainTabsDestination(
                 CompositionLocalProvider(
                     LocalNuvioBottomNavigationOverlayPadding provides if (useNativeBottomTabs) 49.dp else if (!isDesktop && !isTabletLayout && navBarStyleSetting != NavBarStyle.CLASSIC) 72.dp else 0.dp,
                     LocalNuvioNavBarScrollState provides navBarScrollState,
+                    LocalDesktopFloatingTopBarActive provides useDesktopSidebar,
                 ) {
                     AppTabHost(
                         selectedTab = selectedTab,
@@ -279,7 +280,11 @@ internal fun MainTabsDestination(
                     DesktopFloatingTopBar(
                         searchQuery = desktopGlobalSearchQuery,
                         onSearchQueryChange = { desktopGlobalSearchQuery = it },
-                        onTabSelected = onTabSelected,
+                        onTabSelected = { tab ->
+                            if (tab != selectedTab) {
+                                onTabSelected(tab)
+                            }
+                        },
                         onProfileSelected = onProfileSelected,
                         onAddProfileRequested = onAddProfileRequested,
                         startPadding = contentStartPadding,

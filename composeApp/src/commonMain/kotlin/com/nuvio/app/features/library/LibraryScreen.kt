@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.LocalDesktopFloatingTopBarActive
 import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
@@ -555,8 +556,8 @@ fun LibraryScreen(
                                     onRetry = retryLibraryLoad,
                                 )
                             } else {
-                                HomeEmptyStateCard(
-                                    modifier = Modifier.padding(horizontal = pageHorizontalPadding),
+                                CloudLibraryEmptyStateCard(
+                                    horizontalPadding = pageHorizontalPadding,
                                     title = when (uiState.sourceMode) {
                                         LibrarySourceMode.LOCAL -> stringResource(Res.string.library_load_failed)
                                         LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_load_failed)
@@ -574,8 +575,8 @@ fun LibraryScreen(
 
                     uiState.sections.isEmpty() -> {
                         item {
-                            HomeEmptyStateCard(
-                                modifier = Modifier.padding(horizontal = pageHorizontalPadding),
+                            CloudLibraryEmptyStateCard(
+                                horizontalPadding = pageHorizontalPadding,
                                 title = when (uiState.sourceMode) {
                                     LibrarySourceMode.LOCAL -> stringResource(Res.string.library_empty_title)
                                     LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_empty_title)
@@ -590,6 +591,8 @@ fun LibraryScreen(
                                     LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_empty_message)
                                     LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_empty_message)
                                 },
+                                actionLabel = null,
+                                onActionClick = null,
                             )
                         }
                     }
@@ -773,11 +776,13 @@ private fun DesktopLibraryToolbar(
                 if (onDownloadsClick != null) {
                     LibraryDownloadsButton(onClick = onDownloadsClick)
                 }
-                FullscreenActionButton(
-                    buttonSize = 40.dp,
-                    iconSize = 22.dp,
-                    contentColor = tokens.colors.textPrimary,
-                )
+                if (!LocalDesktopFloatingTopBarActive.current) {
+                    FullscreenActionButton(
+                        buttonSize = 40.dp,
+                        iconSize = 22.dp,
+                        contentColor = tokens.colors.textPrimary,
+                    )
+                }
             }
         }
 
@@ -900,8 +905,8 @@ private fun LazyListScope.cloudLibraryContent(
                 }
                 failedProviderStates.forEach { providerState ->
                     item(key = "cloud-error-${providerState.providerId}") {
-                        HomeEmptyStateCard(
-                            modifier = Modifier.padding(horizontal = horizontalPadding),
+                        CloudLibraryEmptyStateCard(
+                            horizontalPadding = horizontalPadding,
                             title = stringResource(Res.string.cloud_library_load_failed, providerState.providerName),
                             message = providerState.errorMessage.orEmpty(),
                             actionLabel = stringResource(Res.string.action_retry),
@@ -914,8 +919,8 @@ private fun LazyListScope.cloudLibraryContent(
                     cloudLibrarySkeletonItems(horizontalPadding = horizontalPadding)
                 } else if (filteredItems.isEmpty() && failedProviderStates.isEmpty()) {
                     item {
-                        HomeEmptyStateCard(
-                            modifier = Modifier.padding(horizontal = horizontalPadding),
+                        CloudLibraryEmptyStateCard(
+                            horizontalPadding = horizontalPadding,
                             title = stringResource(
                                 if (hasActiveFilter) {
                                     Res.string.cloud_library_no_matches_title

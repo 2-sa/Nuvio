@@ -84,6 +84,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.nuvio.app.LocalDesktopFloatingTopBarActive
 import com.nuvio.app.isDesktop
 import com.nuvio.app.core.ui.FullscreenActionButton
 import com.nuvio.app.core.ui.DesktopBackdropVerticalBias
@@ -700,7 +701,7 @@ private fun DesktopHomeHeroFrame(
                 )
             }
 
-            if (isFullscreenActionSupported) {
+            if (isFullscreenActionSupported && !LocalDesktopFloatingTopBarActive.current) {
                 FullscreenActionButton(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
