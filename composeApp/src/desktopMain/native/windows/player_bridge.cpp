@@ -1778,6 +1778,9 @@ private:
                 setMpvOptionStringLocked("vf", appliedVideoFilter.c_str());
             }
             setMpvOptionStringLocked("target-colorspace-hint", "yes");
+            // Browsers color-manage SDR video with the monitor's ICC profile; mpv does not unless
+            // asked, so on wide-gamut displays SDR video looked over-saturated and too dark.
+            setMpvOptionStringLocked("icc-profile-auto", "yes");
             if (decoderPriority == 0) {
                 setMpvOptionStringLocked("vd-lavc-software-fallback", "no");
             } else if (decoderPriority == 2) {
