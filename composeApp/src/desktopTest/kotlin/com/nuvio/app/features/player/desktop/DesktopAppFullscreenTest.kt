@@ -61,4 +61,34 @@ class DesktopAppFullscreenTest {
             updates,
         )
     }
+
+    @Test
+    fun `windows fullscreen exit from maximized restores MAXIMIZED_BOTH directly without NORMAL bounce`() {
+        val extendedStates = mutableListOf<Int>()
+        val placements = mutableListOf<WindowPlacement>()
+
+        applyWindowsFullscreenExit(
+            wasMaximized = true,
+            setExtendedState = { extendedStates += it },
+            setStatePlacement = { placements += it },
+        )
+
+        assertEquals(listOf(java.awt.Frame.MAXIMIZED_BOTH), extendedStates)
+        assertEquals(listOf(WindowPlacement.Maximized), placements)
+    }
+
+    @Test
+    fun `windows fullscreen exit from floating restores NORMAL and Floating`() {
+        val extendedStates = mutableListOf<Int>()
+        val placements = mutableListOf<WindowPlacement>()
+
+        applyWindowsFullscreenExit(
+            wasMaximized = false,
+            setExtendedState = { extendedStates += it },
+            setStatePlacement = { placements += it },
+        )
+
+        assertEquals(listOf(java.awt.Frame.NORMAL), extendedStates)
+        assertEquals(listOf(WindowPlacement.Floating), placements)
+    }
 }

@@ -226,14 +226,11 @@ internal class DesktopAppFullscreenController {
         windowsFullscreenState = null
 
         if (window is Frame) {
-            if (wasMaximized) {
-                window.extendedState = Frame.NORMAL
-                window.extendedState = Frame.MAXIMIZED_BOTH
-                windowState?.placement = WindowPlacement.Maximized
-            } else {
-                window.extendedState = Frame.NORMAL
-                windowState?.placement = WindowPlacement.Floating
-            }
+            applyWindowsFullscreenExit(
+                wasMaximized = wasMaximized,
+                setExtendedState = { window.extendedState = it },
+                setStatePlacement = { windowState?.placement = it },
+            )
             window.revalidate()
             window.repaint()
         }
@@ -266,6 +263,20 @@ internal fun applyMacosComposeFullscreenExit(
         ?: WindowPlacement.Floating
     clearComposeFullscreen()
     setStatePlacement(targetPlacement)
+}
+
+internal fun applyWindowsFullscreenExit(
+    wasMaximized: Boolean,
+    setExtendedState: (Int) -> Unit,
+    setStatePlacement: (WindowPlacement) -> Unit,
+) {
+    if (wasMaximized) {
+        setExtendedState(Frame.MAXIMIZED_BOTH)
+        setStatePlacement(WindowPlacement.Maximized)
+    } else {
+        setExtendedState(Frame.NORMAL)
+        setStatePlacement(WindowPlacement.Floating)
+    }
 }
 
 internal fun installDesktopAppFullscreenShortcuts(window: Window): () -> Unit {
