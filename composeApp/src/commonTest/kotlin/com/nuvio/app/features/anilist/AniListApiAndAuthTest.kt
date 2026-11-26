@@ -166,4 +166,76 @@ class AniListApiAndAuthTest {
         assertEquals(400, error.status)
         assertEquals("Invalid token", error.message)
     }
+
+    @Test
+    fun `selectAniListContinueWatchingEntries keeps only active unfinished series sorted by updatedAt`() {
+        val entries = listOf(
+            AniListMediaEntry(
+                mediaId = 1,
+                titleRomaji = "Completed Show",
+                format = "TV",
+                episodes = 12,
+                userStatus = AniListListStatus.COMPLETED,
+                progress = 12,
+                updatedAtSeconds = 500L,
+            ),
+            AniListMediaEntry(
+                mediaId = 2,
+                titleRomaji = "Paused Show",
+                format = "TV",
+                episodes = 24,
+                userStatus = AniListListStatus.PAUSED,
+                progress = 5,
+                updatedAtSeconds = 400L,
+            ),
+            AniListMediaEntry(
+                mediaId = 3,
+                titleRomaji = "Dropped Show",
+                format = "TV",
+                episodes = 24,
+                userStatus = AniListListStatus.DROPPED,
+                progress = 3,
+                updatedAtSeconds = 300L,
+            ),
+            AniListMediaEntry(
+                mediaId = 4,
+                titleRomaji = "Finished Count Current",
+                format = "TV",
+                episodes = 12,
+                userStatus = AniListListStatus.CURRENT,
+                progress = 12,
+                updatedAtSeconds = 600L,
+            ),
+            AniListMediaEntry(
+                mediaId = 5,
+                titleRomaji = "Movie Current",
+                format = "MOVIE",
+                episodes = 1,
+                userStatus = AniListListStatus.CURRENT,
+                progress = 1,
+                updatedAtSeconds = 700L,
+            ),
+            AniListMediaEntry(
+                mediaId = 6,
+                titleRomaji = "Active Watching Older",
+                format = "TV",
+                episodes = 24,
+                userStatus = AniListListStatus.CURRENT,
+                progress = 5,
+                updatedAtSeconds = 100L,
+            ),
+            AniListMediaEntry(
+                mediaId = 7,
+                titleRomaji = "Active Repeating Newer",
+                format = "TV",
+                episodes = 12,
+                userStatus = AniListListStatus.REPEATING,
+                progress = 2,
+                updatedAtSeconds = 250L,
+            ),
+        )
+
+        val selected = selectAniListContinueWatchingEntries(entries)
+        assertEquals(listOf(7, 6), selected.map { it.mediaId })
+    }
 }

@@ -31,6 +31,7 @@ import com.nuvio.app.features.tracking.TrackingWatchedProvider
 import com.nuvio.app.features.tracking.buildTrackingMediaReference
 import com.nuvio.app.features.tracking.parseTrackingExternalIds
 import com.nuvio.app.features.watched.WatchedItem
+import com.nuvio.app.features.watched.watchedItemKeys
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import kotlin.time.Clock
@@ -459,24 +460,19 @@ object AniListTracker : TrackingAuthProvider {
             val entries = _syncState.value.snapshot?.entries.orEmpty()
             val watched = mutableListOf<WatchedItem>()
             for (entry in entries) {
+                if (entry.userStatus != AniListListStatus.CURRENT &&
+                    entry.userStatus != AniListListStatus.REPEATING
+                ) {
+                    continue
+                }
+                if (entry.episodes != null && entry.progress >= entry.episodes) {
+                    continue
+                }
                 val itemId = "anilist:${entry.mediaId}"
                 val title = entry.displayTitle()
                 val markedAt = entry.updatedAtSeconds * 1000L
                 val isMovie = entry.format.equals("MOVIE", ignoreCase = true)
-                if (isMovie) {
-                    if (entry.userStatus == AniListListStatus.COMPLETED || entry.progress > 0) {
-                        watched += WatchedItem(
-                            id = itemId,
-                            type = "movie",
-                            name = title,
-                            poster = entry.coverImageUrl,
-                            releaseInfo = entry.seasonYear?.toString(),
-                            trackingProviderId = TrackingProviderId.ANILIST.storageId,
-                            trackingProviderItemId = entry.mediaId.toString(),
-                            markedAtEpochMs = markedAt,
-                        )
-                    }
-                } else if (entry.progress > 0) {
+                if (!isMovie && entry.progress > 0) {
                     val maxEpisode = minOf(entry.progress, 2000)
                     for (ep in 1..maxEpisode) {
                         watched += WatchedItem(
@@ -496,6 +492,31 @@ object AniListTracker : TrackingAuthProvider {
                 }
             }
             return watched
+        }
+
+        override suspend fun pullFullyWatchedSeriesKeys(profileId: Int): Set<String>? {
+            if (profileId != activeProfile.value) return emptySet()
+            val entries = _syncState.value.snapshot?.entries.orEmpty()
+            return entries
+                .asSequence()
+                .filter { it.userStatus == AniListListStatus.COMPLETED && !it.format.equals("MOVIE", ignoreCase = true) }
+                .flatMap { entry ->
+                    watchedItemKeys(type = "series", id = "anilist:${entry.mediaId}").asSequence()
+                }
+                .toSet()
+        }
+
+        override suspend fun pullExtraWatchedKeys(profileId: Int): Set<String> {
+            if (profileId != activeProfile.value) return emptySet()
+            val entries = _syncState.value.snapshot?.entries.orEmpty()
+            return entries
+                .asSequence()
+                .filter { it.userStatus == AniListListStatus.COMPLETED }
+                .flatMap { entry ->
+                    val type = if (entry.format.equals("MOVIE", ignoreCase = true)) "movie" else "series"
+                    watchedItemKeys(type = type, id = "anilist:${entry.mediaId}").asSequence()
+                }
+                .toSet()
         }
 
         override suspend fun push(profileId: Int, items: Collection<WatchedItem>) {
@@ -580,12 +601,7 @@ object AniListTracker : TrackingAuthProvider {
 
         override fun snapshot(): TrackingProgressSnapshot {
             val uiState = _syncState.value
-            val entries = uiState.snapshot?.entries.orEmpty()
-                .filter { entry ->
-                    !entry.format.equals("MOVIE", ignoreCase = true) &&
-                        entry.progress > 0 &&
-                        (entry.userStatus == AniListListStatus.CURRENT || entry.userStatus == AniListListStatus.REPEATING)
-                }
+            val entries = selectAniListContinueWatchingEntries(uiState.snapshot?.entries.orEmpty())
                 .map { entry ->
                     val contentId = "anilist:${entry.mediaId}"
                     val ep = entry.progress
@@ -888,3 +904,17 @@ private fun AniListMediaEntry.toLibraryItem(): LibraryItem {
         savedAtEpochMs = updatedAtSeconds * 1000L,
     )
 }
+
+internal fun selectAniListContinueWatchingEntries(
+    entries: List<AniListMediaEntry>,
+): List<AniListMediaEntry> =
+    entries
+        .asSequence()
+        .filter { entry ->
+            !entry.format.equals("MOVIE", ignoreCase = true) &&
+                entry.progress > 0 &&
+                (entry.userStatus == AniListListStatus.CURRENT || entry.userStatus == AniListListStatus.REPEATING) &&
+                (entry.episodes == null || entry.progress < entry.episodes)
+        }
+        .sortedByDescending { it.updatedAtSeconds }
+        .toList()
