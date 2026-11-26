@@ -43,4 +43,7 @@ object TrackingSettingsRepository {
 
     fun setRatingSource(source: TrackingProviderId?) =
         TraktSettingsRepository.setRatingSource(source)
+
+    fun setUseAniListForAnime(enabled: Boolean) =
+        TraktSettingsRepository.setUseAniListForAnime(enabled)
 }

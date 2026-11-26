@@ -61,6 +61,7 @@ data class TraktSettingsUiState(
     val moreLikeThisSource: MoreLikeThisSourcePreference = DEFAULT_MORE_LIKE_THIS_SOURCE,
     val simklAnimeIdPreference: SimklAnimeIdPreference = DEFAULT_SIMKL_ANIME_ID_PREFERENCE,
     val ratingSource: TrackingProviderId? = null,
+    val useAniListForAnime: Boolean = false,
 )
 
 @Serializable
@@ -71,6 +72,7 @@ private data class StoredTraktSettings(
     val moreLikeThisSource: String? = null,
     val simklAnimeIdPreference: String? = null,
     val ratingSource: String? = null,
+    val useAniListForAnime: Boolean = false,
 )
 
 object TraktSettingsRepository {
@@ -154,6 +156,13 @@ object TraktSettingsRepository {
         persist()
     }
 
+    fun setUseAniListForAnime(enabled: Boolean) {
+        ensureLoaded()
+        if (_uiState.value.useAniListForAnime == enabled) return
+        _uiState.value = _uiState.value.copy(useAniListForAnime = enabled)
+        persist()
+    }
+
     private fun loadFromDisk() {
         hasLoaded = true
 
@@ -175,6 +184,7 @@ object TraktSettingsRepository {
                 moreLikeThisSource = MoreLikeThisSourcePreference.fromStorage(stored.moreLikeThisSource),
                 simklAnimeIdPreference = SimklAnimeIdPreference.fromStorage(stored.simklAnimeIdPreference),
                 ratingSource = TrackingProviderId.fromStorage(stored.ratingSource),
+                useAniListForAnime = stored.useAniListForAnime,
             )
         } else {
             TraktSettingsUiState()
@@ -191,6 +201,7 @@ object TraktSettingsRepository {
                     moreLikeThisSource = state.moreLikeThisSource.name,
                     simklAnimeIdPreference = state.simklAnimeIdPreference.name,
                     ratingSource = state.ratingSource?.storageId,
+                    useAniListForAnime = state.useAniListForAnime,
                 ),
             ),
         )
