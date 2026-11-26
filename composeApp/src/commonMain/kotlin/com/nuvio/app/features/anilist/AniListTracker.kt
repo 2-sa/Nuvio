@@ -41,12 +41,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -235,6 +238,20 @@ object AniListTracker : TrackingAuthProvider {
         _syncState.value = _syncState.value.copy(isLoading = true, error = null)
         try {
             val entries = apiClient.fetchAnimeLibrary(token, user.id)
+            if (activeProfile.value != profileId) return
+            val activeSeries = selectAniListContinueWatchingEntries(entries)
+            if (activeSeries.isNotEmpty()) {
+                val semaphore = Semaphore(4)
+                coroutineScope {
+                    for (entry in activeSeries) {
+                        launch {
+                            semaphore.withPermit {
+                                AniListEpisodeMapper.resolveAddonEpisodes("anilist:${entry.mediaId}")
+                            }
+                        }
+                    }
+                }
+            }
             if (activeProfile.value != profileId) return
             val snapshot = AniListSyncSnapshot(
                 user = user,
@@ -473,17 +490,18 @@ object AniListTracker : TrackingAuthProvider {
                 val markedAt = entry.updatedAtSeconds * 1000L
                 val isMovie = entry.format.equals("MOVIE", ignoreCase = true)
                 if (!isMovie && entry.progress > 0) {
-                    val maxEpisode = minOf(entry.progress, 2000)
-                    for (ep in 1..maxEpisode) {
+                    val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes(itemId)
+                    val mappedEpisodes = mapAbsoluteProgressToWatchedEpisodes(entry.progress, addonEpisodes)
+                    for (ref in mappedEpisodes) {
                         watched += WatchedItem(
                             id = itemId,
                             type = "series",
                             name = title,
                             poster = entry.coverImageUrl,
                             releaseInfo = entry.seasonYear?.toString(),
-                            season = 1,
-                            episode = ep,
-                            videoId = "$itemId:1:$ep",
+                            season = ref.season,
+                            episode = ref.episode,
+                            videoId = ref.videoId ?: "$itemId:${ref.season}:${ref.episode}",
                             trackingProviderId = TrackingProviderId.ANILIST.storageId,
                             trackingProviderItemId = entry.mediaId.toString(),
                             markedAtEpochMs = markedAt,
@@ -534,10 +552,16 @@ object AniListTracker : TrackingAuthProvider {
                 val mediaId = resolveMediaId(token, ref) ?: continue
                 val existing = findEntryForReference(ref)
                 val isMovie = item.episode == null && item.type.equals("movie", ignoreCase = true)
+                val absoluteEpisode = if (!isMovie && item.episode != null) {
+                    val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes("anilist:$mediaId")
+                    mapSeasonEpisodeToAbsolute(item.season ?: 1, item.episode, addonEpisodes)
+                } else {
+                    null
+                }
                 val newProgress = if (isMovie) {
                     existing?.episodes ?: 1
                 } else {
-                    maxOf(existing?.progress ?: 0, item.episode ?: 1)
+                    maxOf(existing?.progress ?: 0, absoluteEpisode ?: 1)
                 }
                 val newStatus = when {
                     isMovie -> AniListListStatus.COMPLETED
@@ -569,12 +593,18 @@ object AniListTracker : TrackingAuthProvider {
                 )
                 val existing = findEntryForReference(ref) ?: continue
                 val ep = item.episode
-                if (ep == null || ep <= 1) {
+                val absoluteEp = if (ep != null) {
+                    val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes("anilist:${existing.mediaId}")
+                    mapSeasonEpisodeToAbsolute(item.season ?: 1, ep, addonEpisodes)
+                } else {
+                    null
+                }
+                if (absoluteEp == null || absoluteEp <= 1) {
                     if (existing.entryId > 0 && apiClient.deleteMediaListEntry(token, existing.entryId)) {
                         removeLocalEntry(profileId, existing.mediaId)
                     }
                 } else {
-                    val newProgress = (ep - 1).coerceAtLeast(0)
+                    val newProgress = (absoluteEp - 1).coerceAtLeast(0)
                     val saved = apiClient.saveMediaListEntry(
                         accessToken = token,
                         mediaId = existing.mediaId,
@@ -604,16 +634,17 @@ object AniListTracker : TrackingAuthProvider {
             val entries = selectAniListContinueWatchingEntries(uiState.snapshot?.entries.orEmpty())
                 .map { entry ->
                     val contentId = "anilist:${entry.mediaId}"
-                    val ep = entry.progress
+                    val cachedEpisodes = AniListEpisodeMapper.getCached(contentId)
+                    val mapped = mapAbsoluteEpisodeToSeasonEpisode(entry.progress, cachedEpisodes)
                     WatchProgressEntry(
                         contentType = "series",
                         parentMetaId = contentId,
                         parentMetaType = "series",
-                        videoId = buildPlaybackVideoId(contentId, 1, ep),
+                        videoId = mapped.videoId ?: buildPlaybackVideoId(contentId, mapped.season, mapped.episode),
                         title = entry.displayTitle(),
                         poster = entry.coverImageUrl,
-                        seasonNumber = 1,
-                        episodeNumber = ep,
+                        seasonNumber = mapped.season,
+                        episodeNumber = mapped.episode,
                         lastPositionMs = 0L,
                         durationMs = (entry.duration ?: 24) * 60_000L,
                         lastUpdatedEpochMs = entry.updatedAtSeconds * 1000L,
@@ -663,8 +694,14 @@ object AniListTracker : TrackingAuthProvider {
                 }
                 val existing = findEntryForReference(item.media)
                 val episodeNum = item.media.episode?.number
-                val newProgress = if (episodeNum != null) {
-                    maxOf(existing?.progress ?: 0, episodeNum)
+                val absoluteEp = if (episodeNum != null) {
+                    val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes("anilist:$mediaId")
+                    mapSeasonEpisodeToAbsolute(item.media.episode?.season ?: 1, episodeNum, addonEpisodes)
+                } else {
+                    null
+                }
+                val newProgress = if (absoluteEp != null) {
+                    maxOf(existing?.progress ?: 0, absoluteEp)
                 } else {
                     existing?.episodes ?: 1
                 }
@@ -699,7 +736,13 @@ object AniListTracker : TrackingAuthProvider {
                     continue
                 }
                 val ep = media.episode?.number
-                if (ep == null || ep <= 1) {
+                val absoluteEp = if (ep != null) {
+                    val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes("anilist:${existing.mediaId}")
+                    mapSeasonEpisodeToAbsolute(media.episode?.season ?: 1, ep, addonEpisodes)
+                } else {
+                    null
+                }
+                if (absoluteEp == null || absoluteEp <= 1) {
                     if (existing.entryId > 0 && apiClient.deleteMediaListEntry(token, existing.entryId)) {
                         removeLocalEntry(profileId, existing.mediaId)
                     }
@@ -707,7 +750,7 @@ object AniListTracker : TrackingAuthProvider {
                     val saved = apiClient.saveMediaListEntry(
                         accessToken = token,
                         mediaId = existing.mediaId,
-                        progress = (ep - 1).coerceAtLeast(0),
+                        progress = (absoluteEp - 1).coerceAtLeast(0),
                     )
                     if (saved != null) upsertLocalEntry(profileId, saved)
                 }
@@ -725,8 +768,14 @@ object AniListTracker : TrackingAuthProvider {
             val mediaId = resolveMediaId(token, event.media) ?: return
             val existing = findEntryForReference(event.media)
             val episodeNum = event.media.episode?.number
-            val newProgress = if (episodeNum != null) {
-                maxOf(existing?.progress ?: 0, episodeNum)
+            val absoluteEp = if (episodeNum != null) {
+                val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes("anilist:$mediaId")
+                mapSeasonEpisodeToAbsolute(event.media.episode?.season ?: 1, episodeNum, addonEpisodes)
+            } else {
+                null
+            }
+            val newProgress = if (absoluteEp != null) {
+                maxOf(existing?.progress ?: 0, absoluteEp)
             } else {
                 existing?.episodes ?: 1
             }
