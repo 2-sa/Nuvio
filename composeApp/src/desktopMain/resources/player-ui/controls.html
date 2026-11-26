@@ -36,6 +36,9 @@
       <path d="M6 6L18 18" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"/>
       <path d="M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"/>
     </symbol>
+    <symbol id="icon-back" viewBox="0 0 24 24">
+      <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+    </symbol>
     <symbol id="icon-pip" viewBox="0 0 24 24">
       <path d="M19 11h-8v6h8v-6zm4-8H1c-.55 0-1 .45-1 1v16c0 .55.45 1 1 1h22c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zm-2 16H3V6h18v13z" fill="currentColor"/>
     </symbol>
@@ -161,13 +164,12 @@
     </section>
     <div class="content">
       <header class="header">
+        <div class="header-start">
+          <button class="header-button header-back-button" id="backButton" data-command="back" aria-label="Back" title="Back"><svg><use href="#icon-back"></use></svg></button>
+          <span class="header-title" id="headerTitle"></span>
+        </div>
         <nav class="header-actions" aria-label="Player actions">
-          <button class="header-button" id="submitIntroButton" data-command="submitIntro" aria-label="Submit intro" title="Submit intro"><svg><use href="#icon-flag"></use></svg></button>
-          <button class="header-button" id="partyButton" type="button" aria-label="Watch party" title="Watch party" hidden><svg><use href="#icon-party"></use></svg></button>
-          <button class="header-button" id="videoSettingsButton" data-command="videoSettings" aria-label="Video settings" title="Video settings"><svg><use href="#icon-build"></use></svg></button>
-          <button class="header-button" id="pipButton" data-command="pictureInPicture" aria-label=""><svg><use href="#icon-pip"></use></svg></button>
           <button class="header-button" id="fullscreenButton" data-command="toggleFullscreen" aria-label="Enter fullscreen" title="Enter fullscreen"><svg><use id="fullscreenIcon" href="#icon-fullscreen"></use></svg></button>
-          <button class="header-button" id="backButton" data-command="back" aria-label="Close player" title="Close player"><svg><use href="#icon-close"></use></svg></button>
         </nav>
       </header>
 
@@ -279,6 +281,10 @@
             <button class="action optional" id="sourcesButton" data-command="sources" title="Sources"><svg><use href="#icon-source"></use></svg><span id="sourcesLabel">Sources</span></button>
             <button class="action optional" id="episodesButton" data-command="episodes" title="Episodes"><svg><use href="#icon-episodes"></use></svg><span id="episodesLabel">Episodes</span></button>
             <button class="action optional" id="chaptersButton" data-command="chapters" title="Chapters" hidden><svg><use href="#icon-chapters"></use></svg><span id="chaptersLabel">Chapters</span></button>
+            <button class="action optional" id="partyButton" type="button" aria-label="Watch party" title="Watch party" hidden><svg><use href="#icon-party"></use></svg></button>
+            <button class="action optional" id="pipButton" data-command="pictureInPicture" aria-label=""><svg><use href="#icon-pip"></use></svg></button>
+            <button class="action optional" id="videoSettingsButton" data-command="videoSettings" aria-label="Video settings" title="Video settings"><svg><use href="#icon-build"></use></svg></button>
+            <button class="action optional" id="submitIntroButton" data-command="submitIntro" aria-label="Submit intro" title="Submit intro"><svg><use href="#icon-flag"></use></svg></button>
           </div>
         </div>
       </section>

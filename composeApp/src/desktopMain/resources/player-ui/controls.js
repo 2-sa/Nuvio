@@ -35,6 +35,7 @@ const pipButton = document.getElementById("pipButton");
 const fullscreenIcon = document.getElementById("fullscreenIcon");
 const title = document.getElementById("title");
 const episode = document.getElementById("episode");
+const headerTitle = document.getElementById("headerTitle");
 const playbackMetadata = document.querySelector(".metadata");
 const progressSection = document.querySelector(".progress");
 const playbackMetaRow = document.querySelector(".meta-row");
@@ -495,6 +496,7 @@ const chromeInteractionSelector = [
   "textarea",
   "select",
   "[contenteditable='true']",
+  ".header-start",
   ".header-actions",
   ".center-controls",
   ".progress",
@@ -1130,9 +1132,10 @@ const popoverConfigByName = {
   party: {
     modal: partyModal,
     panel: partyModal ? partyModal.querySelector(".track-panel") : null,
-    placement: "below",
+    placement: "above",
     preferredMaxHeight: 540,
     getAnchor: resolvePartyPopoverAnchor,
+    getPlacement: anchor => (anchor && anchor.id === "partyPill" ? "below" : "above"),
   },
 };
 
@@ -1238,6 +1241,7 @@ const positionActivePopover = () => {
   const anchorRect = anchor && !anchor.hidden ? relativeRect(anchor, originLeft, originTop) : null;
   const seekWrapRect = seekWrap ? relativeRect(seekWrap, originLeft, originTop) : null;
   const headerRect = playerHeader ? relativeRect(playerHeader, originLeft, originTop) : null;
+  const placement = typeof config.getPlacement === "function" ? config.getPlacement(anchor) : config.placement;
 
   const layout = computePopoverLayout({
     viewportWidth,
@@ -1246,7 +1250,7 @@ const positionActivePopover = () => {
     anchorRect,
     seekWrapRect,
     headerRect,
-    placement: config.placement,
+    placement,
     preferredMaxHeight: config.preferredMaxHeight,
   });
 
@@ -3140,6 +3144,14 @@ const renderChrome = () => {
 
   setTextContent(title, state.title || "");
   setText(episode, state.episodeText);
+  if (headerTitle) {
+    const titleText = String(state.title || "").trim();
+    const episodeText = String(state.episodeText || "").trim();
+    const nextHeaderTitle = titleText && episodeText ? `${titleText} - ${episodeText}` : (titleText || "");
+    if (headerTitle.textContent !== nextHeaderTitle) {
+      headerTitle.textContent = nextHeaderTitle;
+    }
+  }
   setText(streamTitle, state.streamTitle);
   setText(providerName, state.providerName);
   renderPlayerBadges();

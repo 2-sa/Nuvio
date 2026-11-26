@@ -162,4 +162,58 @@ class PlayerBottomBarLayoutTest {
             "isControlsSurfaceEvent must treat .seek-row, .action-row, and .action-group as controls surfaces",
         )
     }
+
+    @Test
+    fun `header places back chevron and title on start and keeps fullscreen clean on end`() {
+        val html = loadPlayerUiResource("controls.html")
+        val css = loadPlayerUiResource("controls.css")
+
+        val headerStartIdx = html.indexOf("""<header class="header">""")
+        val headerEndIdx = html.indexOf("</header>", headerStartIdx)
+        assertTrue(headerStartIdx >= 0, "Expected <header class=\"header\"> in controls.html")
+        assertTrue(headerEndIdx > headerStartIdx, "Expected closing </header> in controls.html")
+
+        val headerHtml = html.substring(headerStartIdx, headerEndIdx)
+        val headerActionsIdx = headerHtml.indexOf("""<nav class="header-actions"""")
+        assertTrue(headerActionsIdx >= 0, "Expected <nav class=\"header-actions\"> inside <header>")
+
+        val headerStartHtml = headerHtml.substring(0, headerActionsIdx)
+        val headerActionsHtml = headerHtml.substring(headerActionsIdx)
+
+        assertInOrder(
+            headerStartHtml,
+            listOf(
+                """<div class="header-start">""",
+                """id="backButton"""",
+                """data-command="back"""",
+                """id="headerTitle"""",
+            ),
+            "header-start",
+        )
+
+        assertTrue(headerActionsHtml.contains("""id="fullscreenButton""""), "header-actions must contain #fullscreenButton")
+        assertFalse(headerActionsHtml.contains("""id="pipButton""""), "header-actions must not contain #pipButton")
+        assertFalse(headerActionsHtml.contains("""id="partyButton""""), "header-actions must not contain #partyButton")
+        assertFalse(headerActionsHtml.contains("""id="videoSettingsButton""""), "header-actions must not contain #videoSettingsButton")
+        assertFalse(headerActionsHtml.contains("""id="submitIntroButton""""), "header-actions must not contain #submitIntroButton")
+        assertFalse(headerActionsHtml.contains("#icon-close"), "header-actions must not contain #icon-close")
+
+        val endGroupIdx = html.indexOf("""<div class="action-group action-group-end">""")
+        val progressEndIdx = html.indexOf("</section>", endGroupIdx)
+        assertTrue(endGroupIdx >= 0 && progressEndIdx > endGroupIdx, "Expected .action-group-end container")
+        val endGroupHtml = html.substring(endGroupIdx, progressEndIdx)
+
+        assertTrue(endGroupHtml.contains("""id="partyButton""""), "action-group-end must contain #partyButton")
+        assertTrue(endGroupHtml.contains("""id="pipButton""""), "action-group-end must contain #pipButton")
+        assertTrue(endGroupHtml.contains("""id="videoSettingsButton""""), "action-group-end must contain #videoSettingsButton")
+        assertTrue(endGroupHtml.contains("""id="submitIntroButton""""), "action-group-end must contain #submitIntroButton")
+
+        val headerCssIdx = css.indexOf(".header {")
+        assertTrue(headerCssIdx >= 0, "Expected .header CSS rule in controls.css")
+        val headerCssBlock = css.substring(headerCssIdx, css.indexOf("}", headerCssIdx))
+        assertTrue(
+            headerCssBlock.contains("justify-content: space-between"),
+            ".header CSS rule must use justify-content: space-between",
+        )
+    }
 }

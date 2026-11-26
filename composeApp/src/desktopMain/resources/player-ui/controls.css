@@ -165,6 +165,7 @@ button:disabled {
 .parental-guide,
 .skip-prompt,
 .next-episode-card,
+.header-start,
 .header-actions,
 .center-controls,
 .progress {
@@ -177,6 +178,7 @@ button:disabled {
 .player.native-resizing .parental-guide,
 .player.native-resizing .skip-prompt,
 .player.native-resizing .next-episode-card,
+.player.native-resizing .header-start,
 .player.native-resizing .header-actions,
 .player.native-resizing .center-controls,
 .player.native-resizing .progress,
@@ -187,6 +189,7 @@ button:disabled {
 }
 
 /* The open panel's scrim covers these buttons: they would look active but every click lands on the scrim. */
+.player.modal-open:not(.popover-open) .header-start,
 .player.modal-open:not(.popover-open) .header-actions,
 .player.modal-open .metadata {
   opacity: 0;
@@ -214,6 +217,7 @@ button:disabled {
 .player.chrome-hidden .top-gradient,
 .player.chrome-hidden .bottom-gradient,
 .player.chrome-hidden .metadata,
+.player.chrome-hidden .header-start,
 .player.chrome-hidden .header-actions,
 .player.chrome-hidden .center-controls,
 .player.chrome-hidden .progress,
@@ -229,6 +233,7 @@ button:disabled {
 .player.opening-active .pause-metadata-overlay,
 .player.opening-active .skip-prompt,
 .player.opening-active .next-episode-card,
+.player.opening-active .header-start,
 .player.opening-active .content {
   visibility: hidden;
   opacity: 0;
@@ -243,6 +248,7 @@ button:disabled {
 .player.error-active .pause-metadata-overlay,
 .player.error-active .skip-prompt,
 .player.error-active .next-episode-card,
+.player.error-active .header-start,
 .player.error-active .header-actions,
 .player.error-active .center-controls,
 .player.error-active .progress,
@@ -418,9 +424,31 @@ button:disabled {
   left: var(--hp);
   right: var(--hp);
   display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
+  justify-content: space-between;
+  align-items: center;
   gap: 18px;
+}
+
+.header-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: min(72vw, 760px);
+}
+
+.header-back-button {
+  flex: 0 0 auto;
+}
+
+.header-title {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .65);
 }
 
 .metadata {
@@ -912,6 +940,10 @@ button:disabled {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 0 0 2px var(--theme-selected-ring);
 }
 
+.action.party-active {
+  color: var(--theme-accent);
+}
+
 .header-button.popover-active:hover,
 .action.popover-active:hover {
   background: var(--theme-selected-surface-hover);
@@ -929,7 +961,11 @@ button:disabled {
 }
 
 .player.pip-mode .header-button:not(#pipButton),
+.player.pip-mode .header-start,
 .player.pip-mode .metadata,
+.player.pip-mode #partyButton,
+.player.pip-mode [data-command="videoSettings"],
+.player.pip-mode [data-command="submitIntro"],
 .player.pip-mode [data-command="resize"],
 .player.pip-mode [data-command="speed"],
 .player.pip-mode [data-command="sources"],
@@ -942,6 +978,10 @@ button:disabled {
 .player.pip-mode .parental-guide,
 .player.pip-mode .opening-overlay {
   display: none !important;
+}
+
+.player.pip-mode #pipButton {
+  display: grid !important;
 }
 
 .player.pip-mode .header {
@@ -2046,6 +2086,11 @@ button:disabled {
   .action.focused.popover-active {
     background: var(--theme-selected-surface);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 0 0 2px var(--theme-selected-ring);
+  }
+
+  .action.party-active,
+  .action.focused.party-active {
+    color: var(--theme-accent);
   }
 
   .action.popover-active:hover,
@@ -3476,6 +3521,7 @@ button.action:focus-visible {
   .top-gradient,
   .bottom-gradient,
   .metadata,
+  .header-start,
   .header-actions,
   .center-controls,
   .center-status,
