@@ -2800,4 +2800,22 @@
     <string name="library_anilist_empty_title">Your AniList library is empty</string>
     <string name="library_anilist_empty_message">Add anime to your AniList lists to see them here.</string>
     <string name="tracking_source_anilist">AniList</string>
+    <string name="settings_anilist_title">AniList</string>
+    <string name="settings_anilist_connected_as">Connected as @%1$s</string>
+    <string name="settings_anilist_description">Connect AniList to sync your anime lists, episode progress, ratings, and scrobbles.</string>
+    <string name="settings_anilist_connected_description">Syncs your anime library, episode progress, ratings, and scrobbles with AniList.</string>
+    <string name="settings_anilist_client_id_label">OAuth Client ID</string>
+    <string name="settings_anilist_client_id_placeholder">Enter AniList OAuth Client ID</string>
+    <string name="settings_anilist_sign_in">Sign in with AniList</string>
+    <string name="settings_anilist_access_token_label">Access Token</string>
+    <string name="settings_anilist_access_token_placeholder">Paste AniList access token</string>
+    <string name="settings_anilist_connect_with_token">Connect with Token</string>
+    <string name="settings_anilist_sync_now">Sync Now</string>
+    <string name="settings_anilist_syncing">Syncing AniList library…</string>
+    <string name="settings_anilist_last_synced">Last synced %1$s</string>
+    <string name="settings_anilist_disconnect">Disconnect</string>
+    <string name="settings_anilist_visit">Visit AniList</string>
+    <string name="settings_anilist_library_description">Use your AniList anime lists as the Library source.</string>
+    <string name="settings_anilist_progress_description">Use your AniList anime progress for Continue Watching.</string>
+    <string name="settings_tracking_ratings_anilist_description">Show and submit your AniList anime scores.</string>
 </resources>

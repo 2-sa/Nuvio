@@ -1,6 +1,7 @@
 package com.nuvio.app.features.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,8 +24,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.isDesktop
+import com.nuvio.app.features.anilist.AniListTracker
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.mdblist.MdbListTracker
 import com.nuvio.app.features.profiles.ProfileRepository
@@ -47,6 +50,8 @@ import com.nuvio.app.features.trakt.normalizeTraktContinueWatchingDaysCap
 import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.settings_anilist_library_description
+import nuvio.composeapp.generated.resources.settings_anilist_progress_description
 import nuvio.composeapp.generated.resources.tracking_source_anilist
 import nuvio.composeapp.generated.resources.tracking_source_mdblist
 import nuvio.composeapp.generated.resources.settings_mdblist_library_description
@@ -84,6 +89,7 @@ import nuvio.composeapp.generated.resources.settings_tracking_anime_section
 import nuvio.composeapp.generated.resources.settings_tracking_mdblist_section
 import nuvio.composeapp.generated.resources.compose_action_off
 import nuvio.composeapp.generated.resources.settings_tracking_ratings
+import nuvio.composeapp.generated.resources.settings_tracking_ratings_anilist_description
 import nuvio.composeapp.generated.resources.settings_tracking_ratings_description
 import nuvio.composeapp.generated.resources.settings_tracking_ratings_mdblist_description
 import nuvio.composeapp.generated.resources.settings_tracking_ratings_off_description
@@ -137,11 +143,19 @@ internal fun LazyListScope.trackingSettingsContent(
             title = stringResource(Res.string.settings_tracking_services),
             isTablet = isTablet,
         ) {
-            TrackingProviderCards(
-                isTablet = isTablet,
-                traktUiState = traktUiState,
-                simklUiState = simklUiState,
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(
+                    if (isDesktop) NuvioTokens.Space.s10 else if (isTablet) 16.dp else 12.dp,
+                ),
+            ) {
+                TrackingProviderCards(
+                    isTablet = isTablet,
+                    traktUiState = traktUiState,
+                    simklUiState = simklUiState,
+                )
+                AniListProviderCard(modifier = Modifier.fillMaxWidth())
+            }
         }
     }
 
@@ -224,10 +238,12 @@ private fun TrackingDataSources(
         WatchProgressSourceCoordinator.uiState
     }.collectAsStateWithLifecycle()
     val mdblistConnected by remember { MdbListTracker.ensureLoaded(); MdbListTracker.isAuthenticated }.collectAsStateWithLifecycle()
+    val anilistConnected by remember { AniListTracker.ensureLoaded(); AniListTracker.isAuthenticated }.collectAsStateWithLifecycle()
     val connectedProviders = buildSet {
         if (traktConnected) add(TrackingProviderId.TRAKT)
         if (simklConnected) add(TrackingProviderId.SIMKL)
         if (mdblistConnected) add(TrackingProviderId.MDBLIST)
+        if (anilistConnected) add(TrackingProviderId.ANILIST)
     }
     val effectiveLibrarySource = effectiveLibrarySourceMode(settingsUiState.librarySourceMode) { provider ->
         provider in connectedProviders
@@ -285,6 +301,11 @@ private fun TrackingDataSources(
                             label = stringResource(Res.string.tracking_source_mdblist),
                             enabled = mdblistConnected,
                         ),
+                        DesktopSegmentedOption(
+                            value = LibrarySourceMode.ANILIST,
+                            label = stringResource(Res.string.tracking_source_anilist),
+                            enabled = anilistConnected,
+                        ),
                     ),
                     selected = effectiveLibrarySource,
                     onSelected = TrackingSettingsRepository::setLibrarySourceMode,
@@ -326,6 +347,11 @@ private fun TrackingDataSources(
                                 value = WatchProgressSource.MDBLIST,
                                 label = stringResource(Res.string.tracking_source_mdblist),
                                 enabled = mdblistConnected,
+                            ),
+                            DesktopSegmentedOption(
+                                value = WatchProgressSource.ANILIST,
+                                label = stringResource(Res.string.tracking_source_anilist),
+                                enabled = anilistConnected,
                             ),
                         ),
                         selected = effectiveProgressSource,
@@ -396,7 +422,7 @@ private fun TrackingDataSources(
                     )
                 }
             }
-            if (simklConnected || mdblistConnected) {
+            if (simklConnected || mdblistConnected || anilistConnected) {
                 val effectiveRatingSource = settingsUiState.ratingSource?.takeIf { it in connectedProviders }
                 val ratingsFallback = settingsUiState.ratingSource?.takeIf { effectiveRatingSource == null }?.let { source ->
                     stringResource(
@@ -428,6 +454,11 @@ private fun TrackingDataSources(
                                 value = TrackingProviderId.MDBLIST,
                                 label = ratingSourceLabel(TrackingProviderId.MDBLIST),
                                 enabled = mdblistConnected,
+                            ),
+                            DesktopSegmentedOption<TrackingProviderId?>(
+                                value = TrackingProviderId.ANILIST,
+                                label = ratingSourceLabel(TrackingProviderId.ANILIST),
+                                enabled = anilistConnected,
                             ),
                         ),
                         selected = effectiveRatingSource,
@@ -490,7 +521,7 @@ private fun TrackingDataSources(
                     onClick = { activePickerName = TrackingDataPicker.MORE_LIKE_THIS.name },
                 )
             }
-            if (simklConnected || mdblistConnected) {
+            if (simklConnected || mdblistConnected || anilistConnected) {
                 val effectiveRatingSource = settingsUiState.ratingSource?.takeIf { it in connectedProviders }
                 val ratingsFallback = settingsUiState.ratingSource?.takeIf { effectiveRatingSource == null }?.let { source ->
                     stringResource(
@@ -518,7 +549,7 @@ private fun TrackingDataSources(
             title = stringResource(Res.string.trakt_library_source_dialog_title),
             subtitle = stringResource(Res.string.trakt_library_source_dialog_subtitle),
             selectedValue = effectiveLibrarySource,
-            options = librarySourceOptions(traktConnected, simklConnected, mdblistConnected),
+            options = librarySourceOptions(traktConnected, simklConnected, mdblistConnected, anilistConnected),
             onSelected = TrackingSettingsRepository::setLibrarySourceMode,
             onDismiss = { activePickerName = null },
         )
@@ -527,7 +558,7 @@ private fun TrackingDataSources(
             title = stringResource(Res.string.trakt_watch_progress_dialog_title),
             subtitle = stringResource(Res.string.tracking_watch_progress_dialog_subtitle),
             selectedValue = effectiveProgressSource,
-            options = watchProgressSourceOptions(traktConnected, simklConnected, mdblistConnected),
+            options = watchProgressSourceOptions(traktConnected, simklConnected, mdblistConnected, anilistConnected),
             onSelected = { source ->
                 scope.launch {
                     WatchProgressSourceCoordinator.selectSource(
@@ -555,7 +586,7 @@ private fun TrackingDataSources(
             title = stringResource(Res.string.settings_tracking_ratings),
             subtitle = stringResource(Res.string.settings_tracking_ratings_picker_subtitle),
             selectedValue = settingsUiState.ratingSource?.takeIf { it in connectedProviders },
-            options = ratingSourceOptions(simklConnected, mdblistConnected),
+            options = ratingSourceOptions(simklConnected, mdblistConnected, anilistConnected),
             onSelected = TrackingRatings::setSource,
             onDismiss = { activePickerName = null },
         )
@@ -731,6 +762,7 @@ private fun librarySourceOptions(
     traktConnected: Boolean,
     simklConnected: Boolean,
     mdblistConnected: Boolean,
+    anilistConnected: Boolean,
 ): List<TrackingPickerOption<LibrarySourceMode>> {
     val traktAvailable = isTrackingBrandAvailable(TrackingBrand.TRAKT, traktConnected, simklConnected)
     val simklAvailable = isTrackingBrandAvailable(TrackingBrand.SIMKL, traktConnected, simklConnected)
@@ -761,6 +793,13 @@ private fun librarySourceOptions(
             enabled = mdblistConnected,
             unavailableReason = trackingUnavailableReason(TrackingBrand.MDBLIST, mdblistConnected),
         ),
+        TrackingPickerOption(
+            value = LibrarySourceMode.ANILIST,
+            title = stringResource(Res.string.tracking_source_anilist),
+            description = stringResource(Res.string.settings_anilist_library_description),
+            enabled = anilistConnected,
+            unavailableReason = if (anilistConnected) null else stringResource(Res.string.settings_tracking_connect_first, TrackingProviderId.ANILIST.displayName),
+        ),
     )
 }
 
@@ -769,6 +808,7 @@ private fun watchProgressSourceOptions(
     traktConnected: Boolean,
     simklConnected: Boolean,
     mdblistConnected: Boolean,
+    anilistConnected: Boolean,
 ): List<TrackingPickerOption<WatchProgressSource>> {
     val traktAvailable = isTrackingBrandAvailable(TrackingBrand.TRAKT, traktConnected, simklConnected)
     val simklAvailable = isTrackingBrandAvailable(TrackingBrand.SIMKL, traktConnected, simklConnected)
@@ -798,6 +838,13 @@ private fun watchProgressSourceOptions(
             description = stringResource(Res.string.settings_mdblist_progress_description),
             enabled = mdblistConnected,
             unavailableReason = trackingUnavailableReason(TrackingBrand.MDBLIST, mdblistConnected),
+        ),
+        TrackingPickerOption(
+            value = WatchProgressSource.ANILIST,
+            title = stringResource(Res.string.tracking_source_anilist),
+            description = stringResource(Res.string.settings_anilist_progress_description),
+            enabled = anilistConnected,
+            unavailableReason = if (anilistConnected) null else stringResource(Res.string.settings_tracking_connect_first, TrackingProviderId.ANILIST.displayName),
         ),
     )
 }
@@ -848,6 +895,7 @@ private fun recommendationsSourceOptions(
 private fun ratingSourceOptions(
     simklConnected: Boolean,
     mdblistConnected: Boolean,
+    anilistConnected: Boolean,
 ): List<TrackingPickerOption<TrackingProviderId?>> = listOf(
     TrackingPickerOption(
         value = null,
@@ -867,6 +915,13 @@ private fun ratingSourceOptions(
         description = stringResource(Res.string.settings_tracking_ratings_mdblist_description),
         enabled = mdblistConnected,
         unavailableReason = trackingUnavailableReason(TrackingBrand.MDBLIST, mdblistConnected),
+    ),
+    TrackingPickerOption(
+        value = TrackingProviderId.ANILIST,
+        title = ratingSourceLabel(TrackingProviderId.ANILIST),
+        description = stringResource(Res.string.settings_tracking_ratings_anilist_description),
+        enabled = anilistConnected,
+        unavailableReason = if (anilistConnected) null else stringResource(Res.string.settings_tracking_connect_first, TrackingProviderId.ANILIST.displayName),
     ),
 )
 

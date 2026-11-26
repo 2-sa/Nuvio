@@ -2804,4 +2804,22 @@
     <string name="library_anilist_empty_title">مكتبة AniList فارغة</string>
     <string name="library_anilist_empty_message">أضف أنمي إلى قوائم AniList لتظهر هنا.</string>
     <string name="tracking_source_anilist">AniList</string>
+    <string name="settings_anilist_title">AniList</string>
+    <string name="settings_anilist_connected_as">متصل باسم @%1$s</string>
+    <string name="settings_anilist_description">اربط AniList لمزامنة قوائم الأنمي وتقدم الحلقات والتقييمات وتسجيل المشاهدة.</string>
+    <string name="settings_anilist_connected_description">يزامن مكتبة الأنمي وتقدم الحلقات والتقييمات وتسجيل المشاهدة مع AniList.</string>
+    <string name="settings_anilist_client_id_label">معرّف عميل OAuth</string>
+    <string name="settings_anilist_client_id_placeholder">أدخل معرّف عميل AniList OAuth</string>
+    <string name="settings_anilist_sign_in">تسجيل الدخول عبر AniList</string>
+    <string name="settings_anilist_access_token_label">رمز الوصول</string>
+    <string name="settings_anilist_access_token_placeholder">الصق رمز وصول AniList</string>
+    <string name="settings_anilist_connect_with_token">الربط بالرمز</string>
+    <string name="settings_anilist_sync_now">مزامنة الآن</string>
+    <string name="settings_anilist_syncing">جارٍ مزامنة مكتبة AniList…</string>
+    <string name="settings_anilist_last_synced">آخر مزامنة %1$s</string>
+    <string name="settings_anilist_disconnect">إلغاء الربط</string>
+    <string name="settings_anilist_visit">زيارة AniList</string>
+    <string name="settings_anilist_library_description">استخدم قوائم الأنمي في AniList كمصدر للمكتبة.</string>
+    <string name="settings_anilist_progress_description">استخدم تقدم الأنمي في AniList لقسم متابعة المشاهدة.</string>
+    <string name="settings_tracking_ratings_anilist_description">عرض وإرسال تقييماتك للأنمي على AniList.</string>
 </resources>
