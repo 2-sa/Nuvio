@@ -502,6 +502,32 @@ std::string mpvShaderCacheDirectory() {
     }
 }
 
+// True when Windows HDR ("Advanced Color") is switched on for at least one active display.
+// RTX Video HDR outputs PQ/BT.2020; on an SDR desktop that looks dark and over-saturated.
+bool windowsHdrEnabled() {
+    UINT32 pathCount = 0;
+    UINT32 modeCount = 0;
+    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount) != ERROR_SUCCESS) {
+        return false;
+    }
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(pathCount);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(modeCount);
+    if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, paths.data(), &modeCount, modes.data(), nullptr) != ERROR_SUCCESS) {
+        return false;
+    }
+    for (UINT32 i = 0; i < pathCount; ++i) {
+        DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO info = {};
+        info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
+        info.header.size = sizeof(info);
+        info.header.adapterId = paths[i].targetInfo.adapterId;
+        info.header.id = paths[i].targetInfo.id;
+        if (DisplayConfigGetDeviceInfo(&info.header) == ERROR_SUCCESS && (info.value & 0x2) != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool unifiedMemoryGpu() {
     static const bool unified = []() {
         ComPtr<ID3D11Device> device;
@@ -2045,7 +2071,7 @@ private:
     }
 
     std::string rtxVideoFilter(bool sourceIsSdr) const {
-        const bool hdr = rtxHdr && sourceIsSdr;
+        const bool hdr = rtxHdr && sourceIsSdr && windowsHdrEnabled();
         if (rtxSuperResolution && hdr) {
             return "d3d11vpp=scale=2:scaling-mode=nvidia:format=x2bgr10:nvidia-true-hdr,format=x2bgr10:transfer=pq:primaries=bt.2020";
         }
