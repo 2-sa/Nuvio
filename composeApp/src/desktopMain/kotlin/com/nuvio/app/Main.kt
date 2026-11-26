@@ -66,6 +66,7 @@ private const val BackgroundMemoryTrimDelayMs = 45_000L
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
+    if (!DesktopSingleInstance.acquireOrForward(args)) return
     // On Linux, initialize GTK BEFORE AWT/Compose/Skia to prevent GdkDisplayManager
     // type registration conflict (Skiko partially loads GDK without full GTK init).
     if (System.getProperty("os.name", "").lowercase().contains("linux")) {
@@ -137,6 +138,7 @@ fun main(args: Array<String>) {
         )
         val fullscreenController = remember { DesktopAppFullscreenController() }
         val closeApplication = {
+            DesktopSingleInstance.release()
             P2pStreamingEngine.shutdown()
             DiscordPresenceManager.shutdown()
             SentryInitializer.close()
@@ -171,6 +173,7 @@ fun main(args: Array<String>) {
             }
 
             LaunchedEffect(window) {
+                DesktopSingleInstance.attachWindow(window)
                 window.minimumSize = Dimension(960, 600)
                 applyNativeDesktopWindowChrome(window)
                 installLinuxExtendedMouseButtons()
