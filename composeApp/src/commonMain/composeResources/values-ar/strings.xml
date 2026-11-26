@@ -2798,4 +2798,10 @@
         <item quantity="many">%1$d كتالوجًا</item>
         <item quantity="other">%1$d كتالوج</item>
     </plurals>
+    <string name="compose_catalog_subtitle_anilist_library">مكتبة AniList</string>
+    <string name="library_anilist_title">مكتبة AniList</string>
+    <string name="library_anilist_load_failed">تعذر تحميل مكتبة AniList</string>
+    <string name="library_anilist_empty_title">مكتبة AniList فارغة</string>
+    <string name="library_anilist_empty_message">أضف أنمي إلى قوائم AniList لتظهر هنا.</string>
+    <string name="tracking_source_anilist">AniList</string>
 </resources>

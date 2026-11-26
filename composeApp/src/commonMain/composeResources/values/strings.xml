@@ -2794,4 +2794,10 @@
         <item quantity="one">%1$d Catalog</item>
         <item quantity="other">%1$d Catalogs</item>
     </plurals>
+    <string name="compose_catalog_subtitle_anilist_library">AniList Library</string>
+    <string name="library_anilist_title">AniList Library</string>
+    <string name="library_anilist_load_failed">Couldn’t load AniList library</string>
+    <string name="library_anilist_empty_title">Your AniList library is empty</string>
+    <string name="library_anilist_empty_message">Add anime to your AniList lists to see them here.</string>
+    <string name="tracking_source_anilist">AniList</string>
 </resources>
