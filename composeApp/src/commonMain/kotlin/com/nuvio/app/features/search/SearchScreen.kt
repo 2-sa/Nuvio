@@ -152,6 +152,8 @@ fun SearchScreen(
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     searchFocusRequestCount: Int = 0,
     scrollToTopRequests: Flow<Unit> = emptyFlow(),
+    externalQuery: String? = null,
+    onExternalQueryChange: ((String) -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     var isSearchFocused by remember { mutableStateOf(false) }
@@ -187,7 +189,15 @@ fun SearchScreen(
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
-    var query by rememberSaveable { mutableStateOf("") }
+    var internalQuery by rememberSaveable { mutableStateOf("") }
+    val query = externalQuery ?: internalQuery
+    fun updateQuery(value: String) {
+        if (onExternalQueryChange != null) {
+            onExternalQueryChange(value)
+        } else {
+            internalQuery = value
+        }
+    }
     var lastRequestedQuery by rememberSaveable { mutableStateOf<String?>(null) }
     var observedOfflineState by remember { mutableStateOf(false) }
     val discoverInFocus by remember(query, listState) {
@@ -345,9 +355,9 @@ fun SearchScreen(
                                 value = query,
                                 onValueChange = {
                                     focusRequester.captureFocus()
-                                    query = it
+                                    updateQuery(it)
                                 },
-                                onClear = { query = "" },
+                                onClear = { updateQuery("") },
                                 placeholder = stringResource(Res.string.compose_search_placeholder),
                                 clearContentDescription = stringResource(Res.string.compose_search_clear),
                                 isFocused = isSearchFocused,
@@ -376,7 +386,7 @@ fun SearchScreen(
                     item(key = "recent_searches") {
                         SearchRecentSection(
                             recentSearches = recentSearches,
-                            onSearchPress = { recentQuery -> query = recentQuery },
+                            onSearchPress = { recentQuery -> updateQuery(recentQuery) },
                             onRemoveSearch = SearchHistoryRepository::removeSearch,
                             modifier = Modifier.padding(horizontal = contentPadding),
                         )

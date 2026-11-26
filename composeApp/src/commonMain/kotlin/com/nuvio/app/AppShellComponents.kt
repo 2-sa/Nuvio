@@ -31,10 +31,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +52,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -51,31 +62,40 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.deeplink.handleAppUrl
 import com.nuvio.app.core.ui.DisintegrationRequest
+import com.nuvio.app.core.ui.FullscreenActionButton
+import com.nuvio.app.core.ui.LocalDesktopHistoryActions
 import com.nuvio.app.core.ui.LocalNuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.accentBrush
+import com.nuvio.app.core.ui.isFullscreenActionSupported
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioFocusBorder
 import com.nuvio.app.core.ui.nuvioTrackTopBarFocus
 import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.controller.ControllerFocusZone
 import com.nuvio.app.controller.controllerFocusable
+import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
@@ -96,6 +116,8 @@ import com.nuvio.app.features.profiles.ProfileBackgroundBackdrop
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.profiles.ProfileSwitcherTab
 import com.nuvio.app.features.profiles.SidebarProfileSwitcherStack
+import com.nuvio.app.features.search.SearchHistoryRepository
+import com.nuvio.app.features.search.SearchRepository
 import com.nuvio.app.features.search.SearchScreen
 import com.nuvio.app.features.settings.AppBrandWordmark
 import com.nuvio.app.features.settings.NavBarStyle
@@ -115,6 +137,8 @@ import nuvio.composeapp.generated.resources.compose_nav_library
 import nuvio.composeapp.generated.resources.compose_nav_profile
 import nuvio.composeapp.generated.resources.compose_nav_search
 import nuvio.composeapp.generated.resources.compose_nav_settings
+import nuvio.composeapp.generated.resources.compose_search_clear
+import nuvio.composeapp.generated.resources.compose_search_placeholder
 import nuvio.composeapp.generated.resources.compose_settings_page_root
 import nuvio.composeapp.generated.resources.sidebar_library
 import nuvio.composeapp.generated.resources.sidebar_search
@@ -170,6 +194,8 @@ internal data class AppTabState(
     val searchFocusRequestCount: Int = 0,
     val tabsRouteActiveState: State<Boolean>,
     val topChromePadding: Dp? = null,
+    val searchQuery: String? = null,
+    val onSearchQueryChange: ((String) -> Unit)? = null,
     val libraryDisintegrationRequest: DisintegrationRequest<String>? = null,
     val continueWatchingDisintegrationRequest: DisintegrationRequest<String>? = null,
     val requestedSettingsPageName: String? = null,
@@ -286,6 +312,8 @@ internal fun AppTabHost(
                     onPosterLongClick = actions.onPosterLongClick,
                     searchFocusRequestCount = state.searchFocusRequestCount,
                     scrollToTopRequests = requests.searchScrollToTopRequests,
+                    externalQuery = state.searchQuery,
+                    onExternalQueryChange = state.onSearchQueryChange,
                 )
             }
 
@@ -769,18 +797,58 @@ internal fun DesktopHoverSidebar(
         onTabSelected(tab)
     }
 
+    val sidebarSurfaceColor by animateColorAsState(
+        targetValue = if (sidebarExpanded) {
+            tokens.colors.surfaceElevated.copy(alpha = 0.92f)
+        } else {
+            Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "desktop_sidebar_surface",
+    )
+    val collapsedScrimAlpha by animateFloatAsState(
+        targetValue = if (sidebarExpanded) 0f else 1f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "desktop_sidebar_scrim",
+    )
+    val expandedBorderAlpha by animateFloatAsState(
+        targetValue = if (sidebarExpanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "desktop_sidebar_border",
+    )
+
     Surface(
         modifier = modifier
             .width(sidebarWidth)
             .fillMaxHeight()
             .hoverable(hoverSource)
             .zIndex(NuvioTokens.Z.navigation),
-        color = tokens.colors.surfaceElevated.copy(alpha = 0.96f),
+        color = sidebarSurfaceColor,
         contentColor = tokens.colors.textPrimary,
+        border = if (expandedBorderAlpha > 0.01f) {
+            BorderStroke(1.dp, tokens.colors.borderSubtle.copy(alpha = 0.5f * expandedBorderAlpha))
+        } else {
+            null
+        },
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .then(
+                    if (collapsedScrimAlpha > 0.01f) {
+                        Modifier.background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.56f * collapsedScrimAlpha),
+                                    Color.Black.copy(alpha = 0.24f * collapsedScrimAlpha),
+                                    Color.Transparent,
+                                ),
+                            ),
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
                 .background(
                     Brush.verticalGradient(
                         0.0f to tokens.colors.accent.copy(alpha = 0.04f),
@@ -789,13 +857,6 @@ internal fun DesktopHoverSidebar(
                     ),
                 ),
         ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(tokens.colors.borderSubtle),
-            )
 
             Box(
                 modifier = Modifier
@@ -1069,7 +1130,6 @@ private fun DesktopSidebarItem(
     icon: @Composable (Color) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val accentBrush = MaterialTheme.themePalette.accentBrush()
     val itemShape = RoundedCornerShape(14.dp)
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -1094,11 +1154,6 @@ private fun DesktopSidebarItem(
         animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
         label = "desktop_sidebar_item_fg",
     )
-    val indicatorAlpha by animateFloatAsState(
-        targetValue = desktopSidebarActiveIndicatorAlpha(selected),
-        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
-        label = "desktop_sidebar_indicator_alpha",
-    )
 
     Surface(
         onClick = onClick,
@@ -1122,57 +1177,403 @@ private fun DesktopSidebarItem(
         border = if (borderColor.alpha > 0.01f) BorderStroke(1.dp, borderColor) else null,
         shape = itemShape,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (indicatorAlpha > 0.01f) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 3.dp)
-                        .width(3.dp)
-                        .height(22.dp)
-                        .alpha(indicatorAlpha)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(accentBrush),
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(DesktopSidebarIconSlotSize),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier.size(DesktopSidebarIconSlotSize),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    icon(contentColor)
+                icon(contentColor)
+            }
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(animationSpec = tween(160)) + expandHorizontally(
+                    expandFrom = Alignment.Start,
+                    animationSpec = tween(200, easing = FastOutSlowInEasing),
+                ),
+                exit = shrinkHorizontally(
+                    shrinkTowards = Alignment.Start,
+                    animationSpec = tween(200, easing = FastOutSlowInEasing),
+                ) + fadeOut(
+                    animationSpec = tween(80, delayMillis = 120),
+                ),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        ),
+                        color = contentColor,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                    )
                 }
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = fadeIn(animationSpec = tween(160)) + expandHorizontally(
-                        expandFrom = Alignment.Start,
-                        animationSpec = tween(200, easing = FastOutSlowInEasing),
-                    ),
-                    exit = shrinkHorizontally(
-                        shrinkTowards = Alignment.Start,
-                        animationSpec = tween(200, easing = FastOutSlowInEasing),
-                    ) + fadeOut(
-                        animationSpec = tween(80, delayMillis = 120),
-                    ),
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DesktopFloatingTopBar(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onTabSelected: (AppScreenTab) -> Unit,
+    onProfileSelected: (NuvioProfile) -> Unit,
+    onAddProfileRequested: () -> Unit,
+    startPadding: Dp = 0.dp,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val focusManager = LocalFocusManager.current
+    val historyActions = LocalDesktopHistoryActions.current
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
+    val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
+    val recentSearches by SearchHistoryRepository.uiState.collectAsStateWithLifecycle()
+    val activeProfile = profileState.activeProfile
+    val activeProfileName = activeProfile?.name ?: stringResource(Res.string.compose_nav_profile)
+
+    var isSearchFocused by remember { mutableStateOf(false) }
+    var isProfileMenuOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        SearchHistoryRepository.ensureLoaded()
+    }
+
+    fun executeSearch(rawQuery: String) {
+        val trimmed = rawQuery.trim()
+        if (trimmed.isBlank()) {
+            SearchRepository.clear()
+            return
+        }
+        if (trimmed.startsWith("nuvio://", ignoreCase = true) || trimmed.startsWith("stremio://", ignoreCase = true)) {
+            handleAppUrl(trimmed)
+            onSearchQueryChange("")
+            focusManager.clearFocus()
+            return
+        }
+        onTabSelected(AppScreenTab.Search)
+        SearchRepository.search(
+            query = trimmed,
+            addons = AddonRepository.uiState.value.addons,
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .zIndex(NuvioTokens.Z.navigation + 1f)
+            .nuvioTrackTopBarFocus()
+            .padding(
+                top = statusBarPadding + 14.dp,
+                start = startPadding + 16.dp,
+                end = 24.dp,
+            ),
+    ) {
+        // Left: Back / Forward navigation buttons
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .height(40.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DesktopFloatingHistoryButton(
+                icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                contentDescription = "Back",
+                enabled = historyActions.canGoBack && historyActions.onNavigateBack != null,
+                onClick = { historyActions.onNavigateBack?.invoke() },
+            )
+            DesktopFloatingHistoryButton(
+                icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = "Forward",
+                enabled = historyActions.canGoForward && historyActions.onNavigateForward != null,
+                onClick = { historyActions.onNavigateForward?.invoke() },
+            )
+        }
+
+        // Center: Translucent Floating Search Pill + recent searches dropdown
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .widthIn(max = 460.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val pillShape = RoundedCornerShape(50)
+            val pillBorderColor by animateColorAsState(
+                targetValue = if (isSearchFocused) tokens.colors.borderDefault else tokens.colors.borderSubtle,
+                animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing),
+                label = "desktop_floating_search_border",
+            )
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp),
+                shape = pillShape,
+                color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
+                border = BorderStroke(1.dp, pillBorderColor),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = null,
+                        tint = if (isSearchFocused) tokens.colors.textPrimary else tokens.colors.textMuted,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Text) else Modifier),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        if (searchQuery.isEmpty()) {
+                            Text(
+                                text = stringResource(Res.string.compose_search_placeholder),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = tokens.colors.textMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { updated ->
+                                onSearchQueryChange(updated)
+                                if (updated.isNotBlank()) {
+                                    onTabSelected(AppScreenTab.Search)
+                                } else {
+                                    SearchRepository.clear()
+                                }
+                            },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = tokens.colors.textPrimary,
                             ),
-                            color = contentColor,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Clip,
+                            cursorBrush = SolidColor(tokens.colors.accent),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(
+                                onSearch = {
+                                    executeSearch(searchQuery)
+                                    focusManager.clearFocus()
+                                },
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { isSearchFocused = it.isFocused },
                         )
                     }
+                    if (searchQuery.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                                .clickable {
+                                    onSearchQueryChange("")
+                                    SearchRepository.clear()
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = stringResource(Res.string.compose_search_clear),
+                                tint = tokens.colors.textMuted,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (isSearchFocused && searchQuery.isBlank() && recentSearches.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                DesktopFloatingSearchDropdown(
+                    recentSearches = recentSearches.take(6),
+                    onSelectSearch = { term ->
+                        onSearchQueryChange(term)
+                        executeSearch(term)
+                        focusManager.clearFocus()
+                    },
+                )
+            }
+        }
+
+        // Right: Fullscreen toggle + active Profile avatar pill
+        Column(
+            modifier = Modifier.align(Alignment.TopEnd),
+            horizontalAlignment = Alignment.End,
+        ) {
+            Row(
+                modifier = Modifier.height(40.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isFullscreenActionSupported) {
+                    Surface(
+                        shape = CircleShape,
+                        color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
+                        border = BorderStroke(1.dp, tokens.colors.borderSubtle),
+                        modifier = Modifier
+                            .size(36.dp)
+                            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+                    ) {
+                        FullscreenActionButton(
+                            buttonSize = 36.dp,
+                            iconSize = 18.dp,
+                            containerColor = Color.Transparent,
+                            contentColor = tokens.colors.textPrimary,
+                        )
+                    }
+                }
+
+                val profilePillShape = RoundedCornerShape(50)
+                Surface(
+                    onClick = { isProfileMenuOpen = !isProfileMenuOpen },
+                    shape = profilePillShape,
+                    color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isProfileMenuOpen) tokens.colors.borderDefault else tokens.colors.borderSubtle,
+                    ),
+                    modifier = Modifier
+                        .height(36.dp)
+                        .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 5.dp, end = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ActiveProfileMiniAvatar(
+                            profile = activeProfile,
+                            avatars = avatars,
+                            selected = false,
+                            size = 26,
+                        )
+                        Text(
+                            text = activeProfileName,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = tokens.colors.textPrimary,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            if (isProfileMenuOpen) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = tokens.colors.surfacePopover.copy(alpha = 0.96f),
+                    border = BorderStroke(1.dp, tokens.colors.borderDefault),
+                    shadowElevation = tokens.elevation.overlay,
+                    modifier = Modifier.width(216.dp),
+                ) {
+                    SidebarProfileSwitcherStack(
+                        onProfileSelected = { profile ->
+                            isProfileMenuOpen = false
+                            onProfileSelected(profile)
+                        },
+                        onAddProfileRequested = {
+                            isProfileMenuOpen = false
+                            onAddProfileRequested()
+                        },
+                        onDismissRequest = { isProfileMenuOpen = false },
+                        modifier = Modifier.padding(6.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopFloatingHistoryButton(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = CircleShape,
+        color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, tokens.colors.borderSubtle),
+        modifier = Modifier
+            .size(36.dp)
+            .then(if (isDesktop && enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = if (enabled) tokens.colors.textPrimary else tokens.colors.textMuted.copy(alpha = 0.4f),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DesktopFloatingSearchDropdown(
+    recentSearches: List<String>,
+    onSelectSearch: (String) -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = tokens.colors.surfacePopover.copy(alpha = 0.96f),
+        border = BorderStroke(1.dp, tokens.colors.borderDefault),
+        shadowElevation = tokens.elevation.overlay,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 6.dp, horizontal = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            recentSearches.forEach { term ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                        .clickable { onSelectSearch(term) }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.History,
+                        contentDescription = null,
+                        tint = tokens.colors.textMuted,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = term,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = tokens.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }

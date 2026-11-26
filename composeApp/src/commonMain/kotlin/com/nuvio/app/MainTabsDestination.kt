@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,12 +99,12 @@ internal fun MainTabsDestination(
             desktopNavigationLayout == DesktopNavigationLayout.Sidebar
         val useDesktopTopBar = isDesktop && !useNativeBottomTabs && !useDesktopSidebar
         val useFloatingTopBar = !isDesktop && isTabletLayout && !useNativeBottomTabs
-        val topChromePadding = if (useFloatingTopBar || useDesktopTopBar) {
+        val topChromePadding = if (useFloatingTopBar || useDesktopTopBar || useDesktopSidebar) {
             val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            if (useDesktopTopBar) {
-                statusBarPadding + 48.dp + 64.dp
-            } else {
-                max(statusBarPadding + 24.dp, 48.dp) + 64.dp
+            when {
+                useDesktopTopBar -> statusBarPadding + 48.dp + 64.dp
+                useDesktopSidebar -> statusBarPadding + 68.dp
+                else -> max(statusBarPadding + 24.dp, 48.dp) + 64.dp
             }
         } else {
             null
@@ -141,6 +142,7 @@ internal fun MainTabsDestination(
         }
         val navBarGlowEnabled by ThemeSettingsRepository.navBarGlowEnabled.collectAsStateWithLifecycle()
         var isTopProfileSwitcherOpen by remember { mutableStateOf(false) }
+        var desktopGlobalSearchQuery by rememberSaveable { mutableStateOf("") }
         val floatingNavigationItems = listOf(
             FloatingNavigationItem(
                 selected = selectedTab == AppScreenTab.Home,
@@ -244,6 +246,12 @@ internal fun MainTabsDestination(
                         state = state.copy(
                             tabsRouteActiveState = tabsRouteActiveState,
                             topChromePadding = topChromePadding,
+                            searchQuery = if (useDesktopSidebar) desktopGlobalSearchQuery else null,
+                            onSearchQueryChange = if (useDesktopSidebar) {
+                                { desktopGlobalSearchQuery = it }
+                            } else {
+                                null
+                            },
                         ),
                         actions = tabActions,
                         modifier = Modifier
@@ -267,6 +275,15 @@ internal fun MainTabsDestination(
                         profileStackVisible = isProfileStackVisible,
                         onProfileStackVisibleChange = { isProfileStackVisible = it },
                         modifier = Modifier.align(Alignment.CenterStart),
+                    )
+                    DesktopFloatingTopBar(
+                        searchQuery = desktopGlobalSearchQuery,
+                        onSearchQueryChange = { desktopGlobalSearchQuery = it },
+                        onTabSelected = onTabSelected,
+                        onProfileSelected = onProfileSelected,
+                        onAddProfileRequested = onAddProfileRequested,
+                        startPadding = contentStartPadding,
+                        modifier = Modifier.align(Alignment.TopCenter),
                     )
                 }
 
