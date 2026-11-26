@@ -37,7 +37,7 @@ internal class AniListApiClient(
             query = query,
         )
         val parsed = aniListJson.decodeFromString<GraphQlResponse<ViewerData>>(responseBody)
-        ensureNoFatalErrors(parsed.errors, parsed.data)
+        ensureNoFatalErrors(parsed.errors, parsed.data?.viewer)
         val viewer = parsed.data?.viewer
             ?: throw AniListApiException(message = "AniList viewer response was empty")
         return AniListUser(
@@ -89,7 +89,7 @@ internal class AniListApiClient(
             variables = variables,
         )
         val parsed = aniListJson.decodeFromString<GraphQlResponse<SaveMediaListEntryData>>(responseBody)
-        ensureNoFatalErrors(parsed.errors, parsed.data)
+        ensureNoFatalErrors(parsed.errors, parsed.data?.saveMediaListEntry)
         val entry = parsed.data?.saveMediaListEntry ?: return null
         return entry.toAniListMediaEntry(fallbackStatus = status)
     }
@@ -106,7 +106,7 @@ internal class AniListApiClient(
             variables = variables,
         )
         val parsed = aniListJson.decodeFromString<GraphQlResponse<DeleteMediaListEntryData>>(responseBody)
-        ensureNoFatalErrors(parsed.errors, parsed.data)
+        ensureNoFatalErrors(parsed.errors, parsed.data?.deleteMediaListEntry)
         return parsed.data?.deleteMediaListEntry?.deleted == true
     }
 
@@ -186,7 +186,7 @@ internal class AniListApiClient(
 
 internal fun parseMediaListCollectionResponse(jsonText: String): List<AniListMediaEntry> {
     val parsed = aniListJson.decodeFromString<GraphQlResponse<MediaListCollectionData>>(jsonText)
-    ensureNoFatalErrors(parsed.errors, parsed.data)
+    ensureNoFatalErrors(parsed.errors, parsed.data?.mediaListCollection)
     val lists = parsed.data?.mediaListCollection?.lists.orEmpty()
     val entries = mutableListOf<AniListMediaEntry>()
     for (list in lists) {

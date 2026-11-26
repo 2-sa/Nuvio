@@ -81,8 +81,9 @@ object AniListAuthCallbackParser {
 
     fun normalizeDirectToken(raw: String): String? {
         val trimmed = raw.trim()
-        val token = if (trimmed.startsWith("Bearer ", ignoreCase = true)) {
-            trimmed.drop(7).trim()
+        if (trimmed.equals("Bearer", ignoreCase = true)) return null
+        val token = if (trimmed.startsWith("Bearer", ignoreCase = true) && trimmed.length > 6 && trimmed[6].isWhitespace()) {
+            trimmed.drop(6).trim()
         } else {
             trimmed
         }

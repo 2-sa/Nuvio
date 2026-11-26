@@ -2,6 +2,7 @@ package com.nuvio.app.features.anilist
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class AniListApiAndAuthTest {
@@ -148,5 +149,21 @@ class AniListApiAndAuthTest {
             "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx21.jpg",
             completed.coverImageUrl,
         )
+    }
+
+    @Test
+    fun `parseMediaListCollectionResponse throws AniListApiException when root field is null with errors`() {
+        val json = """
+            {
+              "data": { "MediaListCollection": null },
+              "errors": [{ "message": "Invalid token", "status": 400 }]
+            }
+        """.trimIndent()
+
+        val error = assertFailsWith<AniListApiException> {
+            parseMediaListCollectionResponse(json)
+        }
+        assertEquals(400, error.status)
+        assertEquals("Invalid token", error.message)
     }
 }
