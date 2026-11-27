@@ -39,8 +39,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
@@ -68,7 +66,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
@@ -87,7 +84,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.deeplink.handleAppUrl
 import com.nuvio.app.core.ui.DisintegrationRequest
 import com.nuvio.app.core.ui.FullscreenActionButton
-import com.nuvio.app.core.ui.LocalDesktopHistoryActions
 import com.nuvio.app.core.ui.LocalNuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioNavBarScrollState
@@ -144,6 +140,8 @@ import nuvio.composeapp.generated.resources.compose_nav_search
 import nuvio.composeapp.generated.resources.compose_nav_settings
 import nuvio.composeapp.generated.resources.compose_search_clear
 import nuvio.composeapp.generated.resources.compose_search_placeholder
+import nuvio.composeapp.generated.resources.compose_search_recent_searches
+import nuvio.composeapp.generated.resources.compose_search_remove_recent_search
 import nuvio.composeapp.generated.resources.compose_settings_page_root
 import nuvio.composeapp.generated.resources.sidebar_library
 import nuvio.composeapp.generated.resources.sidebar_search
@@ -249,10 +247,11 @@ internal fun rememberGuardedPlayerPopBackStack(
     navController: NuvioNavigator,
     route: AppRoute,
     beforePop: () -> Unit = {},
+    onPop: (() -> Boolean)? = null,
 ): PlayerBackRequest {
     val guard = remember(route) { PlayerBackReleaseGuard() }
 
-    return remember(navController, route, beforePop, guard) {
+    return remember(navController, route, beforePop, onPop, guard) {
         { releaseBeforeBack ->
             guard.request(
                 canStart = {
@@ -263,7 +262,7 @@ internal fun rememberGuardedPlayerPopBackStack(
                 beforePop = beforePop,
                 pop = {
                     navController.currentRoute == route &&
-                        navController.popBackStack(expectedRoute = route)
+                        (onPop?.invoke() ?: navController.popBackStack(expectedRoute = route))
                 },
             )
         }
@@ -1239,7 +1238,6 @@ internal fun DesktopFloatingTopBar(
 ) {
     val tokens = MaterialTheme.nuvio
     val focusManager = LocalFocusManager.current
-    val historyActions = LocalDesktopHistoryActions.current
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
     val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
@@ -1248,10 +1246,20 @@ internal fun DesktopFloatingTopBar(
     val activeProfileName = activeProfile?.name ?: stringResource(Res.string.compose_nav_profile)
 
     var isSearchFocused by remember { mutableStateOf(false) }
+    var isDropdownOpen by remember { mutableStateOf(false) }
+    val dropdownInteractionSource = remember { MutableInteractionSource() }
+    val isDropdownHovered by dropdownInteractionSource.collectIsHoveredAsState()
     var isProfileMenuOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         SearchHistoryRepository.ensureLoaded()
+    }
+
+    LaunchedEffect(isSearchFocused, isDropdownHovered) {
+        if (!isSearchFocused && !isDropdownHovered) {
+            kotlinx.coroutines.delay(140L)
+            isDropdownOpen = false
+        }
     }
 
     fun executeSearch(rawQuery: String) {
@@ -1288,28 +1296,6 @@ internal fun DesktopFloatingTopBar(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,
         ) {
-            // Left: Back / Forward navigation buttons
-            Row(
-                modifier = Modifier.height(40.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DesktopFloatingHistoryButton(
-                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                    contentDescription = "Back",
-                    enabled = historyActions.canGoBack && historyActions.onNavigateBack != null,
-                    onClick = { historyActions.onNavigateBack?.invoke() },
-                )
-                DesktopFloatingHistoryButton(
-                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = "Forward",
-                    enabled = historyActions.canGoForward && historyActions.onNavigateForward != null,
-                    onClick = { historyActions.onNavigateForward?.invoke() },
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
             // Center: Translucent Floating Search Pill + recent searches dropdown
             Box(
                 modifier = Modifier.weight(1f),
@@ -1387,7 +1373,12 @@ internal fun DesktopFloatingTopBar(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .onFocusChanged { isSearchFocused = it.isFocused },
+                                .onFocusChanged { focusState ->
+                                    isSearchFocused = focusState.isFocused
+                                    if (focusState.isFocused) {
+                                        isDropdownOpen = true
+                                    }
+                                },
                         )
                     }
                     if (searchQuery.isNotEmpty()) {
@@ -1413,14 +1404,23 @@ internal fun DesktopFloatingTopBar(
                 }
             }
 
-            if (isSearchFocused && searchQuery.isBlank() && recentSearches.isNotEmpty()) {
+            if (isDropdownOpen && searchQuery.isBlank() && recentSearches.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 DesktopFloatingSearchDropdown(
                     recentSearches = recentSearches.take(6),
+                    interactionSource = dropdownInteractionSource,
                     onSelectSearch = { term ->
+                        isDropdownOpen = false
                         onSearchQueryChange(term)
                         executeSearch(term)
                         focusManager.clearFocus()
+                    },
+                    onRemoveSearch = { term ->
+                        SearchHistoryRepository.removeSearch(term)
+                    },
+                    onClearHistory = {
+                        SearchHistoryRepository.clear()
+                        isDropdownOpen = false
                     },
                 )
             }
@@ -1528,38 +1528,12 @@ internal fun DesktopFloatingTopBar(
 }
 
 @Composable
-private fun DesktopFloatingHistoryButton(
-    icon: ImageVector,
-    contentDescription: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val tokens = MaterialTheme.nuvio
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = CircleShape,
-        color = tokens.colors.surfaceElevated.copy(alpha = 0.72f),
-        border = BorderStroke(1.dp, tokens.colors.borderSubtle),
-        modifier = Modifier
-            .size(36.dp)
-            .then(if (isDesktop && enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = if (enabled) tokens.colors.textPrimary else tokens.colors.textMuted.copy(alpha = 0.4f),
-                modifier = Modifier.size(18.dp),
-            )
-        }
-    }
-}
-
-@Composable
 private fun DesktopFloatingSearchDropdown(
     recentSearches: List<String>,
+    interactionSource: MutableInteractionSource,
     onSelectSearch: (String) -> Unit,
+    onRemoveSearch: (String) -> Unit,
+    onClearHistory: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
     Surface(
@@ -1567,12 +1541,39 @@ private fun DesktopFloatingSearchDropdown(
         color = tokens.colors.surfacePopover.copy(alpha = 0.96f),
         border = BorderStroke(1.dp, tokens.colors.borderDefault),
         shadowElevation = tokens.elevation.overlay,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .hoverable(interactionSource),
     ) {
         Column(
             modifier = Modifier.padding(vertical = 6.dp, horizontal = 6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(Res.string.compose_search_recent_searches),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = tokens.colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = stringResource(Res.string.compose_search_clear),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = tokens.colors.textMuted,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                        .clickable { onClearHistory() }
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
             recentSearches.forEach { term ->
                 Row(
                     modifier = Modifier
@@ -1580,7 +1581,7 @@ private fun DesktopFloatingSearchDropdown(
                         .clip(RoundedCornerShape(10.dp))
                         .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
                         .clickable { onSelectSearch(term) }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                        .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -1598,6 +1599,21 @@ private fun DesktopFloatingSearchDropdown(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .then(if (isDesktop) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+                            .clickable { onRemoveSearch(term) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = stringResource(Res.string.compose_search_remove_recent_search),
+                            tint = tokens.colors.textMuted,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             }
         }

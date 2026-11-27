@@ -238,4 +238,58 @@ class AniListApiAndAuthTest {
         val selected = selectAniListContinueWatchingEntries(entries)
         assertEquals(listOf(7, 6), selected.map { it.mediaId })
     }
+
+    @Test
+    fun `parseMediaListCollectionResponse extracts serial PREQUEL ids and ignores SEQUEL or MOVIE`() {
+        val json = """
+            {
+              "data": {
+                "MediaListCollection": {
+                  "lists": [
+                    {
+                      "status": "CURRENT",
+                      "entries": [
+                        {
+                          "id": 910,
+                          "status": "CURRENT",
+                          "progress": 5,
+                          "updatedAt": 1700000300,
+                          "media": {
+                            "id": 180001,
+                            "title": {
+                              "romaji": "Black Clover Season 2",
+                              "english": "Black Clover Season 2"
+                            },
+                            "format": "TV",
+                            "episodes": 12,
+                            "relations": {
+                              "edges": [
+                                {
+                                  "relationType": "PREQUEL",
+                                  "node": { "id": 97940, "format": "TV" }
+                                },
+                                {
+                                  "relationType": "PREQUEL",
+                                  "node": { "id": 99999, "format": "MOVIE" }
+                                },
+                                {
+                                  "relationType": "SEQUEL",
+                                  "node": { "id": 180002, "format": "TV" }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val entries = parseMediaListCollectionResponse(json)
+        assertEquals(1, entries.size)
+        assertEquals(listOf(97940), entries.first().prequelIds)
+    }
 }

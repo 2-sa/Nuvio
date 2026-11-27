@@ -52,7 +52,8 @@ internal class AniListApiClient(
             "query (\$userId: Int) { MediaListCollection(userId: \$userId, type: ANIME) { " +
                 "lists { status entries { id status score(format: POINT_100) progress updatedAt " +
                 "media { id idMal title { romaji english } format status episodes duration seasonYear " +
-                "coverImage { extraLarge large } averageScore } } } } }"
+                "coverImage { extraLarge large } averageScore " +
+                "relations { edges { relationType node { id format } } } } } } } }"
         val variables = buildJsonObject {
             put("userId", userId)
         }
@@ -76,7 +77,8 @@ internal class AniListApiClient(
                 "SaveMediaListEntry(mediaId: \$mediaId, status: \$status, progress: \$progress, scoreRaw: \$scoreRaw) { " +
                 "id status score(format: POINT_100) progress updatedAt " +
                 "media { id idMal title { romaji english } format status episodes duration seasonYear " +
-                "coverImage { extraLarge large } averageScore } } }"
+                "coverImage { extraLarge large } averageScore " +
+                "relations { edges { relationType node { id format } } } } } }"
         val variables = buildJsonObject {
             put("mediaId", mediaId)
             status?.let { put("status", it.name) }
@@ -221,6 +223,17 @@ private fun MediaListEntryNode.toAniListMediaEntry(
     val romaji = mediaNode.title?.romaji?.takeIf { it.isNotBlank() }
         ?: mediaNode.title?.english?.takeIf { it.isNotBlank() }
         ?: return null
+    val prequelIds = mediaNode.relations?.edges
+        .orEmpty()
+        .asSequence()
+        .filter { edge ->
+            edge.relationType.equals("PREQUEL", ignoreCase = true) &&
+                edge.node != null &&
+                (edge.node.format == null || edge.node.format.uppercase() in SERIAL_PREQUEL_FORMATS)
+        }
+        .mapNotNull { it.node?.id }
+        .distinct()
+        .toList()
     return AniListMediaEntry(
         entryId = id,
         mediaId = mediaNode.id,
@@ -238,8 +251,11 @@ private fun MediaListEntryNode.toAniListMediaEntry(
         progress = progress ?: 0,
         userScore = score?.toInt() ?: 0,
         updatedAtSeconds = updatedAt ?: 0L,
+        prequelIds = prequelIds,
     )
 }
+
+private val SERIAL_PREQUEL_FORMATS = setOf("TV", "TV_SHORT", "ONA")
 
 @Serializable
 private data class GraphQlRequest(
@@ -316,6 +332,24 @@ private data class MediaNode(
     val seasonYear: Int? = null,
     val coverImage: MediaCoverImageNode? = null,
     val averageScore: Int? = null,
+    val relations: MediaRelationsNode? = null,
+)
+
+@Serializable
+private data class MediaRelationsNode(
+    val edges: List<MediaRelationEdgeNode>? = null,
+)
+
+@Serializable
+private data class MediaRelationEdgeNode(
+    val relationType: String? = null,
+    val node: MediaRelationTargetNode? = null,
+)
+
+@Serializable
+private data class MediaRelationTargetNode(
+    val id: Int,
+    val format: String? = null,
 )
 
 @Serializable

@@ -512,7 +512,7 @@ object AniListTracker : TrackingAuthProvider {
                     val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes(
                         listOfNotNull(itemId, entry.malId?.let { "mal:$it" }),
                     )
-                    val mappedEpisodes = mapAbsoluteProgressToWatchedEpisodes(entry.progress, addonEpisodes)
+                    val mappedEpisodes = mapEntryProgressToWatchedEpisodes(entry, entries, addonEpisodes)
                     for (ref in mappedEpisodes) {
                         watched += WatchedItem(
                             id = itemId,
@@ -572,12 +572,13 @@ object AniListTracker : TrackingAuthProvider {
                 )
                 val mediaId = resolveMediaId(token, ref) ?: continue
                 val existing = findEntryForReference(ref)
+                val allEntries = _syncState.value.snapshot?.entries.orEmpty()
                 val isMovie = item.episode == null && item.type.equals("movie", ignoreCase = true)
                 val absoluteEpisode = if (!isMovie && item.episode != null) {
                     val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes(
                         listOfNotNull(item.id, "anilist:$mediaId", existing?.malId?.let { "mal:$it" }),
                     )
-                    mapSeasonEpisodeToAbsolute(item.season ?: 1, item.episode, addonEpisodes)
+                    mapSeasonEpisodeToEntryProgress(item.season ?: 1, item.episode, existing, allEntries, addonEpisodes)
                 } else {
                     null
                 }
@@ -615,12 +616,13 @@ object AniListTracker : TrackingAuthProvider {
                     episodeNumber = item.episode,
                 )
                 val existing = findEntryForReference(ref) ?: continue
+                val allEntries = _syncState.value.snapshot?.entries.orEmpty()
                 val ep = item.episode
                 val absoluteEp = if (ep != null) {
                     val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes(
                         listOfNotNull(item.id, "anilist:${existing.mediaId}", existing.malId?.let { "mal:$it" }),
                     )
-                    mapSeasonEpisodeToAbsolute(item.season ?: 1, ep, addonEpisodes)
+                    mapSeasonEpisodeToEntryProgress(item.season ?: 1, ep, existing, allEntries, addonEpisodes)
                 } else {
                     null
                 }
@@ -656,11 +658,12 @@ object AniListTracker : TrackingAuthProvider {
 
         override fun snapshot(): TrackingProgressSnapshot {
             val uiState = _syncState.value
-            val entries = selectAniListContinueWatchingEntries(uiState.snapshot?.entries.orEmpty())
+            val allEntries = uiState.snapshot?.entries.orEmpty()
+            val entries = selectAniListContinueWatchingEntries(allEntries)
                 .map { entry ->
                     val contentId = "anilist:${entry.mediaId}"
                     val cachedEpisodes = AniListEpisodeMapper.getCached(contentId)
-                    val mapped = mapAbsoluteEpisodeToSeasonEpisode(entry.progress, cachedEpisodes)
+                    val mapped = mapEntryProgressToSeasonEpisode(entry, allEntries, cachedEpisodes)
                     WatchProgressEntry(
                         contentType = "series",
                         parentMetaId = contentId,
@@ -726,6 +729,7 @@ object AniListTracker : TrackingAuthProvider {
                     continue
                 }
                 val existing = findEntryForReference(item.media)
+                val allEntries = _syncState.value.snapshot?.entries.orEmpty()
                 val episodeNum = item.media.episode?.number
                 val absoluteEp = if (episodeNum != null) {
                     val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes(
@@ -735,7 +739,7 @@ object AniListTracker : TrackingAuthProvider {
                             existing?.malId?.let { "mal:$it" },
                         ),
                     )
-                    mapSeasonEpisodeToAbsolute(item.media.episode?.season ?: 1, episodeNum, addonEpisodes)
+                    mapSeasonEpisodeToEntryProgress(item.media.episode?.season ?: 1, episodeNum, existing, allEntries, addonEpisodes)
                 } else {
                     null
                 }
@@ -770,6 +774,7 @@ object AniListTracker : TrackingAuthProvider {
             var notFound = 0
             for (media in items) {
                 val existing = findEntryForReference(media)
+                val allEntries = _syncState.value.snapshot?.entries.orEmpty()
                 if (existing == null) {
                     notFound++
                     continue
@@ -779,7 +784,7 @@ object AniListTracker : TrackingAuthProvider {
                     val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes(
                         listOfNotNull(media.catalog?.contentId, "anilist:${existing.mediaId}", existing.malId?.let { "mal:$it" }),
                     )
-                    mapSeasonEpisodeToAbsolute(media.episode?.season ?: 1, ep, addonEpisodes)
+                    mapSeasonEpisodeToEntryProgress(media.episode?.season ?: 1, ep, existing, allEntries, addonEpisodes)
                 } else {
                     null
                 }
@@ -808,6 +813,7 @@ object AniListTracker : TrackingAuthProvider {
             val token = requireToken(profileId) ?: return
             val mediaId = resolveMediaId(token, event.media) ?: return
             val existing = findEntryForReference(event.media)
+            val allEntries = _syncState.value.snapshot?.entries.orEmpty()
             val episodeNum = event.media.episode?.number
             val absoluteEp = if (episodeNum != null) {
                 val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes(
@@ -817,7 +823,7 @@ object AniListTracker : TrackingAuthProvider {
                         existing?.malId?.let { "mal:$it" },
                     ),
                 )
-                mapSeasonEpisodeToAbsolute(event.media.episode?.season ?: 1, episodeNum, addonEpisodes)
+                mapSeasonEpisodeToEntryProgress(event.media.episode?.season ?: 1, episodeNum, existing, allEntries, addonEpisodes)
             } else {
                 null
             }

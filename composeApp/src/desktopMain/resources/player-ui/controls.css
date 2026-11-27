@@ -954,6 +954,24 @@ button:disabled {
   height: var(--header-icon);
 }
 
+.header-back-button {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.header-back-button:hover,
+.header-back-button:focus-visible {
+  background: rgba(255, 255, 255, .14);
+}
+
+.header-back-button svg {
+  width: 26px;
+  height: 26px;
+}
+
 /* PiP keeps only playback, captions/audio, volume, restore action, and pause overlay. */
 .player.pip-mode {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);

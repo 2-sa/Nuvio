@@ -51,6 +51,7 @@ data class AniListMediaEntry(
     val progress: Int = 0,
     val userScore: Int = 0,
     val updatedAtSeconds: Long = 0L,
+    val prequelIds: List<Int> = emptyList(),
 )
 
 @Serializable

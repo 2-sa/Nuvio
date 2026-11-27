@@ -61,4 +61,76 @@ class AniListEpisodeMapperTest {
         )
         assertEquals(850, mapSeasonEpisodeToAbsolute(1, 850, emptyList()))
     }
+
+    @Test
+    fun `maps separate Season 2 AniList entry to Season 2 and marks Season 1 fully watched`() {
+        val blackCloverEpisodes = buildList {
+            for (ep in 1..170) add(SeasonEpisodeRef(season = 1, episode = ep))
+            for (ep in 1..12) add(SeasonEpisodeRef(season = 2, episode = ep))
+        }
+        val season1Entry = AniListMediaEntry(
+            mediaId = 97940,
+            titleRomaji = "Black Clover",
+            titleEnglish = "Black Clover",
+            format = "TV",
+            episodes = 170,
+            userStatus = AniListListStatus.COMPLETED,
+            progress = 170,
+        )
+        val season2Entry = AniListMediaEntry(
+            mediaId = 180001,
+            titleRomaji = "Black Clover Season 2",
+            titleEnglish = "Black Clover Season 2",
+            format = "TV",
+            episodes = 12,
+            userStatus = AniListListStatus.CURRENT,
+            progress = 5,
+            prequelIds = listOf(97940),
+        )
+        val allEntries = listOf(season1Entry, season2Entry)
+
+        val currentRef = mapEntryProgressToSeasonEpisode(season2Entry, allEntries, blackCloverEpisodes)
+        assertEquals(SeasonEpisodeRef(season = 2, episode = 5), currentRef)
+
+        val watched = mapEntryProgressToWatchedEpisodes(season2Entry, allEntries, blackCloverEpisodes)
+        assertEquals(175, watched.size)
+        assertTrue(watched.contains(SeasonEpisodeRef(season = 1, episode = 170)))
+        assertTrue(watched.contains(SeasonEpisodeRef(season = 2, episode = 5)))
+        assertTrue(!watched.contains(SeasonEpisodeRef(season = 2, episode = 6)))
+
+        assertEquals(6, mapSeasonEpisodeToEntryProgress(2, 6, season2Entry, allEntries, blackCloverEpisodes))
+    }
+
+    @Test
+    fun `maps titled sequel without explicit season number using prequelIds offset`() {
+        val showEpisodes = buildList {
+            for (ep in 1..24) add(SeasonEpisodeRef(season = 1, episode = ep))
+            for (ep in 1..12) add(SeasonEpisodeRef(season = 2, episode = ep))
+        }
+        val s1 = AniListMediaEntry(
+            mediaId = 1001,
+            titleRomaji = "Example Show",
+            format = "TV",
+            episodes = 24,
+            userStatus = AniListListStatus.COMPLETED,
+            progress = 24,
+        )
+        val s2 = AniListMediaEntry(
+            mediaId = 1002,
+            titleRomaji = "Example Show: Arc II",
+            format = "TV",
+            episodes = 12,
+            userStatus = AniListListStatus.CURRENT,
+            progress = 5,
+            prequelIds = listOf(1001),
+        )
+        val allEntries = listOf(s1, s2)
+
+        assertEquals(
+            SeasonEpisodeRef(season = 2, episode = 5),
+            mapEntryProgressToSeasonEpisode(s2, allEntries, showEpisodes),
+        )
+        assertEquals(29, mapEntryProgressToWatchedEpisodes(s2, allEntries, showEpisodes).size)
+        assertEquals(6, mapSeasonEpisodeToEntryProgress(2, 6, s2, allEntries, showEpisodes))
+    }
 }

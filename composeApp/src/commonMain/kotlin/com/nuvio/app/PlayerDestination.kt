@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.party.PartyMedia
 import com.nuvio.app.features.player.ExternalPlayerIntentResult
 import com.nuvio.app.features.player.ExternalPlayerPlatform
@@ -14,8 +15,10 @@ import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
 import com.nuvio.app.features.player.PlayerScreen
 import com.nuvio.app.features.watchprogress.ResumePromptRepository
+import com.nuvio.app.navigation.DetailRoute
 import com.nuvio.app.navigation.NuvioNavigator
 import com.nuvio.app.navigation.PlayerRoute
+import com.nuvio.app.navigation.StreamRoute
 
 @Composable
 internal fun PlayerDestination(
@@ -45,10 +48,37 @@ internal fun PlayerDestination(
     }
     val currentFullscreen = com.nuvio.app.core.ui.isFullscreenActionActive()
     val initialFullscreen = remember { currentFullscreen }
+    val popToPreviousOrDetails = remember(navController, route, launch) {
+        {
+            val previousRoute = navController.routes.dropLast(1).lastOrNull()
+            val metaId = launch.parentMetaId?.takeIf { it.isNotBlank() }
+            val metaType = launch.parentMetaType ?: launch.contentType
+            if (
+                previousRoute !is DetailRoute &&
+                previousRoute !is StreamRoute &&
+                metaId != null &&
+                !metaType.equals(CloudLibraryContentType, ignoreCase = true)
+            ) {
+                navController.navigate(
+                    DetailRoute(
+                        type = metaType,
+                        id = metaId,
+                        title = launch.title,
+                    ),
+                ) {
+                    popUpTo<PlayerRoute> { inclusive = true }
+                }
+                true
+            } else {
+                navController.popBackStack(expectedRoute = route)
+            }
+        }
+    }
     val onBackBase = rememberGuardedPlayerPopBackStack(
         navController = navController,
         route = route,
         beforePop = ResumePromptRepository::markPlayerExitedNormally,
+        onPop = popToPreviousOrDetails,
     )
     val onBack = remember(onBackBase, initialFullscreen, currentFullscreen) {
         { releaseBeforeBack: com.nuvio.app.features.player.PlayerReleaseBeforeBack ->

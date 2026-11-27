@@ -215,5 +215,13 @@ class PlayerBottomBarLayoutTest {
             headerCssBlock.contains("justify-content: space-between"),
             ".header CSS rule must use justify-content: space-between",
         )
+
+        val backButtonIdx = css.indexOf(".header-back-button {", css.indexOf(".header-button svg"))
+        assertTrue(backButtonIdx >= 0, "Expected .header-back-button rule after .header-button")
+        val backButtonBlock = css.substring(backButtonIdx, css.indexOf("}", backButtonIdx))
+        assertTrue(backButtonBlock.contains("width: 48px"), "Back button must have 48px hitbox width")
+        assertTrue(backButtonBlock.contains("height: 48px"), "Back button must have 48px hitbox height")
+        assertTrue(backButtonBlock.contains("border-radius: 10px"), "Back button must use rounded-square radius")
+        assertTrue(backButtonBlock.contains("background: transparent"), "Back button must have transparent default background")
     }
 }
