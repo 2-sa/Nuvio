@@ -37,7 +37,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
@@ -164,6 +166,8 @@ object WatchedRepository {
     private var deltaInitialized: Boolean = false
     internal var syncAdapter: WatchedSyncAdapter = SupabaseWatchedSyncAdapter
     private var extraKeysObserverJob: Job? = null
+    private var secondaryAniListExtraKeysJob: Job? = null
+    private var dualAniListObserverJob: Job? = null
 
     fun ensureLoaded() {
         ensureTrackingProvidersRegistered()
@@ -183,7 +187,9 @@ object WatchedRepository {
 
     fun onProfileChanged(profileId: Int) {
         if (profileId == currentProfileId && hasLoaded) return
+        stopExtraKeysObserver()
         loadFromDisk(profileId)
+        startExtraKeysObserverIfNeeded()
     }
 
     fun clearLocalState() {
@@ -195,6 +201,8 @@ object WatchedRepository {
         }
         previousAccountJob.cancel()
         extraKeysObserverJob = null
+        secondaryAniListExtraKeysJob = null
+        dualAniListObserverJob = null
         hasLoaded = false
         currentProfileId = 1
         profileGeneration += 1L
@@ -853,18 +861,33 @@ object WatchedRepository {
         ensureLoaded()
         if (items.isEmpty()) return
         val source = activeSource
+        val dualAniList = isDualAniListActive(source)
         val markedAt = WatchedClock.nowEpochMs()
         val timestampedItems = items.map { watchedItem ->
             watchedItem.copy(markedAtEpochMs = markedAt)
         }
         itemsStore.update { nuvioItems, providerItems, dirtyNuvioKeys, dirtyProviderKeys ->
-            val targetItems = source.providerId
+            val primaryTargetItems = source.providerId
                 ?.let { providerId -> providerItems.getOrPut(providerId, ::mutableMapOf) }
                 ?: nuvioItems
-            val dirtyKeys = source.providerId
+            val primaryDirtyKeys = source.providerId
                 ?.let { providerId -> dirtyProviderKeys.getOrPut(providerId, ::mutableSetOf) }
                 ?: dirtyNuvioKeys
             timestampedItems.forEach { watchedItem ->
+                val routeToAniList = dualAniList && isAnimeTrackingTarget(
+                    contentId = watchedItem.id,
+                    isKnownInAniList = AniListTracker.hasKnownMedia(watchedItem.id, watchedItem.name),
+                )
+                val targetItems = if (routeToAniList) {
+                    providerItems.getOrPut(TrackingProviderId.ANILIST, ::mutableMapOf)
+                } else {
+                    primaryTargetItems
+                }
+                val dirtyKeys = if (routeToAniList) {
+                    dirtyProviderKeys.getOrPut(TrackingProviderId.ANILIST, ::mutableSetOf)
+                } else {
+                    primaryDirtyKeys
+                }
                 val key = watchedItemKey(watchedItem.type, watchedItem.id, watchedItem.season, watchedItem.episode)
                 targetItems[key] = watchedItem
                 dirtyKeys += key
@@ -941,11 +964,12 @@ object WatchedRepository {
         ensureLoaded()
         if (items.isEmpty()) return
         val source = activeSource
+        val dualAniList = isDualAniListActive(source)
         val (removedItems, removedExtraKeys) = itemsStore.update { nuvioItems, providerItems, dirtyNuvioKeys, dirtyProviderKeys ->
-            val targetItems = source.providerId
+            val primaryTargetItems = source.providerId
                 ?.let { providerId -> providerItems.getOrPut(providerId, ::mutableMapOf) }
                 ?: nuvioItems
-            val dirtyKeys = source.providerId
+            val primaryDirtyKeys = source.providerId
                 ?.let { providerId -> dirtyProviderKeys.getOrPut(providerId, ::mutableSetOf) }
                 ?: dirtyNuvioKeys
             var extraKeysChanged = false
@@ -956,8 +980,26 @@ object WatchedRepository {
                     season = watchedItem.season,
                     episode = watchedItem.episode,
                 )
+                val routeToAniList = dualAniList && isAnimeTrackingTarget(
+                    contentId = watchedItem.id,
+                    isKnownInAniList = AniListTracker.hasKnownMedia(watchedItem.id, watchedItem.name),
+                )
+                if (routeToAniList || source == WatchProgressSource.ANILIST) {
+                    AniListTracker.markEpisodeOptimisticallyUnwatched(watchedItem.videoId)
+                }
+                val targetProviderId = if (routeToAniList) TrackingProviderId.ANILIST else source.providerId
+                val targetItems = if (routeToAniList) {
+                    providerItems.getOrPut(TrackingProviderId.ANILIST, ::mutableMapOf)
+                } else {
+                    primaryTargetItems
+                }
+                val dirtyKeys = if (routeToAniList) {
+                    dirtyProviderKeys.getOrPut(TrackingProviderId.ANILIST, ::mutableSetOf)
+                } else {
+                    primaryDirtyKeys
+                }
                 val matchingKey = keys.firstOrNull(targetItems::containsKey)
-                source.providerId?.let { providerId ->
+                targetProviderId?.let { providerId ->
                     providerExtraWatchedKeys[providerId]?.let { extraKeys ->
                         val updated = extraKeys - keys
                         if (updated != extraKeys) {
@@ -980,7 +1022,7 @@ object WatchedRepository {
             publish()
             persist()
             if (syncRemote) pushDeleteToServer(items = removedItems, source = source)
-        } else if (source.providerId != null) {
+        } else if (source.providerId != null || dualAniList) {
             if (removedExtraKeys) {
                 publish()
                 persist()
@@ -997,15 +1039,28 @@ object WatchedRepository {
     ): Boolean {
         ensureLoaded()
         val source = activeSource
+        val dualAniList = isDualAniListActive(source)
         val keys = watchedItemKeys(type = type, id = id, season = season, episode = episode)
         val stored = itemsStore.read { nuvioItems, providerItems, _, _ ->
-            source.providerId?.let { providerId ->
+            val inPrimary = source.providerId?.let { providerId ->
                 providerItems[providerId]?.let { itemsByKey -> keys.any(itemsByKey::containsKey) } == true
             } ?: keys.any(nuvioItems::containsKey)
+            inPrimary || (
+                dualAniList &&
+                    providerItems[TrackingProviderId.ANILIST]?.let { itemsByKey ->
+                        keys.any(itemsByKey::containsKey)
+                    } == true
+                )
         }
         if (stored) return true
-        val providerId = source.providerId ?: return false
-        return providerExtraWatchedKeys[providerId]?.let { extraKeys -> keys.any(extraKeys::contains) } == true
+        val inPrimaryExtra = source.providerId?.let { providerId ->
+            providerExtraWatchedKeys[providerId]?.let { extraKeys -> keys.any(extraKeys::contains) } == true
+        } == true
+        if (inPrimaryExtra) return true
+        return dualAniList &&
+            providerExtraWatchedKeys[TrackingProviderId.ANILIST]?.let { extraKeys ->
+                keys.any(extraKeys::contains)
+            } == true
     }
 
     fun isFullyWatchedSeries(id: String, type: String): Boolean {
@@ -1053,7 +1108,13 @@ object WatchedRepository {
             } else {
                 val episodeNumber = episode.episode
                 if (episodeNumber != null) {
-                    com.nuvio.app.features.simkl.SimklAnimeWatchedFallback.isWatched(episode.id, episodeNumber)
+                    com.nuvio.app.features.simkl.SimklAnimeWatchedFallback.isWatched(episode.id, episodeNumber) ||
+                        AniListTracker.isAnimeEpisodeWatched(
+                            metaId = meta.id,
+                            videoId = episode.id,
+                            seasonNumber = episode.season,
+                            episodeNumber = episodeNumber,
+                        )
                 } else {
                     false
                 }
@@ -1251,62 +1312,156 @@ object WatchedRepository {
             watchedItemKey(item.type, item.id, item.season, item.episode)
         }
 
+    private fun isDualAniListActive(source: WatchProgressSource = activeSource): Boolean =
+        TrackingSettingsRepository.uiState.value.useAniListForAnime &&
+            source != WatchProgressSource.ANILIST &&
+            TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST)
+
     /**
-     * Observes provider extra watched keys (e.g. Simkl anime alternate IDs).
-     * When the provider's snapshot changes (after mutations, syncs), recomputes
-     * extra keys, re-pulls watched items, and re-publishes so watchedKeys and
-     * items stay reactive and current.
+     * Observes provider watched-state changes (e.g. Simkl anime alternate IDs and AniList
+     * snapshot/AnimeIdBridge updates in both primary and dual-tracker modes).
      */
     private fun startExtraKeysObserverIfNeeded() {
-        if (extraKeysObserverJob != null) return
-        val providerId = activeSource.providerId ?: return
-        val adapter = TrackingProviderRegistry.connectedWatchedProviders()
-            .firstOrNull { it.providerId == providerId } ?: return
-        extraKeysObserverJob = accountScopeSnapshot().launch {
-            adapter.observeExtraWatchedKeys(currentProfileId)
-                .distinctUntilChanged()
-                .collectLatest { extraKeys ->
-                    val keysChanged = extraWatchedKeysChanged(
-                        previous = providerExtraWatchedKeys[providerId],
-                        current = extraKeys,
-                    )
-                    if (keysChanged) {
-                        val freshItems = watchedProviderRefreshOrNull(
-                            refresh = {
-                                adapter.pull(
-                                    profileId = currentProfileId,
-                                    pageSize = watchedItemsPageSize,
+        val observedProfileId = currentProfileId
+        if (extraKeysObserverJob == null) {
+            val providerId = activeSource.providerId
+            val adapter = providerId?.let { id ->
+                TrackingProviderRegistry.connectedWatchedProviders().firstOrNull { it.providerId == id }
+            }
+            if (providerId != null && adapter != null) {
+                extraKeysObserverJob = accountScopeSnapshot().launch {
+                    if (providerId == TrackingProviderId.ANILIST) {
+                        adapter.observeWatchedChanges(observedProfileId)
+                            .drop(1)
+                            .collectLatest {
+                                refreshProviderFromObserver(
+                                    adapter = adapter,
+                                    providerId = providerId,
+                                    profileId = observedProfileId,
                                 )
-                            },
-                            onFailure = { error ->
-                                log.w(error) { "Failed to refresh watched items from ${providerId.storageId}" }
-                            },
-                        ) ?: return@collectLatest
-                        providerExtraWatchedKeys[providerId] = extraKeys
-                        itemsStore.update { _, providerItems, _, dirtyProviderKeys ->
-                            val dirtyKeys = dirtyProviderKeys.getOrPut(providerId, ::mutableSetOf)
-                            val merged = mergeWatchedSnapshot(
-                                serverItems = freshItems,
-                                localItems = providerItems[providerId]?.values.orEmpty().toList(),
-                                dirtyKeys = dirtyKeys,
-                                acknowledgeDirtyByPresence = true,
-                            )
-                            providerItems[providerId] = merged.items.toMutableMap()
-                            dirtyKeys.clear()
-                            dirtyKeys += merged.dirtyKeys
-                        }
-                        loadedProviders += providerId
-                        providersLoadedFromRemote += providerId
-                        publish()
-                        persist()
+                            }
+                    } else {
+                        adapter.observeExtraWatchedKeys(observedProfileId)
+                            .distinctUntilChanged()
+                            .collectLatest { extraKeys ->
+                                val keysChanged = extraWatchedKeysChanged(
+                                    previous = providerExtraWatchedKeys[providerId],
+                                    current = extraKeys,
+                                )
+                                if (keysChanged) {
+                                    refreshProviderFromObserver(
+                                        adapter = adapter,
+                                        providerId = providerId,
+                                        profileId = observedProfileId,
+                                        knownExtraKeys = extraKeys,
+                                    )
+                                }
+                            }
                     }
                 }
+            }
         }
+        if (dualAniListObserverJob == null) {
+            dualAniListObserverJob = accountScopeSnapshot().launch {
+                combine(
+                    TrackingSettingsRepository.uiState.map { it.useAniListForAnime }.distinctUntilChanged(),
+                    TrackingProviderRegistry.connectedProviderIds
+                        .map { TrackingProviderId.ANILIST in it }
+                        .distinctUntilChanged(),
+                ) { useAniList, isAniListConnected ->
+                    useAniList && isAniListConnected
+                }
+                    .distinctUntilChanged()
+                    .collectLatest { dualEnabled ->
+                        val shouldRunSecondary = dualEnabled && activeSource != WatchProgressSource.ANILIST
+                        if (!shouldRunSecondary) {
+                            secondaryAniListExtraKeysJob?.cancel()
+                            secondaryAniListExtraKeysJob = null
+                            publish()
+                            return@collectLatest
+                        }
+                        val anilistAdapter = TrackingProviderRegistry.watchedProvider(TrackingProviderId.ANILIST)
+                            ?: return@collectLatest
+                        secondaryAniListExtraKeysJob?.cancel()
+                        secondaryAniListExtraKeysJob = accountScopeSnapshot().launch {
+                            anilistAdapter.observeWatchedChanges(observedProfileId)
+                                .drop(1)
+                                .collectLatest {
+                                    refreshProviderFromObserver(
+                                        adapter = anilistAdapter,
+                                        providerId = TrackingProviderId.ANILIST,
+                                        profileId = observedProfileId,
+                                    )
+                                }
+                        }
+                        publish()
+                    }
+            }
+        }
+    }
+
+    private suspend fun refreshProviderFromObserver(
+        adapter: WatchedSyncAdapter,
+        providerId: TrackingProviderId,
+        profileId: Int,
+        knownExtraKeys: Set<String>? = null,
+    ) {
+        if (currentProfileId != profileId) return
+        val freshItems = watchedProviderRefreshOrNull(
+            refresh = {
+                adapter.pull(
+                    profileId = profileId,
+                    pageSize = watchedItemsPageSize,
+                )
+            },
+            onFailure = { error ->
+                log.w(error) { "Failed to refresh watched items from ${providerId.storageId}" }
+            },
+        ) ?: return
+        val freshFullyWatchedKeys = watchedProviderRefreshOrNull(
+            refresh = { adapter.pullFullyWatchedSeriesKeys(profileId) },
+            onFailure = { error ->
+                log.w(error) { "Failed to refresh fully-watched series keys from ${providerId.storageId}" }
+            },
+        )
+        val freshExtraKeys = knownExtraKeys ?: watchedProviderRefreshOrNull(
+            refresh = { adapter.pullExtraWatchedKeys(profileId) },
+            onFailure = { error ->
+                log.w(error) { "Failed to refresh extra watched keys from ${providerId.storageId}" }
+            },
+        )
+        if (currentProfileId != profileId) return
+        freshFullyWatchedKeys?.let { keys ->
+            providerFullyWatchedSeriesKeys[providerId] = keys
+        }
+        freshExtraKeys?.let { keys ->
+            providerExtraWatchedKeys[providerId] = keys
+        }
+        itemsStore.update { _, providerItems, _, dirtyProviderKeys ->
+            val dirtyKeys = dirtyProviderKeys.getOrPut(providerId, ::mutableSetOf)
+            val merged = mergeWatchedSnapshot(
+                serverItems = freshItems,
+                localItems = providerItems[providerId]?.values.orEmpty().toList(),
+                dirtyKeys = dirtyKeys,
+                acknowledgeDirtyByPresence = true,
+            )
+            providerItems[providerId] = merged.items.toMutableMap()
+            dirtyKeys.clear()
+            dirtyKeys += merged.dirtyKeys
+        }
+        loadedProviders += providerId
+        providersLoadedFromRemote += providerId
+        publish()
+        persist()
     }
 
     private fun stopExtraKeysObserver() {
         extraKeysObserverJob?.cancel()
         extraKeysObserverJob = null
+        secondaryAniListExtraKeysJob?.cancel()
+        secondaryAniListExtraKeysJob = null
+        dualAniListObserverJob?.cancel()
+        dualAniListObserverJob = null
     }
 
     private fun persist() {

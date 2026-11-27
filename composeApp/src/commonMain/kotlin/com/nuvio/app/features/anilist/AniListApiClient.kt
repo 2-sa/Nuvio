@@ -53,6 +53,7 @@ internal class AniListApiClient(
                 "lists { status entries { id status score(format: POINT_100) progress updatedAt " +
                 "media { id idMal title { romaji english } format status episodes duration seasonYear " +
                 "coverImage { extraLarge large } averageScore " +
+                "nextAiringEpisode { airingAt episode } " +
                 "relations { edges { relationType node { id format } } } } } } } }"
         val variables = buildJsonObject {
             put("userId", userId)
@@ -78,6 +79,7 @@ internal class AniListApiClient(
                 "id status score(format: POINT_100) progress updatedAt " +
                 "media { id idMal title { romaji english } format status episodes duration seasonYear " +
                 "coverImage { extraLarge large } averageScore " +
+                "nextAiringEpisode { airingAt episode } " +
                 "relations { edges { relationType node { id format } } } } } }"
         val variables = buildJsonObject {
             put("mediaId", mediaId)
@@ -252,6 +254,8 @@ private fun MediaListEntryNode.toAniListMediaEntry(
         userScore = score?.toInt() ?: 0,
         updatedAtSeconds = updatedAt ?: 0L,
         prequelIds = prequelIds,
+        nextAiringEpisode = mediaNode.nextAiringEpisode?.episode?.takeIf { it > 0 },
+        nextAiringAtSeconds = mediaNode.nextAiringEpisode?.airingAt?.takeIf { it > 0L },
     )
 }
 
@@ -332,7 +336,14 @@ private data class MediaNode(
     val seasonYear: Int? = null,
     val coverImage: MediaCoverImageNode? = null,
     val averageScore: Int? = null,
+    val nextAiringEpisode: NextAiringEpisodeNode? = null,
     val relations: MediaRelationsNode? = null,
+)
+
+@Serializable
+private data class NextAiringEpisodeNode(
+    val airingAt: Long? = null,
+    val episode: Int? = null,
 )
 
 @Serializable

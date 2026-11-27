@@ -50,7 +50,13 @@ object WatchingState {
             if (com.nuvio.app.features.simkl.SimklAnimeWatchedFallback.isWatched(videoId, episodeNumber)) {
                 return true
             }
-            if (com.nuvio.app.features.anilist.AniListTracker.isAnimeEpisodeWatched(metaId, videoId, episodeNumber)) {
+            if (com.nuvio.app.features.anilist.AniListTracker.isAnimeEpisodeWatched(
+                    metaId = metaId,
+                    videoId = videoId,
+                    seasonNumber = episode.season,
+                    episodeNumber = episodeNumber,
+                )
+            ) {
                 return true
             }
         }

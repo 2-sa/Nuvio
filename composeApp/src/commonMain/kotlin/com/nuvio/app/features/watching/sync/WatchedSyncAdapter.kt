@@ -3,6 +3,7 @@ package com.nuvio.app.features.watching.sync
 import com.nuvio.app.features.watched.WatchedItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 data class WatchedDeltaEvent(
     val eventId: Long,
@@ -36,6 +37,9 @@ interface WatchedSyncAdapter {
      * Default implementation emits the result of pullExtraWatchedKeys once.
      */
     fun observeExtraWatchedKeys(profileId: Int): Flow<Set<String>> = flowOf(emptySet())
+
+    fun observeWatchedChanges(profileId: Int): Flow<Unit> =
+        observeExtraWatchedKeys(profileId).map { Unit }
 
     suspend fun getDeltaCursor(profileId: Int): Long? = null
 

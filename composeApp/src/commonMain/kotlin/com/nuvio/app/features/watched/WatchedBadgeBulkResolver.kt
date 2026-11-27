@@ -88,7 +88,13 @@ suspend fun resolveWatchedBadgesBulk(
                             } else {
                                 val episodeNumber = episode.episode
                                 if (episodeNumber != null) {
-                                    com.nuvio.app.features.simkl.SimklAnimeWatchedFallback.isWatched(episode.id, episodeNumber)
+                                    com.nuvio.app.features.simkl.SimklAnimeWatchedFallback.isWatched(episode.id, episodeNumber) ||
+                                        com.nuvio.app.features.anilist.AniListTracker.isAnimeEpisodeWatched(
+                                            metaId = meta.id,
+                                            videoId = episode.id,
+                                            seasonNumber = episode.season,
+                                            episodeNumber = episodeNumber,
+                                        )
                                 } else {
                                     false
                                 }
@@ -147,16 +153,31 @@ fun expandFullyWatchedWithSiblings() {
 }
 
 private fun getActiveProviderSiblingMap(): Map<String, Set<String>> {
-    val source = TrackingSettingsRepository.uiState.value.watchProgressSource
+    val settings = TrackingSettingsRepository.uiState.value
     val effectiveSource = effectiveWatchProgressSource(
-        requestedSource = source,
+        requestedSource = settings.watchProgressSource,
         isProviderAuthenticated = { providerId ->
             com.nuvio.app.features.tracking.TrackingProviderRegistry.isAuthenticated(providerId)
         },
     )
-    return effectiveSource.providerId?.let {
+    val primarySiblings = effectiveSource.providerId?.let {
         com.nuvio.app.features.tracking.TrackingProviderRegistry.progressProvider(it)?.showIdSiblings()
     }.orEmpty()
+    val dualAniListActive = settings.useAniListForAnime &&
+        effectiveSource != com.nuvio.app.features.tracking.WatchProgressSource.ANILIST &&
+        com.nuvio.app.features.tracking.TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST)
+    if (!dualAniListActive) return primarySiblings
+    val anilistSiblings = com.nuvio.app.features.tracking.TrackingProviderRegistry
+        .progressProvider(TrackingProviderId.ANILIST)
+        ?.showIdSiblings()
+        .orEmpty()
+    if (anilistSiblings.isEmpty()) return primarySiblings
+    if (primarySiblings.isEmpty()) return anilistSiblings
+    val merged = primarySiblings.mapValuesTo(linkedMapOf()) { (_, v) -> v.toMutableSet() }
+    anilistSiblings.forEach { (key, siblings) ->
+        merged.getOrPut(key) { linkedSetOf() }.addAll(siblings)
+    }
+    return merged.mapValues { (_, v) -> v.toSet() }
 }
 
 private fun extractContentIdFromWatchedKey(key: String): String? {

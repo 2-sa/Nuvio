@@ -58,10 +58,19 @@ internal fun mapEntryProgressToSeasonEpisode(
     entry: AniListMediaEntry,
     allEntries: List<AniListMediaEntry>,
     addonEpisodes: List<SeasonEpisodeRef>,
+    isPerSeasonContentId: Boolean = false,
 ): SeasonEpisodeRef {
     val safeProgress = entry.progress.coerceAtLeast(1)
-    val explicitSeason = extractExplicitSeasonNumber(entry.titleEnglish, entry.titleRomaji)
     val ordered = orderedMainEpisodes(addonEpisodes)
+    val distinctMainSeasons = ordered.mapTo(mutableSetOf()) { it.season }
+    if (distinctMainSeasons.size == 1) {
+        val season = ordered.first().season
+        return ordered.getOrNull(safeProgress - 1) ?: SeasonEpisodeRef(season = season, episode = safeProgress)
+    }
+    if (ordered.isEmpty() && isPerSeasonContentId) {
+        return SeasonEpisodeRef(season = 1, episode = safeProgress)
+    }
+    val explicitSeason = extractExplicitSeasonNumber(entry.titleEnglish, entry.titleRomaji)
     if (explicitSeason != null) {
         val seasonEps = ordered.filter { it.season == explicitSeason }
         if (seasonEps.isNotEmpty()) {
@@ -85,10 +94,25 @@ internal fun mapEntryProgressToWatchedEpisodes(
     entry: AniListMediaEntry,
     allEntries: List<AniListMediaEntry>,
     addonEpisodes: List<SeasonEpisodeRef>,
+    isPerSeasonContentId: Boolean = false,
 ): List<SeasonEpisodeRef> {
     if (entry.progress <= 0) return emptyList()
-    val explicitSeason = extractExplicitSeasonNumber(entry.titleEnglish, entry.titleRomaji)
     val ordered = orderedMainEpisodes(addonEpisodes)
+    val distinctMainSeasons = ordered.mapTo(mutableSetOf()) { it.season }
+    if (distinctMainSeasons.size == 1) {
+        val season = ordered.first().season
+        val count = minOf(entry.progress, MAX_FALLBACK_EPISODES)
+        return if (count <= ordered.size) {
+            ordered.take(count)
+        } else {
+            ordered + ((ordered.size + 1)..count).map { ep -> SeasonEpisodeRef(season = season, episode = ep) }
+        }
+    }
+    if (ordered.isEmpty() && isPerSeasonContentId) {
+        val count = minOf(entry.progress, MAX_FALLBACK_EPISODES)
+        return (1..count).map { ep -> SeasonEpisodeRef(season = 1, episode = ep) }
+    }
+    val explicitSeason = extractExplicitSeasonNumber(entry.titleEnglish, entry.titleRomaji)
     if (explicitSeason != null) {
         val priorSeasonEps = ordered.filter { it.season in 1 until explicitSeason }
         val targetSeasonEps = ordered.filter { it.season == explicitSeason }
@@ -128,8 +152,14 @@ internal fun mapSeasonEpisodeToEntryProgress(
     entry: AniListMediaEntry?,
     allEntries: List<AniListMediaEntry>,
     addonEpisodes: List<SeasonEpisodeRef>,
+    isPerSeasonContentId: Boolean = false,
 ): Int {
     if (entry == null) return mapSeasonEpisodeToAbsolute(season, episode, addonEpisodes)
+    val ordered = orderedMainEpisodes(addonEpisodes)
+    val distinctMainSeasons = ordered.mapTo(mutableSetOf()) { it.season }
+    if (distinctMainSeasons.size == 1 || (ordered.isEmpty() && isPerSeasonContentId)) {
+        return episode.coerceAtLeast(1)
+    }
     val explicitSeason = extractExplicitSeasonNumber(entry.titleEnglish, entry.titleRomaji)
     if (explicitSeason != null && season == explicitSeason) {
         return episode.coerceAtLeast(1)

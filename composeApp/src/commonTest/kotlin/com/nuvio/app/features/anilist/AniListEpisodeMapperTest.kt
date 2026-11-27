@@ -133,4 +133,159 @@ class AniListEpisodeMapperTest {
         assertEquals(29, mapEntryProgressToWatchedEpisodes(s2, allEntries, showEpisodes).size)
         assertEquals(6, mapSeasonEpisodeToEntryProgress(2, 6, s2, allEntries, showEpisodes))
     }
+
+    @Test
+    fun `maps per-season single-season addon episodes as flat Season 1 without prequel offset`() {
+        val gantzS1 = AniListMediaEntry(
+            mediaId = 384,
+            malId = 384,
+            titleRomaji = "Gantz",
+            format = "TV",
+            episodes = 13,
+            userStatus = AniListListStatus.COMPLETED,
+            progress = 13,
+        )
+        val gantzS2 = AniListMediaEntry(
+            mediaId = 395,
+            malId = 395,
+            titleRomaji = "Gantz: Second Stage",
+            titleEnglish = "Gantz: Second Stage",
+            format = "TV",
+            episodes = 13,
+            userStatus = AniListListStatus.CURRENT,
+            progress = 3,
+            prequelIds = listOf(384),
+        )
+        val allEntries = listOf(gantzS1, gantzS2)
+        val singleSeasonAddonEpisodes = (1..13).map { ep -> SeasonEpisodeRef(season = 1, episode = ep) }
+
+        assertEquals(
+            SeasonEpisodeRef(season = 1, episode = 3),
+            mapEntryProgressToSeasonEpisode(
+                entry = gantzS2,
+                allEntries = allEntries,
+                addonEpisodes = singleSeasonAddonEpisodes,
+                isPerSeasonContentId = true,
+            ),
+        )
+        val watched = mapEntryProgressToWatchedEpisodes(
+            entry = gantzS2,
+            allEntries = allEntries,
+            addonEpisodes = singleSeasonAddonEpisodes,
+            isPerSeasonContentId = true,
+        )
+        assertEquals(
+            listOf(
+                SeasonEpisodeRef(season = 1, episode = 1),
+                SeasonEpisodeRef(season = 1, episode = 2),
+                SeasonEpisodeRef(season = 1, episode = 3),
+            ),
+            watched,
+        )
+        assertEquals(
+            4,
+            mapSeasonEpisodeToEntryProgress(
+                season = 1,
+                episode = 4,
+                entry = gantzS2,
+                allEntries = allEntries,
+                addonEpisodes = singleSeasonAddonEpisodes,
+                isPerSeasonContentId = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `maps per-season contentId that fell back to multi-season Cinemeta addon using explicit season and prequel offset`() {
+        val blackCloverEpisodes = buildList {
+            for (ep in 1..170) add(SeasonEpisodeRef(season = 1, episode = ep))
+            for (ep in 1..12) add(SeasonEpisodeRef(season = 2, episode = ep))
+        }
+        val season1Entry = AniListMediaEntry(
+            mediaId = 97940,
+            malId = 34572,
+            titleRomaji = "Black Clover",
+            format = "TV",
+            episodes = 170,
+            userStatus = AniListListStatus.COMPLETED,
+            progress = 170,
+        )
+        val season2Entry = AniListMediaEntry(
+            mediaId = 180001,
+            malId = 55001,
+            titleRomaji = "Black Clover Season 2",
+            titleEnglish = "Black Clover Season 2",
+            format = "TV",
+            episodes = 12,
+            userStatus = AniListListStatus.CURRENT,
+            progress = 5,
+            prequelIds = listOf(97940),
+        )
+        val allEntries = listOf(season1Entry, season2Entry)
+
+        assertEquals(
+            SeasonEpisodeRef(season = 2, episode = 5),
+            mapEntryProgressToSeasonEpisode(
+                entry = season2Entry,
+                allEntries = allEntries,
+                addonEpisodes = blackCloverEpisodes,
+                isPerSeasonContentId = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `empty addon episodes with isPerSeasonContentId true defaults to flat Season 1 without prequel offset`() {
+        val season1Entry = AniListMediaEntry(
+            mediaId = 97940,
+            malId = 34572,
+            titleRomaji = "Black Clover",
+            format = "TV",
+            episodes = 170,
+            userStatus = AniListListStatus.COMPLETED,
+            progress = 170,
+        )
+        val season2Entry = AniListMediaEntry(
+            mediaId = 180001,
+            malId = 55001,
+            titleRomaji = "Black Clover Season 2",
+            titleEnglish = "Black Clover Season 2",
+            format = "TV",
+            episodes = 12,
+            userStatus = AniListListStatus.CURRENT,
+            progress = 5,
+            prequelIds = listOf(97940),
+        )
+        val allEntries = listOf(season1Entry, season2Entry)
+
+        assertEquals(
+            SeasonEpisodeRef(season = 1, episode = 5),
+            mapEntryProgressToSeasonEpisode(
+                entry = season2Entry,
+                allEntries = allEntries,
+                addonEpisodes = emptyList(),
+                isPerSeasonContentId = true,
+            ),
+        )
+        assertEquals(
+            5,
+            mapEntryProgressToWatchedEpisodes(
+                entry = season2Entry,
+                allEntries = allEntries,
+                addonEpisodes = emptyList(),
+                isPerSeasonContentId = true,
+            ).size,
+        )
+        assertEquals(
+            6,
+            mapSeasonEpisodeToEntryProgress(
+                season = 1,
+                episode = 6,
+                entry = season2Entry,
+                allEntries = allEntries,
+                addonEpisodes = emptyList(),
+                isPerSeasonContentId = true,
+            ),
+        )
+    }
 }

@@ -324,4 +324,119 @@ class AniListApiAndAuthTest {
         assertFalse(isAniListEntryEpisodeWatched(entries, "mal:55001", null, 6))
         assertFalse(isAniListEntryEpisodeWatched(entries, "mal:999999", null, 1))
     }
+
+    @Test
+    fun `parseMediaListCollectionResponse parses nextAiringEpisode onto AniListMediaEntry`() {
+        val json = """
+            {
+              "data": {
+                "MediaListCollection": {
+                  "lists": [
+                    {
+                      "status": "CURRENT",
+                      "entries": [
+                        {
+                          "id": 950,
+                          "status": "CURRENT",
+                          "progress": 4,
+                          "updatedAt": 1700000500,
+                          "media": {
+                            "id": 180001,
+                            "idMal": 55001,
+                            "title": {
+                              "romaji": "Black Clover Season 2",
+                              "english": "Black Clover Season 2"
+                            },
+                            "format": "TV",
+                            "status": "RELEASING",
+                            "episodes": null,
+                            "nextAiringEpisode": {
+                              "airingAt": 1764000000,
+                              "episode": 5
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val entries = parseMediaListCollectionResponse(json)
+        assertEquals(1, entries.size)
+        assertEquals(5, entries.first().nextAiringEpisode)
+        assertEquals(1764000000L, entries.first().nextAiringAtSeconds)
+    }
+
+    @Test
+    fun `selectAniListContinueWatchingEntries includes progress 0 airing or finished and episodes null while excluding unreleased without airing time`() {
+        val entries = listOf(
+            AniListMediaEntry(
+                mediaId = 10,
+                titleRomaji = "Black Clover Season 2",
+                format = "TV",
+                status = "RELEASING",
+                episodes = null,
+                userStatus = AniListListStatus.CURRENT,
+                progress = 0,
+                updatedAtSeconds = 500L,
+            ),
+            AniListMediaEntry(
+                mediaId = 11,
+                titleRomaji = "Dragon Ball Super: Beerus",
+                format = "TV",
+                status = "NOT_YET_RELEASED",
+                episodes = null,
+                userStatus = AniListListStatus.CURRENT,
+                progress = 0,
+                nextAiringEpisode = 1,
+                nextAiringAtSeconds = 1764500000L,
+                updatedAtSeconds = 400L,
+            ),
+            AniListMediaEntry(
+                mediaId = 12,
+                titleRomaji = "Overgeared",
+                format = "ONA",
+                status = "RELEASING",
+                episodes = null,
+                userStatus = AniListListStatus.REPEATING,
+                progress = 3,
+                updatedAtSeconds = 600L,
+            ),
+            AniListMediaEntry(
+                mediaId = 13,
+                titleRomaji = "Far Future Unannounced",
+                format = "TV",
+                status = "NOT_YET_RELEASED",
+                episodes = 12,
+                userStatus = AniListListStatus.CURRENT,
+                progress = 0,
+                nextAiringAtSeconds = null,
+                updatedAtSeconds = 700L,
+            ),
+            AniListMediaEntry(
+                mediaId = 14,
+                titleRomaji = "Finished Show Just Added",
+                format = "TV",
+                status = "FINISHED",
+                episodes = 12,
+                userStatus = AniListListStatus.CURRENT,
+                progress = 0,
+                updatedAtSeconds = 300L,
+            ),
+        )
+
+        val selected = selectAniListContinueWatchingEntries(entries)
+        assertEquals(listOf(12, 10, 11, 14), selected.map { it.mediaId })
+    }
+
+    @Test
+    fun `ANILIST_TABS order matches Watching Completed Planning Paused Dropped Repeating`() {
+        assertEquals(
+            listOf("Watching", "Completed", "Planning", "Paused", "Dropped", "Repeating"),
+            ANILIST_TABS.map { it.title },
+        )
+    }
 }
