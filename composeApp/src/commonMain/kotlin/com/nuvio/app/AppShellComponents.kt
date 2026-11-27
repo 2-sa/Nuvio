@@ -66,6 +66,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
@@ -1353,9 +1358,7 @@ internal fun DesktopFloatingTopBar(
                             value = searchQuery,
                             onValueChange = { updated ->
                                 onSearchQueryChange(updated)
-                                if (updated.isNotBlank()) {
-                                    onTabSelected(AppScreenTab.Search)
-                                } else {
+                                if (updated.isBlank()) {
                                     SearchRepository.clear()
                                 }
                             },
@@ -1367,12 +1370,25 @@ internal fun DesktopFloatingTopBar(
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(
                                 onSearch = {
+                                    isDropdownOpen = false
                                     executeSearch(searchQuery)
                                     focusManager.clearFocus()
                                 },
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown &&
+                                        (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                                    ) {
+                                        isDropdownOpen = false
+                                        executeSearch(searchQuery)
+                                        focusManager.clearFocus()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
                                 .onFocusChanged { focusState ->
                                     isSearchFocused = focusState.isFocused
                                     if (focusState.isFocused) {
