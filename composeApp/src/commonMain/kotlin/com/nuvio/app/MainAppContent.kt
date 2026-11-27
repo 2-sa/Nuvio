@@ -1305,7 +1305,10 @@ internal fun MainAppContent(
         val onContinueWatchingClick: (ContinueWatchingItem) -> Unit = { item ->
             if (
                 !item.isCloudLibraryContinueWatchingItem() &&
-                continueWatchingPreferencesUiState.clickAction.opensDetails(item)
+                continueWatchingPreferencesUiState.clickAction.opensDetails(
+                    item = item,
+                    canSelectStreams = canSelectContinueWatchingStreams(item),
+                )
             ) {
                 navController.navigate(
                     DetailRoute(

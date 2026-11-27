@@ -1879,9 +1879,15 @@ object WatchProgressRepository {
     suspend fun prepareNextUpProgressEntries(
         entries: List<WatchProgressEntry>,
         contentId: String,
-    ): List<WatchProgressEntry> = activeProgressProvider()
-        ?.prepareNextUpProgressEntries(entries, contentId)
-        ?: entries
+    ): List<WatchProgressEntry> = prepareNextUpProgressEntriesWithDelegate(
+        entries = entries,
+        contentId = contentId,
+        delegate = { targetEntries, targetContentId ->
+            activeProgressProvider()
+                ?.prepareNextUpProgressEntries(targetEntries, targetContentId)
+                ?: targetEntries
+        },
+    )
 
     private fun AddonsUiState.metadataProviderReadiness(): MetadataProviderReadiness {
         val enabled = addons.enabledAddons()
@@ -1896,6 +1902,22 @@ object WatchProgressRepository {
     private fun AddonManifest.hasMetaResource(): Boolean =
         resources.any { resource -> resource.name == "meta" }
 
+}
+
+internal suspend fun prepareNextUpProgressEntriesWithDelegate(
+    entries: List<WatchProgressEntry>,
+    contentId: String,
+    delegate: suspend (List<WatchProgressEntry>, String) -> List<WatchProgressEntry>,
+): List<WatchProgressEntry> {
+    if (
+        entries.any { entry ->
+            entry.parentMetaId == contentId &&
+                entry.source == TrackingProviderId.ANILIST.storageId
+        }
+    ) {
+        return entries
+    }
+    return delegate(entries, contentId)
 }
 
 internal fun projectWatchProgressUiState(

@@ -33,6 +33,7 @@ data class CachedNextUpItem(
     val seedEpisode: Int? = null,
     val isReleaseAlert: Boolean = false,
     val isNewSeasonRelease: Boolean = false,
+    val isSyntheticFallback: Boolean = false,
 )
 
 @Serializable

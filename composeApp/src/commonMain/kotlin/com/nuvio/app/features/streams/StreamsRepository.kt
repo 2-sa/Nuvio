@@ -3,7 +3,10 @@ package com.nuvio.app.features.streams
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.anilist.AnimeIdBridge
+import com.nuvio.app.features.anilist.AnimeIdBridgeIndex
 import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DebridStreamPresentation
@@ -183,19 +186,15 @@ object StreamsRepository {
             return
         }
 
-        val streamAddons = installedAddons
-            .mapNotNull { addon ->
-                val manifest = addon.manifest ?: return@mapNotNull null
-                if (!manifest.supportsStream(type, videoId)) return@mapNotNull null
+        val (resolvedVideoId, streamAddons) = resolveStreamAddonTargets(
+            installedAddons = installedAddons,
+            type = type,
+            videoId = videoId,
+            season = season,
+            episode = episode,
+        )
 
-                InstalledStreamAddonTarget(
-                    addonName = addon.displayTitle.ifBlank { manifest.name },
-                    addonId = addon.streamAddonInstanceId(manifest.id),
-                    manifest = manifest,
-                )
-            }
-
-        log.d { "Found ${streamAddons.size} addons for stream type=$type id=$videoId" }
+        log.d { "Found ${streamAddons.size} addons for stream type=$type id=$videoId resolvedId=$resolvedVideoId" }
 
         if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty()) {
             _uiState.value = StreamsUiState(
@@ -210,7 +209,7 @@ object StreamsRepository {
         // Initialise loading placeholders
         val searchTargets = StreamSearchTargets(
             type = type,
-            videoId = videoId,
+            videoId = resolvedVideoId,
             season = season,
             episode = episode,
             streamAddons = streamAddons,
@@ -590,4 +589,45 @@ object StreamsRepository {
     fun setOverlayVisible(visible: Boolean, message: String? = null) {
         _uiState.update { it.copy(showDirectAutoPlayOverlay = visible, overlayMessage = message) }
     }
+}
+
+internal fun resolveStreamAddonTargets(
+    installedAddons: List<ManagedAddon>,
+    type: String,
+    videoId: String,
+    season: Int? = null,
+    episode: Int? = null,
+    bridgeIndex: AnimeIdBridgeIndex = AnimeIdBridge.currentIndex(),
+): Pair<String, List<InstalledStreamAddonTarget>> {
+    fun findTargets(candidateVideoId: String): List<InstalledStreamAddonTarget> =
+        installedAddons.mapNotNull { addon ->
+            val manifest = addon.manifest ?: return@mapNotNull null
+            if (!manifest.supportsStream(type, candidateVideoId)) return@mapNotNull null
+            InstalledStreamAddonTarget(
+                addonName = addon.displayTitle.ifBlank { manifest.name },
+                addonId = addon.streamAddonInstanceId(manifest.id),
+                manifest = manifest,
+            )
+        }
+
+    val directTargets = findTargets(videoId)
+    if (directTargets.isNotEmpty()) {
+        return videoId to directTargets
+    }
+
+    val fallbackVideoIds = AnimeIdBridge.addonFallbackVideoIds(
+        type = type,
+        videoId = videoId,
+        season = season,
+        episode = episode,
+        index = bridgeIndex,
+    ).drop(1)
+    for (candidateVideoId in fallbackVideoIds) {
+        val candidateTargets = findTargets(candidateVideoId)
+        if (candidateTargets.isNotEmpty()) {
+            return candidateVideoId to candidateTargets
+        }
+    }
+
+    return videoId to emptyList()
 }

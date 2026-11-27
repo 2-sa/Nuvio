@@ -9,6 +9,8 @@ import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.supportsResource
+import com.nuvio.app.features.anilist.AnimeIdBridge
+import com.nuvio.app.features.anilist.AnimeIdBridgeIndex
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.plugins.PluginRepository
@@ -24,7 +26,13 @@ internal fun hasCompatiblePlaybackSource(
     plugins: PluginsUiState,
     type: String,
     videoId: String,
+    bridgeIndex: AnimeIdBridgeIndex = AnimeIdBridge.currentIndex(),
 ): Boolean = addons.any { it.enabled && it.manifest?.supportsStream(type, videoId) == true } ||
+    AnimeIdBridge.addonFallbackVideoIds(type = type, videoId = videoId, index = bridgeIndex)
+        .drop(1)
+        .any { candidateVideoId ->
+            addons.any { it.enabled && it.manifest?.supportsStream(type, candidateVideoId) == true }
+        } ||
     (plugins.pluginsEnabled && plugins.scrapers.any { it.enabled && it.supportsType(type) })
 
 internal class PlaybackAvailability(
@@ -84,7 +92,8 @@ internal fun rememberPlaybackAvailability(): PlaybackAvailability {
         ServerRepository.ensureLoaded()
         ServerRepository.uiState
     }.collectAsStateWithLifecycle()
-    return remember(addons, plugins, downloads, servers.revision) {
+    val animeIdBridgeIndex by AnimeIdBridge.indexState.collectAsStateWithLifecycle()
+    return remember(addons, plugins, downloads, servers.revision, animeIdBridgeIndex) {
         PlaybackAvailability(addons.addons, plugins)
     }
 }

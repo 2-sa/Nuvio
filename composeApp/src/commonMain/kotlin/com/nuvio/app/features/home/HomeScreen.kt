@@ -50,10 +50,16 @@ import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryRepository
 import com.nuvio.app.features.cloud.CloudLibraryUiState
 import com.nuvio.app.features.cloud.findPlaybackTargetForProgress
+import com.nuvio.app.features.anilist.AniListMediaEntry
+import com.nuvio.app.features.anilist.AniListTracker
+import com.nuvio.app.features.anilist.displayTitle
+import com.nuvio.app.features.anilist.extractExplicitSeasonNumber
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.details.SeriesPrimaryAction
+import com.nuvio.app.features.details.firstPlayableEpisode
+import com.nuvio.app.features.details.firstReleasedPlayableEpisode
 import com.nuvio.app.features.details.seriesPrimaryAction
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
@@ -93,6 +99,7 @@ import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import com.nuvio.app.features.watchprogress.buildContinueWatchingEpisodeSubtitle
+import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import com.nuvio.app.features.watchprogress.continueWatchingEntries
 import com.nuvio.app.features.watchprogress.toContinueWatchingItem
 import com.nuvio.app.features.watchprogress.toUpNextContinueWatchingItem
@@ -116,6 +123,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import kotlin.time.TimeSource
 import com.nuvio.app.features.home.components.continueWatchingHeroViewportReserveHeight
 import com.nuvio.app.features.home.components.homeCatalogPreviewLimitForWidth
@@ -186,6 +194,7 @@ fun HomeScreen(
         TrackingSettingsRepository.ensureLoaded()
         TrackingSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
+    val aniListSyncUiState by AniListTracker.syncState.collectAsStateWithLifecycle()
     val navBarScrollState = LocalNuvioNavBarScrollState.current
     var observedOfflineState by remember { mutableStateOf(false) }
 
@@ -286,10 +295,12 @@ fun HomeScreen(
     val recentNextUpSeedCandidates = remember(
         allNextUpSeedCandidates,
         continueWatchingCutoffEpochMs,
+        aniListSyncUiState.snapshot,
     ) {
         filterHomeNextUpCandidatesForContinueWatchingWindow(
             candidates = allNextUpSeedCandidates,
             cutoffEpochMs = continueWatchingCutoffEpochMs,
+            isAniListCandidate = AniListTracker::isActiveContinueWatchingContentId,
         )
     }
 
@@ -656,20 +667,10 @@ fun HomeScreen(
         }
 
         withContext(Dispatchers.Default) {
-            val cachedResolvedNextUpItems = completedSeriesCandidates.mapNotNull { candidate ->
-                val cached = cachedNextUpItems[candidate.content.id] ?: return@mapNotNull null
-                val item = cached.second
-                if (
-                    item.nextUpSeedSeasonNumber != candidate.seasonNumber ||
-                    item.nextUpSeedEpisodeNumber != candidate.episodeNumber
-                ) {
-                    return@mapNotNull null
-                }
-                if (!hasUsableHomeNextUpMetadata(item)) {
-                    return@mapNotNull null
-                }
-                candidate.content.id to cached
-            }.toMap()
+            val cachedResolvedNextUpItems = filterCachedResolvedNextUpItems(
+                candidates = completedSeriesCandidates,
+                cachedNextUpItems = cachedNextUpItems,
+            )
             val candidatesToResolve = completedSeriesCandidates.filter { candidate ->
                 candidate.content.id !in cachedResolvedNextUpItems
             }
@@ -1395,12 +1396,44 @@ internal fun filterEntriesForContinueWatchingWindow(
     ?.let { cutoff -> entries.filter { entry -> entry.lastUpdatedEpochMs >= cutoff } }
     ?: entries
 
+internal fun shouldBypassContinueWatchingCutoffForCandidate(
+    candidate: CompletedSeriesCandidate,
+    isAniListCandidate: (String) -> Boolean,
+): Boolean = isAniListCandidate(candidate.content.id)
+
 internal fun filterHomeNextUpCandidatesForContinueWatchingWindow(
     candidates: List<CompletedSeriesCandidate>,
     cutoffEpochMs: Long?,
+    isAniListCandidate: (String) -> Boolean = { false },
 ): List<CompletedSeriesCandidate> = cutoffEpochMs
-    ?.let { cutoff -> candidates.filter { candidate -> candidate.markedAtEpochMs >= cutoff } }
+    ?.let { cutoff ->
+        candidates.filter { candidate ->
+            candidate.markedAtEpochMs >= cutoff ||
+                shouldBypassContinueWatchingCutoffForCandidate(candidate, isAniListCandidate)
+        }
+    }
     ?: candidates
+
+internal fun filterCachedResolvedNextUpItems(
+    candidates: List<CompletedSeriesCandidate>,
+    cachedNextUpItems: Map<String, Pair<Long, ContinueWatchingItem>>,
+): Map<String, Pair<Long, ContinueWatchingItem>> = candidates.mapNotNull { candidate ->
+    val cached = cachedNextUpItems[candidate.content.id] ?: return@mapNotNull null
+    val item = cached.second
+    if (item.isSyntheticFallback) {
+        return@mapNotNull null
+    }
+    if (
+        item.nextUpSeedSeasonNumber != candidate.seasonNumber ||
+        item.nextUpSeedEpisodeNumber != candidate.episodeNumber
+    ) {
+        return@mapNotNull null
+    }
+    if (!hasUsableHomeNextUpMetadata(item)) {
+        return@mapNotNull null
+    }
+    candidate.content.id to cached
+}.toMap()
 
 internal fun buildHomeNextUpSeedCandidates(
     progressEntries: List<WatchProgressEntry>,
@@ -1559,6 +1592,103 @@ internal fun classifyHomeNextUpCandidateMetadata(
     )
 }
 
+internal fun buildSyntheticAniListNextUpItem(
+    entry: AniListMediaEntry,
+    contentId: String,
+    seedSeasonNumber: Int,
+    seedEpisodeNumber: Int,
+    meta: MetaDetails?,
+    nowEpochMs: Long,
+    showUnairedNextUp: Boolean,
+): ContinueWatchingItem? {
+    val nextEpisodeNum = entry.progress.coerceAtLeast(0) + 1
+    if (entry.episodes != null && nextEpisodeNum > entry.episodes) {
+        return null
+    }
+
+    val airingAtSeconds = when {
+        entry.nextAiringEpisode == nextEpisodeNum -> entry.nextAiringAtSeconds
+        entry.progress == 0 && entry.nextAiringEpisode == null -> entry.nextAiringAtSeconds
+        else -> null
+    }
+    val releasedIso = if (airingAtSeconds != null) {
+        val isFuture = airingAtSeconds * 1000L > nowEpochMs
+        if (isFuture && !showUnairedNextUp) {
+            return null
+        }
+        Instant.fromEpochSeconds(airingAtSeconds).toString()
+    } else {
+        if (
+            entry.progress == 0 &&
+            entry.status.equals("NOT_YET_RELEASED", ignoreCase = true) &&
+            !showUnairedNextUp
+        ) {
+            return null
+        }
+        null
+    }
+
+    val distinctMainMetaSeasons = meta?.videos
+        .orEmpty()
+        .mapNotNull { video -> video.season?.takeIf { it > 0 } }
+        .toSet()
+    val isPerSeasonId = contentId.startsWith("mal:", ignoreCase = true) ||
+        contentId.startsWith("kitsu:", ignoreCase = true) ||
+        contentId.startsWith("anilist:", ignoreCase = true) ||
+        contentId.startsWith("anidb:", ignoreCase = true)
+    val resolvedNextSeason = when {
+        distinctMainMetaSeasons.size > 1 || !isPerSeasonId -> {
+            extractExplicitSeasonNumber(entry.titleEnglish, entry.titleRomaji)
+                ?: seedSeasonNumber.takeIf { it > 0 }
+                ?: 1
+        }
+        distinctMainMetaSeasons.size == 1 -> distinctMainMetaSeasons.first()
+        else -> seedSeasonNumber.takeIf { it > 0 } ?: 1
+    }
+
+    val resolvedTitle = meta?.name?.takeIf(String::isNotBlank) ?: entry.displayTitle()
+    val resolvedPoster = meta?.poster?.takeIf(String::isNotBlank) ?: entry.coverImageUrl?.takeIf(String::isNotBlank)
+    val resolvedBackground = meta?.background?.takeIf(String::isNotBlank)
+    val resolvedLogo = meta?.logo?.takeIf(String::isNotBlank)
+    val resolvedImageUrl = resolvedBackground ?: resolvedPoster
+
+    return ContinueWatchingItem(
+        parentMetaId = contentId,
+        parentMetaType = "series",
+        videoId = buildPlaybackVideoId(
+            parentMetaId = contentId,
+            seasonNumber = resolvedNextSeason,
+            episodeNumber = nextEpisodeNum,
+        ),
+        title = resolvedTitle,
+        subtitle = buildContinueWatchingEpisodeSubtitle(
+            seasonNumber = resolvedNextSeason,
+            episodeNumber = nextEpisodeNum,
+            episodeTitle = null,
+        ),
+        imageUrl = resolvedImageUrl,
+        logo = resolvedLogo,
+        poster = resolvedPoster,
+        background = resolvedBackground,
+        seasonNumber = resolvedNextSeason,
+        episodeNumber = nextEpisodeNum,
+        episodeTitle = null,
+        episodeThumbnail = null,
+        pauseDescription = null,
+        released = releasedIso,
+        isNextUp = true,
+        nextUpSeedSeasonNumber = seedSeasonNumber,
+        nextUpSeedEpisodeNumber = seedEpisodeNumber,
+        resumePositionMs = 0L,
+        resumeProgressFraction = null,
+        durationMs = 0L,
+        progressFraction = 0f,
+        isReleaseAlert = false,
+        isNewSeasonRelease = false,
+        isSyntheticFallback = true,
+    )
+}
+
 private suspend fun resolveHomeNextUpCandidate(
     completedEntry: CompletedSeriesCandidate,
     watchProgressEntries: List<WatchProgressEntry>,
@@ -1571,6 +1701,49 @@ private suspend fun resolveHomeNextUpCandidate(
     providerOwnsCompletedHistory: Boolean,
 ): HomeNextUpResolutionAttempt {
     val contentId = completedEntry.content.id
+    val anilistEntry = AniListTracker.findActiveContinueWatchingEntry(contentId)
+
+    fun resolveSyntheticAniListFallback(resolvedMeta: MetaDetails?): HomeNextUpResolutionAttempt {
+        val entry = anilistEntry ?: return HomeNextUpResolutionAttempt.conclusiveNone()
+        val dismissKey = nextUpDismissKey(
+            contentId = contentId,
+            seasonNumber = completedEntry.seasonNumber,
+            episodeNumber = completedEntry.episodeNumber,
+        )
+        if (dismissKey in dismissedNextUpKeys) {
+            return HomeNextUpResolutionAttempt.conclusiveNone()
+        }
+        val syntheticItem = buildSyntheticAniListNextUpItem(
+            entry = entry,
+            contentId = contentId,
+            seedSeasonNumber = completedEntry.seasonNumber,
+            seedEpisodeNumber = completedEntry.episodeNumber,
+            meta = resolvedMeta,
+            nowEpochMs = WatchProgressClock.nowEpochMs(),
+            showUnairedNextUp = showUnairedNextUp,
+        ) ?: return HomeNextUpResolutionAttempt.conclusiveNone()
+        val metadataDecision = classifyHomeNextUpCandidateMetadata(
+            freshItem = syntheticItem,
+            cachedFallbackItem = cachedFallbackItem,
+            dismissedNextUpKeys = dismissedNextUpKeys,
+        )
+        return when (metadataDecision.outcome) {
+            HomeNextUpCandidateMetadataOutcome.Dismissed -> HomeNextUpResolutionAttempt.conclusiveNone()
+            HomeNextUpCandidateMetadataOutcome.Transient -> HomeNextUpResolutionAttempt.transientFailure()
+            HomeNextUpCandidateMetadataOutcome.Ready -> {
+                val item = metadataDecision.item
+                val sortTimestamp = if (item.isReleaseAlert) {
+                    parseReleaseDateToEpochMs(item.released) ?: completedEntry.markedAtEpochMs
+                } else {
+                    completedEntry.markedAtEpochMs
+                }
+                HomeNextUpResolutionAttempt.success(
+                    contentId to (sortTimestamp to item),
+                )
+            }
+        }
+    }
+
     val meta = try {
         MetaDetailsRepository.fetch(
             type = completedEntry.content.type,
@@ -1581,7 +1754,43 @@ private suspend fun resolveHomeNextUpCandidate(
         null
     }
     if (meta == null) {
-        return HomeNextUpResolutionAttempt.transientFailure()
+        return if (anilistEntry != null) {
+            resolveSyntheticAniListFallback(resolvedMeta = null)
+        } else {
+            HomeNextUpResolutionAttempt.transientFailure()
+        }
+    }
+
+    if (completedEntry.episodeNumber == 0 && anilistEntry != null) {
+        val firstEpisode = meta.firstReleasedPlayableEpisode(todayIsoDate)
+            ?: if (showUnairedNextUp) meta.firstPlayableEpisode() else null
+        if (firstEpisode != null) {
+            val metadataDecision = classifyHomeNextUpCandidateMetadata(
+                freshItem = completedEntry.toContinueWatchingSeed(meta)
+                    .toUpNextContinueWatchingItem(firstEpisode),
+                cachedFallbackItem = cachedFallbackItem,
+                dismissedNextUpKeys = dismissedNextUpKeys,
+            )
+            return when (metadataDecision.outcome) {
+                HomeNextUpCandidateMetadataOutcome.Dismissed -> HomeNextUpResolutionAttempt.conclusiveNone()
+                HomeNextUpCandidateMetadataOutcome.Transient -> HomeNextUpResolutionAttempt.transientFailure()
+                HomeNextUpCandidateMetadataOutcome.Ready -> {
+                    val item = metadataDecision.item
+                    val sortTimestamp = if (item.isReleaseAlert) {
+                        parseReleaseDateToEpochMs(item.released) ?: completedEntry.markedAtEpochMs
+                    } else {
+                        completedEntry.markedAtEpochMs
+                    }
+                    HomeNextUpResolutionAttempt.success(
+                        contentId to (sortTimestamp to item),
+                    )
+                }
+            }
+        }
+        if (!showUnairedNextUp && meta.firstPlayableEpisode() != null) {
+            return HomeNextUpResolutionAttempt.conclusiveNone()
+        }
+        return resolveSyntheticAniListFallback(resolvedMeta = meta)
     }
 
     val resolvedProgressEntries = WatchProgressRepository.prepareNextUpProgressEntries(
@@ -1618,7 +1827,11 @@ private suspend fun resolveHomeNextUpCandidate(
         showUnairedNextUp = showUnairedNextUp,
     )
     if (action == null) {
-        return HomeNextUpResolutionAttempt.conclusiveNone()
+        return if (anilistEntry != null) {
+            resolveSyntheticAniListFallback(resolvedMeta = meta)
+        } else {
+            HomeNextUpResolutionAttempt.conclusiveNone()
+        }
     }
     if (action.resumePositionMs != null) {
         return HomeNextUpResolutionAttempt.conclusiveNone()
@@ -1626,7 +1839,11 @@ private suspend fun resolveHomeNextUpCandidate(
 
     val nextEpisode = meta.videoForSeriesAction(action)
     if (nextEpisode == null) {
-        return HomeNextUpResolutionAttempt.conclusiveNone()
+        return if (anilistEntry != null) {
+            resolveSyntheticAniListFallback(resolvedMeta = meta)
+        } else {
+            HomeNextUpResolutionAttempt.conclusiveNone()
+        }
     }
     val metadataDecision = classifyHomeNextUpCandidateMetadata(
         freshItem = completedEntry.toContinueWatchingSeed(meta)
@@ -1779,10 +1996,12 @@ internal fun ContinueWatchingItem.isUpcoming(nowEpochMs: Long = WatchProgressClo
 internal fun ContinueWatchingClickAction.opensDetails(
     item: ContinueWatchingItem,
     nowEpochMs: Long = WatchProgressClock.nowEpochMs(),
+    canSelectStreams: Boolean = true,
 ): Boolean = when (this) {
-    ContinueWatchingClickAction.STREAM -> false
+    ContinueWatchingClickAction.STREAM -> item.isSyntheticFallback && !canSelectStreams
     ContinueWatchingClickAction.DETAILS -> true
-    ContinueWatchingClickAction.DETAILS_FOR_UPCOMING -> item.isUpcoming(nowEpochMs)
+    ContinueWatchingClickAction.DETAILS_FOR_UPCOMING -> item.isUpcoming(nowEpochMs) ||
+        (item.isSyntheticFallback && !canSelectStreams)
 }
 
 private fun applyStreamingStyleSort(
@@ -1902,6 +2121,7 @@ private fun saveContinueWatchingSnapshots(
             seedEpisode = item.nextUpSeedEpisodeNumber,
             isReleaseAlert = item.isReleaseAlert,
             isNewSeasonRelease = item.isNewSeasonRelease,
+            isSyntheticFallback = item.isSyntheticFallback,
         )
     }
     val inProgressCache = buildHomeInProgressCacheSnapshot(
@@ -2019,6 +2239,7 @@ private fun CachedNextUpItem.toContinueWatchingItem(
         progressFraction = 0f,
         isReleaseAlert = alertState.isReleaseAlert,
         isNewSeasonRelease = alertState.isNewSeasonRelease,
+        isSyntheticFallback = isSyntheticFallback,
     )
 }
 

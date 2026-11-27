@@ -9,6 +9,7 @@ import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.core.poster.withCustomPosterUrls
 import com.nuvio.app.features.addons.supportsResource
+import com.nuvio.app.features.anilist.AnimeIdBridge
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.filterReleasedItems
 import com.nuvio.app.features.mdblist.MdbListMetadataService
@@ -137,28 +138,7 @@ object MetaDetailsRepository {
         scope.launch {
             val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
             val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
-
-            if (manifests.isEmpty()) {
-                val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
-                if (tmdbMeta != null) {
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = tmdbMeta,
-                        fallbackItemId = id,
-                        fallbackItemType = type,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                    )
-                    return@launch
-                }
-
-                log.w { "No addon provides meta for type=$type id=$id" }
-                _uiState.value = MetaDetailsUiState(
-                    errorMessage = getString(Res.string.details_no_addon_meta),
-                )
-                activeRequestKey = null
-                return@launch
-            }
+            var anySupportedAddon = manifests.isNotEmpty()
 
             for (manifest in manifests) {
                 val result = withContext(Dispatchers.Default) {
@@ -177,7 +157,51 @@ object MetaDetailsRepository {
                 }
             }
 
-            val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
+            val triedTmdbFallbackIds = mutableSetOf<String>()
+            val animeFallbackIds = AnimeIdBridge.addonFallbackIds(id).drop(1)
+            for (candidateId in animeFallbackIds) {
+                if (candidateId.equals(metaLookupId, ignoreCase = true)) continue
+                val candidateManifests = findReadyMetaManifests(type = type, id = candidateId)
+                if (candidateManifests.isNotEmpty()) {
+                    anySupportedAddon = true
+                }
+                for (manifest in candidateManifests) {
+                    val result = withContext(Dispatchers.Default) {
+                        tryFetchMeta(manifest, type, candidateId, includeMdbList = false)
+                    }
+                    if (result != null) {
+                        publishLoadedMeta(
+                            requestKey = requestKey,
+                            meta = result,
+                            fallbackItemId = candidateId,
+                            fallbackItemType = type,
+                            mdbListSettings = mdbListSettings,
+                            metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
+                        )
+                        return@launch
+                    }
+                }
+                if (candidateId.isTmdbFallbackEligibleId() && triedTmdbFallbackIds.add(candidateId.lowercase())) {
+                    val tmdbCandidateMeta = tryFetchTmdbFallbackMeta(type = type, id = candidateId)
+                    if (tmdbCandidateMeta != null) {
+                        publishLoadedMeta(
+                            requestKey = requestKey,
+                            meta = tmdbCandidateMeta,
+                            fallbackItemId = candidateId,
+                            fallbackItemType = type,
+                            mdbListSettings = mdbListSettings,
+                            metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
+                        )
+                        return@launch
+                    }
+                }
+            }
+
+            val tmdbMeta = if (triedTmdbFallbackIds.add(id.lowercase())) {
+                tryFetchTmdbFallbackMeta(type = type, id = id)
+            } else {
+                null
+            }
             if (tmdbMeta != null) {
                 publishLoadedMeta(
                     requestKey = requestKey,
@@ -190,9 +214,16 @@ object MetaDetailsRepository {
                 return@launch
             }
 
-            _uiState.value = MetaDetailsUiState(
-                errorMessage = getString(Res.string.details_load_failed_all_addons),
-            )
+            if (!anySupportedAddon) {
+                log.w { "No addon provides meta for type=$type id=$id" }
+                _uiState.value = MetaDetailsUiState(
+                    errorMessage = getString(Res.string.details_no_addon_meta),
+                )
+            } else {
+                _uiState.value = MetaDetailsUiState(
+                    errorMessage = getString(Res.string.details_load_failed_all_addons),
+                )
+            }
             activeRequestKey = null
         }
     }
@@ -241,6 +272,33 @@ object MetaDetailsRepository {
             }
         }
 
+        val triedTmdbFallbackIds = mutableSetOf<String>()
+        val animeFallbackIds = AnimeIdBridge.addonFallbackIds(id).drop(1)
+        for (candidateId in animeFallbackIds) {
+            if (candidateId.equals(metaLookupId, ignoreCase = true)) continue
+            val candidateManifests = findReadyMetaManifests(type = type, id = candidateId)
+            for (manifest in candidateManifests) {
+                val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
+                    tryFetchMeta(manifest, type, candidateId, includeMdbList = false)
+                }
+                if (result != null) {
+                    if (cacheResult) {
+                        cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+                    }
+                    return result
+                }
+            }
+            if (candidateId.isTmdbFallbackEligibleId() && triedTmdbFallbackIds.add(candidateId.lowercase())) {
+                tryFetchTmdbFallbackMeta(type = type, id = candidateId)?.let { result ->
+                    if (cacheResult) {
+                        cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+                    }
+                    return result
+                }
+            }
+        }
+
+        if (!triedTmdbFallbackIds.add(id.lowercase())) return null
         return tryFetchTmdbFallbackMeta(type = type, id = id)?.also { result ->
             if (cacheResult) {
                 cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
@@ -377,6 +435,9 @@ object MetaDetailsRepository {
             ?.takeIf { it.isNotBlank() }
             ?: itemId
     }
+
+    private fun String.isTmdbFallbackEligibleId(): Boolean =
+        startsWith("tt", ignoreCase = true) || startsWith("tmdb:", ignoreCase = true)
 
     private suspend fun tryFetchTmdbFallbackMeta(type: String, id: String): MetaDetails? =
         withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
