@@ -3,7 +3,9 @@ package com.nuvio.app.features.anilist
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class AniListApiAndAuthTest {
     @Test
@@ -291,5 +293,35 @@ class AniListApiAndAuthTest {
         val entries = parseMediaListCollectionResponse(json)
         assertEquals(1, entries.size)
         assertEquals(listOf(97940), entries.first().prequelIds)
+    }
+
+    @Test
+    fun `isAniListEntryEpisodeWatched matches MAL and AniList IDs for COMPLETED and CURRENT entries`() {
+        val entries = listOf(
+            AniListMediaEntry(
+                mediaId = 97940,
+                malId = 34572,
+                titleRomaji = "Black Clover",
+                format = "TV",
+                episodes = 170,
+                userStatus = AniListListStatus.COMPLETED,
+                progress = 170,
+            ),
+            AniListMediaEntry(
+                mediaId = 180001,
+                malId = 55001,
+                titleRomaji = "Black Clover Season 2",
+                format = "TV",
+                episodes = 12,
+                userStatus = AniListListStatus.CURRENT,
+                progress = 5,
+            ),
+        )
+
+        assertTrue(isAniListEntryEpisodeWatched(entries, "mal:34572", null, 170))
+        assertTrue(isAniListEntryEpisodeWatched(entries, "anilist:97940", null, 1))
+        assertTrue(isAniListEntryEpisodeWatched(entries, "mal:55001", null, 5))
+        assertFalse(isAniListEntryEpisodeWatched(entries, "mal:55001", null, 6))
+        assertFalse(isAniListEntryEpisodeWatched(entries, "mal:999999", null, 1))
     }
 }

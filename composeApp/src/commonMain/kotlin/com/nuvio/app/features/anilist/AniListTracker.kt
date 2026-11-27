@@ -173,6 +173,17 @@ object AniListTracker : TrackingAuthProvider {
         }
     }
 
+    internal fun isAnimeEpisodeWatched(
+        metaId: String,
+        videoId: String?,
+        episodeNumber: Int,
+    ): Boolean = isAniListEntryEpisodeWatched(
+        entries = _syncState.value.snapshot?.entries.orEmpty(),
+        metaId = metaId,
+        videoId = videoId,
+        episodeNumber = episodeNumber,
+    )
+
     fun setClientId(clientId: String) {
         ensureLoaded()
         val profileId = activeProfile.value
@@ -513,6 +524,7 @@ object AniListTracker : TrackingAuthProvider {
                         listOfNotNull(itemId, entry.malId?.let { "mal:$it" }),
                     )
                     val mappedEpisodes = mapEntryProgressToWatchedEpisodes(entry, entries, addonEpisodes)
+                    val malItemId = entry.malId?.let { "mal:$it" }
                     for (ref in mappedEpisodes) {
                         watched += WatchedItem(
                             id = itemId,
@@ -527,6 +539,21 @@ object AniListTracker : TrackingAuthProvider {
                             trackingProviderItemId = entry.mediaId.toString(),
                             markedAtEpochMs = markedAt,
                         )
+                        if (malItemId != null) {
+                            watched += WatchedItem(
+                                id = malItemId,
+                                type = "series",
+                                name = title,
+                                poster = entry.coverImageUrl,
+                                releaseInfo = entry.seasonYear?.toString(),
+                                season = ref.season,
+                                episode = ref.episode,
+                                videoId = "$malItemId:${ref.season}:${ref.episode}",
+                                trackingProviderId = TrackingProviderId.ANILIST.storageId,
+                                trackingProviderItemId = entry.mediaId.toString(),
+                                markedAtEpochMs = markedAt,
+                            )
+                        }
                     }
                 }
             }
@@ -540,7 +567,12 @@ object AniListTracker : TrackingAuthProvider {
                 .asSequence()
                 .filter { it.userStatus == AniListListStatus.COMPLETED && !it.format.equals("MOVIE", ignoreCase = true) }
                 .flatMap { entry ->
-                    watchedItemKeys(type = "series", id = "anilist:${entry.mediaId}").asSequence()
+                    buildList {
+                        addAll(watchedItemKeys(type = "series", id = "anilist:${entry.mediaId}"))
+                        entry.malId?.let { malId ->
+                            addAll(watchedItemKeys(type = "series", id = "mal:$malId"))
+                        }
+                    }.asSequence()
                 }
                 .toSet()
         }
@@ -553,7 +585,12 @@ object AniListTracker : TrackingAuthProvider {
                 .filter { it.userStatus == AniListListStatus.COMPLETED }
                 .flatMap { entry ->
                     val type = if (entry.format.equals("MOVIE", ignoreCase = true)) "movie" else "series"
-                    watchedItemKeys(type = type, id = "anilist:${entry.mediaId}").asSequence()
+                    buildList {
+                        addAll(watchedItemKeys(type = type, id = "anilist:${entry.mediaId}"))
+                        entry.malId?.let { malId ->
+                            addAll(watchedItemKeys(type = type, id = "mal:$malId"))
+                        }
+                    }.asSequence()
                 }
                 .toSet()
         }
@@ -1020,3 +1057,25 @@ internal fun selectAniListContinueWatchingEntries(
         }
         .sortedByDescending { it.updatedAtSeconds }
         .toList()
+
+internal fun isAniListEntryEpisodeWatched(
+    entries: List<AniListMediaEntry>,
+    metaId: String,
+    videoId: String?,
+    episodeNumber: Int,
+): Boolean {
+    if (entries.isEmpty() || episodeNumber <= 0) return false
+    val parsedMeta = parseTrackingExternalIds(metaId)
+    val parsedVideo = videoId?.let(::parseTrackingExternalIds)
+    val anilistId = parsedMeta.anilist?.toInt() ?: parsedVideo?.anilist?.toInt()
+    val malId = parsedMeta.mal?.toInt() ?: parsedVideo?.mal?.toInt()
+    if (anilistId == null && malId == null) return false
+
+    val matched = entries.firstOrNull { entry ->
+        (anilistId != null && entry.mediaId == anilistId) ||
+            (malId != null && entry.malId == malId)
+    } ?: return false
+
+    return matched.userStatus == AniListListStatus.COMPLETED ||
+        episodeNumber <= matched.progress
+}
