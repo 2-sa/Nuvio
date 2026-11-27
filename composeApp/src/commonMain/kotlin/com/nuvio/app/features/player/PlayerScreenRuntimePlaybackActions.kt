@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.player_engine_switching_automatic_message
 import nuvio.composeapp.generated.resources.player_engine_switching_manual_message
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -170,6 +171,7 @@ internal fun PlayerScreenRuntime.resetIdentityStateIfNeeded() {
         scrobbleStartRequestGeneration = 0L
         pendingSeekScrobbleRestart = false
         hasSentCompletionScrobbleForCurrentItem = false
+        hasSentMidPlaybackScrobbleForCurrentItem = false
         currentTrackingMedia = null
         resetTrackSelectionState()
     }
@@ -418,18 +420,60 @@ internal fun PlayerScreenRuntime.resendAddonPlayerStateAfterSeek() {
     emitAddonPlayerEvent(action)
 }
 
+internal fun PlayerScreenRuntime.maybeEmitMidPlaybackScrobble(
+    useNonCancellable: Boolean = false,
+) {
+    if (hasSentMidPlaybackScrobbleForCurrentItem) return
+    if (isScrubbingTimeline || !initialSeekApplied) return
+    if (isShortPlaceholderDuration(playbackSnapshot.durationMs)) return
+    val progressPercent = currentPlaybackProgressPercent()
+    if (progressPercent < 50f) return
+    hasSentMidPlaybackScrobbleForCurrentItem = true
+    val mediaSnapshot = currentTrackingMedia
+    val inputsSnapshot = snapshotTrackingScrobbleItemInputs()
+    val itemVideoIdentity = lastResetVideoIdentity
+    val context = if (useNonCancellable) NonCancellable else EmptyCoroutineContext
+    scope.launch(context) {
+        val media = mediaSnapshot ?: inputsSnapshot.buildMedia()
+        if (!media.hasResolvableIdentity) {
+            if (lastResetVideoIdentity == itemVideoIdentity) {
+                hasSentMidPlaybackScrobbleForCurrentItem = false
+            }
+            return@launch
+        }
+        val failures = TrackingScrobbleCoordinator.scrobbleProgressThreshold(
+            profileId = profileId,
+            event = TrackingScrobbleEvent(
+                media = media,
+                progressPercent = progressPercent.toDouble(),
+            ),
+        )
+        if (failures.isNotEmpty() && lastResetVideoIdentity == itemVideoIdentity) {
+            // Allow retry on PAUSE/STOP if transient network failure occurred
+            hasSentMidPlaybackScrobbleForCurrentItem = false
+        }
+    }
+}
+
 internal fun PlayerScreenRuntime.flushWatchProgress(
     scrobbleAction: TrackingScrobbleAction = TrackingScrobbleAction.STOP,
 ) {
+    if (scrobbleAction == TrackingScrobbleAction.PAUSE || scrobbleAction == TrackingScrobbleAction.STOP) {
+        maybeEmitMidPlaybackScrobble(useNonCancellable = true)
+    }
     when (scrobbleAction) {
         TrackingScrobbleAction.PAUSE -> emitTrackingScrobblePause()
         TrackingScrobbleAction.STOP -> emitStopScrobbleForCurrentProgress()
-        TrackingScrobbleAction.START -> Unit
+        TrackingScrobbleAction.START,
+        TrackingScrobbleAction.PROGRESS,
+        -> Unit
     }
     when (scrobbleAction) {
         TrackingScrobbleAction.PAUSE -> emitAddonPlayerEvent(AddonPlayerAction.PAUSE)
         TrackingScrobbleAction.STOP -> emitAddonPlayerEvent(AddonPlayerAction.STOP)
-        TrackingScrobbleAction.START -> Unit
+        TrackingScrobbleAction.START,
+        TrackingScrobbleAction.PROGRESS,
+        -> Unit
     }
     WatchProgressRepository.flushPlaybackProgress(
         session = playbackSession,

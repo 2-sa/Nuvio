@@ -128,6 +128,7 @@ private fun TrackingScrobbleAction.fallbackOutcome(progress: Double): SimklScrob
     when (this) {
         TrackingScrobbleAction.START -> SimklScrobbleOutcome.START
         TrackingScrobbleAction.PAUSE -> SimklScrobbleOutcome.PAUSE
+        TrackingScrobbleAction.PROGRESS -> SimklScrobbleOutcome.PAUSE
         TrackingScrobbleAction.STOP -> {
             if (progress >= 80.0) SimklScrobbleOutcome.SCROBBLE else SimklScrobbleOutcome.PAUSE
         }

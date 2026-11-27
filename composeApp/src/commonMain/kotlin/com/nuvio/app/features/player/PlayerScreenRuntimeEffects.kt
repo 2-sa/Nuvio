@@ -597,6 +597,9 @@ private fun PlayerScreenRuntime.BindPlayerUiVisibilityEffects() {
         }
         if (playbackSnapshot.isPlaying) {
             persistPlaybackProgressTick()
+            if (!playbackSnapshot.isLoading) {
+                maybeEmitMidPlaybackScrobble()
+            }
         }
     }
 }

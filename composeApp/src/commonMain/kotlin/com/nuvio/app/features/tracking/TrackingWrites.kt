@@ -17,6 +17,7 @@ enum class TrackingScrobbleAction(val wireValue: String) {
     START("start"),
     PAUSE("pause"),
     STOP("stop"),
+    PROGRESS("progress"),
 }
 
 enum class TrackingSeekScrobblePolicy {
@@ -85,6 +86,10 @@ interface TrackingScrobbler {
     val providerId: TrackingProviderId
     val seekScrobblePolicy: TrackingSeekScrobblePolicy
         get() = TrackingSeekScrobblePolicy.NONE
+    val scrobbleThresholdPercent: Double
+        get() = 80.0
+    val scrobbleOnThresholdReached: Boolean
+        get() = false
 
     suspend fun scrobble(
         profileId: Int,

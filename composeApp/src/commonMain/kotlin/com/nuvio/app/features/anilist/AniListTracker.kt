@@ -82,6 +82,7 @@ object AniListTracker : TrackingAuthProvider {
 
     private var generationCounter = 0L
     private val optimisticallyRemovedVideoIds = mutableSetOf<String>()
+    private val scrobbleDeduplicator = AniListScrobbleDeduplicator()
     override val accountGeneration: Long
         get() = synchronized(lock) { generationCounter }
 
@@ -137,6 +138,7 @@ object AniListTracker : TrackingAuthProvider {
             generationCounter++
             optimisticallyRemovedVideoIds.clear()
         }
+        scrobbleDeduplicator.clear()
         activeProfile.value = nextProfile
         val loadedAuth = loadAuthState(nextProfile)
         _authState.value = loadedAuth
@@ -149,6 +151,7 @@ object AniListTracker : TrackingAuthProvider {
             generationCounter++
             optimisticallyRemovedVideoIds.clear()
         }
+        scrobbleDeduplicator.clear()
         AniListStorage.clearAll()
         val profileId = ProfileRepository.activeProfileId
         activeProfile.value = profileId
@@ -164,6 +167,7 @@ object AniListTracker : TrackingAuthProvider {
                 generationCounter++
                 optimisticallyRemovedVideoIds.clear()
             }
+            scrobbleDeduplicator.clear()
             _authState.value = AniListAuthState(profileId = profileId)
             _syncState.value = AniListSyncUiState()
             authenticated.value = false
@@ -326,6 +330,7 @@ object AniListTracker : TrackingAuthProvider {
             generationCounter++
             optimisticallyRemovedVideoIds.clear()
         }
+        scrobbleDeduplicator.clear()
         val preservedClientId = _authState.value.clientId
         AniListStorage.removeProfile(profileId)
         AniListEpisodeMapper.clearCache()
@@ -648,6 +653,7 @@ object AniListTracker : TrackingAuthProvider {
                 if (saved != null) upsertLocalEntry(profileId, saved)
             } else if (existingEntry != null && existingEntry.entryId > 0) {
                 if (apiClient.deleteMediaListEntry(token, existingEntry.entryId)) {
+                    scrobbleDeduplicator.invalidate(profileId, existingEntry.mediaId)
                     removeLocalEntry(profileId, existingEntry.mediaId)
                 }
             }
@@ -811,6 +817,7 @@ object AniListTracker : TrackingAuthProvider {
                 } else {
                     null
                 }
+                scrobbleDeduplicator.invalidate(profileId, existing.mediaId)
                 if (absoluteEp == null || absoluteEp <= 1) {
                     if (existing.entryId > 0 && apiClient.deleteMediaListEntry(token, existing.entryId)) {
                         removeLocalEntry(profileId, existing.mediaId)
@@ -913,6 +920,7 @@ object AniListTracker : TrackingAuthProvider {
                         ),
                     )
                     ?: continue
+                scrobbleDeduplicator.invalidate(activeProfile.value, existing.mediaId)
                 val saved = apiClient.saveMediaListEntry(
                     accessToken = token,
                     mediaId = existing.mediaId,
@@ -925,6 +933,8 @@ object AniListTracker : TrackingAuthProvider {
 
     class AniListTrackingWrites : TrackingHistoryWriter, TrackingScrobbler, TrackingListWriter {
         override val providerId = TrackingProviderId.ANILIST
+        override val scrobbleThresholdPercent: Double = 50.0
+        override val scrobbleOnThresholdReached: Boolean = true
 
         override suspend fun addToHistory(
             profileId: Int,
@@ -999,6 +1009,7 @@ object AniListTracker : TrackingAuthProvider {
                 } else {
                     null
                 }
+                scrobbleDeduplicator.invalidate(profileId, existing.mediaId)
                 if (absoluteEp == null || absoluteEp <= 1) {
                     if (existing.entryId > 0 && apiClient.deleteMediaListEntry(token, existing.entryId)) {
                         removeLocalEntry(profileId, existing.mediaId)
@@ -1020,42 +1031,67 @@ object AniListTracker : TrackingAuthProvider {
             action: TrackingScrobbleAction,
             event: TrackingScrobbleEvent,
         ) {
-            if (action != TrackingScrobbleAction.STOP || event.progressPercent < 80.0) return
+            if (
+                action != TrackingScrobbleAction.PROGRESS &&
+                action != TrackingScrobbleAction.PAUSE &&
+                action != TrackingScrobbleAction.STOP
+            ) {
+                return
+            }
+            if (event.progressPercent < scrobbleThresholdPercent) return
             val token = requireToken(profileId) ?: return
-            val mediaId = resolveMediaId(token, event.media) ?: return
-            val existing = findEntryForReference(event.media)
             val allEntries = _syncState.value.snapshot?.entries.orEmpty()
-            val episodeNum = event.media.episode?.number
-            val absoluteEp = if (episodeNum != null) {
-                val addonEpisodes = AniListEpisodeMapper.resolveAddonEpisodes(
-                    listOfNotNull(
-                        event.media.catalog?.contentId,
-                        "anilist:$mediaId",
-                        existing?.malId?.let { "mal:$it" },
-                    ),
-                )
-                mapSeasonEpisodeToEntryProgress(event.media.episode?.season ?: 1, episodeNum, existing, allEntries, addonEpisodes)
-            } else {
-                null
-            }
-            val newProgress = if (absoluteEp != null) {
-                maxOf(existing?.progress ?: 0, absoluteEp)
-            } else {
-                existing?.episodes ?: 1
-            }
-            val newStatus = when {
-                event.media.kind == TrackingMediaKind.MOVIE -> AniListListStatus.COMPLETED
-                existing?.episodes != null && newProgress >= existing.episodes -> AniListListStatus.COMPLETED
-                existing?.userStatus == null -> AniListListStatus.CURRENT
-                else -> existing.userStatus
-            }
-            val saved = apiClient.saveMediaListEntry(
-                accessToken = token,
-                mediaId = mediaId,
-                status = newStatus,
-                progress = newProgress,
+            val target = resolveTargetMediaAndProgress(
+                media = event.media,
+                allEntries = allEntries,
+                bridgeIndex = AnimeIdBridge.currentIndex(),
+                resolveAddonEpisodes = { ids -> AniListEpisodeMapper.resolveAddonEpisodes(ids) },
+                searchMediaIdByTitleOrMal = { title, malId ->
+                    apiClient.searchMediaIdByTitleOrMal(
+                        accessToken = token,
+                        title = title,
+                        malId = malId,
+                    )
+                },
+            ) ?: return
+            val existing = target.existingEntry
+                ?: allEntries.firstOrNull { it.mediaId == target.mediaId }
+            val decision = decideAniListScrobbleMutation(
+                existing = existing,
+                targetProgress = target.targetProgress,
+                isMovie = target.isMovie,
             )
-            if (saved != null) upsertLocalEntry(profileId, saved)
+            if (!decision.shouldWrite) {
+                if (
+                    existing != null &&
+                    (existing.userStatus == AniListListStatus.CURRENT || existing.userStatus == AniListListStatus.REPEATING) &&
+                    existing.progress >= target.targetProgress
+                ) {
+                    scrobbleDeduplicator.markSucceeded(profileId, target.mediaId, target.targetProgress)
+                }
+                return
+            }
+            if (!scrobbleDeduplicator.tryBegin(profileId, target.mediaId, target.targetProgress)) {
+                return
+            }
+            var succeeded = false
+            try {
+                val saved = apiClient.saveMediaListEntry(
+                    accessToken = token,
+                    mediaId = target.mediaId,
+                    status = decision.newStatus,
+                    progress = decision.newProgress,
+                )
+                if (saved != null) {
+                    scrobbleDeduplicator.markSucceeded(profileId, target.mediaId, target.targetProgress)
+                    succeeded = true
+                    upsertLocalEntry(profileId, saved)
+                }
+            } finally {
+                if (!succeeded) {
+                    scrobbleDeduplicator.markFailed(profileId, target.mediaId, target.targetProgress)
+                }
+            }
         }
 
         override suspend fun moveToList(
@@ -1097,6 +1133,7 @@ object AniListTracker : TrackingAuthProvider {
                     continue
                 }
                 if (apiClient.deleteMediaListEntry(token, existing.entryId)) {
+                    scrobbleDeduplicator.invalidate(profileId, existing.mediaId)
                     removeLocalEntry(profileId, existing.mediaId)
                 }
             }
@@ -1615,4 +1652,324 @@ private fun computePrequelChainDepth(
         current = nextPrequel
     }
     return depth
+}
+
+internal data class AniListScrobbleTarget(
+    val mediaId: Int,
+    val targetProgress: Int,
+    val isMovie: Boolean,
+    val existingEntry: AniListMediaEntry? = null,
+)
+
+internal suspend fun resolveTargetMediaAndProgress(
+    media: TrackingMediaReference,
+    allEntries: List<AniListMediaEntry>,
+    bridgeIndex: AnimeIdBridgeIndex = AnimeIdBridge.currentIndex(),
+    resolveAddonEpisodes: suspend (List<String>) -> List<SeasonEpisodeRef> = { ids ->
+        AniListEpisodeMapper.resolveAddonEpisodes(ids)
+    },
+    searchMediaIdByTitleOrMal: suspend (title: String?, malId: Int?) -> Int? = { _, _ -> null },
+): AniListScrobbleTarget? {
+    val entriesByAniListId = allEntries.associateBy { it.mediaId }
+    val entriesByMalId = buildMap<Int, AniListMediaEntry> {
+        for (entry in allEntries) {
+            val malId = entry.malId ?: continue
+            if (!containsKey(malId)) put(malId, entry)
+        }
+    }
+    fun findEntry(anilistId: Int?, malId: Int? = null): AniListMediaEntry? =
+        anilistId?.let(entriesByAniListId::get) ?: malId?.let(entriesByMalId::get)
+
+    val catalogType = media.catalog?.contentType?.trim()?.lowercase()
+    fun isMovieTarget(existing: AniListMediaEntry?, mapping: AnimeIdMapping?): Boolean =
+        media.kind == TrackingMediaKind.MOVIE ||
+            catalogType == "movie" ||
+            catalogType == "film" ||
+            existing?.format.equals("MOVIE", ignoreCase = true) ||
+            mapping?.type.equals("MOVIE", ignoreCase = true)
+
+    val rawVideoId = media.catalog?.videoId?.trim()?.takeIf { it.isNotEmpty() }
+    val rawContentId = media.catalog?.contentId?.trim()?.takeIf { it.isNotEmpty() }
+
+    // Path A: Anime-prefixed videoId (e.g., mal:42203:7, kitsu:43137:7, anilist:108632:7, mal:42203:1:7)
+    if (rawVideoId != null && isPerSeasonContentId(rawVideoId)) {
+        val parsedVideo = parseTrackingExternalIds(rawVideoId)
+        val mapping = AnimeIdBridge.resolveByContentId(rawVideoId, bridgeIndex)
+        val existing = findEntry(
+            anilistId = parsedVideo.anilist?.toInt() ?: mapping?.anilistId,
+            malId = parsedVideo.mal?.toInt() ?: mapping?.malId,
+        )
+        val mediaId = existing?.mediaId
+            ?: parsedVideo.anilist?.toInt()?.takeIf { it > 0 }
+            ?: mapping?.anilistId?.takeIf { it > 0 }
+            ?: searchMediaIdByTitleOrMal(media.title, parsedVideo.mal?.toInt() ?: mapping?.malId)
+        if (mediaId != null && mediaId > 0) {
+            val movie = isMovieTarget(existing, mapping)
+            val flatEp = extractFlatEpisodeFromAnimeVideoId(rawVideoId)
+            val targetProgress = if (movie) {
+                existing?.episodes?.takeIf { it > 0 } ?: 1
+            } else {
+                (flatEp ?: media.episode?.number ?: 1).coerceAtLeast(1)
+            }
+            return AniListScrobbleTarget(
+                mediaId = mediaId,
+                targetProgress = targetProgress,
+                isMovie = movie,
+                existingEntry = existing ?: entriesByAniListId[mediaId],
+            )
+        }
+    }
+
+    // Path B: 1-to-1 anime-prefixed parentMetaId (anilist:, mal:, kitsu:, anidb:) or direct anime IDs
+    val perSeasonId = rawContentId?.takeIf(::isPerSeasonContentId)
+        ?: if (rawContentId == null) {
+            media.ids.anilist?.let { "anilist:$it" }
+                ?: media.ids.mal?.let { "mal:$it" }
+                ?: media.ids.kitsu?.let { "kitsu:$it" }
+                ?: media.ids.anidb?.let { "anidb:$it" }
+        } else {
+            null
+        }
+    if (perSeasonId != null) {
+        val parsed = parseTrackingExternalIds(perSeasonId)
+        val mapping = AnimeIdBridge.resolveByContentId(perSeasonId, bridgeIndex)
+        val existing = findEntry(
+            anilistId = parsed.anilist?.toInt() ?: mapping?.anilistId,
+            malId = parsed.mal?.toInt() ?: mapping?.malId,
+        )
+        val mediaId = existing?.mediaId
+            ?: parsed.anilist?.toInt()?.takeIf { it > 0 }
+            ?: mapping?.anilistId?.takeIf { it > 0 }
+            ?: searchMediaIdByTitleOrMal(media.title, parsed.mal?.toInt() ?: mapping?.malId)
+        if (mediaId != null && mediaId > 0) {
+            val resolvedExisting = existing ?: entriesByAniListId[mediaId]
+            val movie = isMovieTarget(resolvedExisting, mapping)
+            val targetProgress = if (movie) {
+                resolvedExisting?.episodes?.takeIf { it > 0 } ?: 1
+            } else {
+                val episodeRef = media.episode
+                if (episodeRef != null) {
+                    val addonEpisodes = resolveAddonEpisodes(
+                        listOfNotNull(
+                            perSeasonId,
+                            "anilist:$mediaId",
+                            (resolvedExisting?.malId ?: mapping?.malId)?.let { "mal:$it" },
+                        ),
+                    )
+                    mapSeasonEpisodeToEntryProgress(
+                        season = episodeRef.season ?: 1,
+                        episode = episodeRef.number,
+                        entry = resolvedExisting,
+                        allEntries = allEntries,
+                        addonEpisodes = addonEpisodes,
+                        isPerSeasonContentId = true,
+                    )
+                } else {
+                    resolvedExisting?.episodes?.takeIf { it > 0 } ?: 1
+                }
+            }
+            return AniListScrobbleTarget(
+                mediaId = mediaId,
+                targetProgress = targetProgress,
+                isMovie = movie,
+                existingEntry = resolvedExisting,
+            )
+        }
+    }
+
+    // Path C: Franchise parentMetaId (tt..., tmdb:, tvdb:)
+    val franchiseCandidate = rawContentId
+        ?: media.ids.imdb
+        ?: media.ids.tmdb?.let { "tmdb:$it" }
+        ?: media.ids.tvdb?.let { "tvdb:$it" }
+    val franchiseMappings = AnimeIdBridge.mappingsForFranchiseId(franchiseCandidate, bridgeIndex)
+    if (franchiseMappings.isNotEmpty()) {
+        val movieByContext = media.kind == TrackingMediaKind.MOVIE ||
+            catalogType == "movie" ||
+            catalogType == "film" ||
+            (media.episode == null && franchiseMappings.all { it.type.equals("MOVIE", ignoreCase = true) })
+        if (movieByContext) {
+            val mapping = franchiseMappings.firstOrNull { it.type.equals("MOVIE", ignoreCase = true) }
+                ?: franchiseMappings.first()
+            val existing = findEntry(mapping.anilistId, mapping.malId)
+            val mediaId = existing?.mediaId
+                ?: mapping.anilistId?.takeIf { it > 0 }
+                ?: searchMediaIdByTitleOrMal(media.title, mapping.malId)
+            if (mediaId != null && mediaId > 0) {
+                val resolvedExisting = existing ?: entriesByAniListId[mediaId]
+                return AniListScrobbleTarget(
+                    mediaId = mediaId,
+                    targetProgress = resolvedExisting?.episodes?.takeIf { it > 0 } ?: 1,
+                    isMovie = true,
+                    existingEntry = resolvedExisting,
+                )
+            }
+        } else {
+            val serialMappings = franchiseMappings.filter { mapping ->
+                mapping.type == null || mapping.type.uppercase() in SERIAL_FRANCHISE_FORMATS
+            }.ifEmpty { franchiseMappings }
+            val season = media.episode?.season?.takeIf { it > 0 } ?: 1
+            val episode = media.episode?.number?.takeIf { it > 0 } ?: 1
+
+            if (serialMappings.size == 1) {
+                val mapping = serialMappings.first()
+                val existing = findEntry(mapping.anilistId, mapping.malId)
+                val mediaId = existing?.mediaId
+                    ?: mapping.anilistId?.takeIf { it > 0 }
+                    ?: searchMediaIdByTitleOrMal(media.title, mapping.malId)
+                if (mediaId != null && mediaId > 0) {
+                    val resolvedExisting = existing ?: entriesByAniListId[mediaId]
+                    val addonEpisodes = resolveAddonEpisodes(
+                        listOfNotNull(
+                            franchiseCandidate,
+                            "anilist:$mediaId",
+                            (resolvedExisting?.malId ?: mapping.malId)?.let { "mal:$it" },
+                        ),
+                    )
+                    val targetProgress = mapSeasonEpisodeToEntryProgress(
+                        season = season,
+                        episode = episode,
+                        entry = resolvedExisting,
+                        allEntries = allEntries,
+                        addonEpisodes = addonEpisodes,
+                        isPerSeasonContentId = false,
+                    )
+                    return AniListScrobbleTarget(
+                        mediaId = mediaId,
+                        targetProgress = targetProgress,
+                        isMovie = false,
+                        existingEntry = resolvedExisting,
+                    )
+                }
+            } else {
+                val franchiseEntries = serialMappings
+                    .mapNotNull { mapping -> findEntry(mapping.anilistId, mapping.malId) }
+                    .distinctBy { it.mediaId }
+
+                if (franchiseEntries.isNotEmpty()) {
+                    // 1. Direct explicit season match
+                    val explicitMatch = if (season >= 2) {
+                        franchiseEntries.firstOrNull { entry ->
+                            extractExplicitSeasonNumber(entry.titleEnglish, entry.titleRomaji) == season
+                        }
+                    } else {
+                        franchiseEntries.firstOrNull { entry ->
+                            extractExplicitSeasonNumber(entry.titleEnglish, entry.titleRomaji) == null &&
+                                computePrequelEpisodeOffset(entry, allEntries) == 0
+                        }
+                    }
+                    if (explicitMatch != null) {
+                        return AniListScrobbleTarget(
+                            mediaId = explicitMatch.mediaId,
+                            targetProgress = episode,
+                            isMovie = false,
+                            existingEntry = explicitMatch,
+                        )
+                    }
+
+                    // 2. Cumulative episode range match using prequel offsets + addon episodes
+                    val addonEpisodes = resolveAddonEpisodes(listOfNotNull(franchiseCandidate))
+                    if (addonEpisodes.isNotEmpty()) {
+                        val absoluteEp = mapSeasonEpisodeToAbsolute(season, episode, addonEpisodes)
+                        val sortedByOffset = franchiseEntries.sortedBy { computePrequelEpisodeOffset(it, allEntries) }
+                        for (entry in sortedByOffset) {
+                            val offset = computePrequelEpisodeOffset(entry, allEntries)
+                            val count = entry.episodes ?: entry.progress.coerceAtLeast(0)
+                            if (absoluteEp > offset && (count == 0 || absoluteEp <= offset + count)) {
+                                return AniListScrobbleTarget(
+                                    mediaId = entry.mediaId,
+                                    targetProgress = (absoluteEp - offset).coerceAtLeast(1),
+                                    isMovie = false,
+                                    existingEntry = entry,
+                                )
+                            }
+                        }
+                    }
+
+                    // 3. Prequel chain depth match for titled sequels (e.g. "Gantz: Second Stage")
+                    val depthMatch = franchiseEntries.firstOrNull { entry ->
+                        computePrequelChainDepth(entry, allEntries) + 1 == season
+                    }
+                    if (depthMatch != null) {
+                        return AniListScrobbleTarget(
+                            mediaId = depthMatch.mediaId,
+                            targetProgress = episode,
+                            isMovie = false,
+                            existingEntry = depthMatch,
+                        )
+                    }
+                }
+
+                // Target season not yet in user's AniList snapshot
+                if (season >= 2) {
+                    val searchedId = media.title?.trim()?.takeIf { it.isNotEmpty() }?.let { title ->
+                        searchMediaIdByTitleOrMal("$title Season $season", null)
+                    }
+                    if (searchedId != null && searchedId > 0) {
+                        return AniListScrobbleTarget(
+                            mediaId = searchedId,
+                            targetProgress = episode,
+                            isMovie = false,
+                            existingEntry = entriesByAniListId[searchedId],
+                        )
+                    }
+                } else {
+                    val firstTvId = serialMappings.firstNotNullOfOrNull { it.anilistId?.takeIf { id -> id > 0 } }
+                    if (firstTvId != null) {
+                        return AniListScrobbleTarget(
+                            mediaId = firstTvId,
+                            targetProgress = episode,
+                            isMovie = false,
+                            existingEntry = entriesByAniListId[firstTvId],
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Path D: Fallback by title or MAL ID search
+    val normalizedTitle = media.title?.trim()?.takeIf { it.isNotEmpty() }
+    val titleEntry = normalizedTitle?.let { title ->
+        allEntries.firstOrNull { entry ->
+            entry.titleEnglish.equals(title, ignoreCase = true) ||
+                entry.titleRomaji.equals(title, ignoreCase = true)
+        }
+    }
+    val fallbackMediaId = titleEntry?.mediaId
+        ?: searchMediaIdByTitleOrMal(media.title, media.ids.mal?.toInt())
+        ?: return null
+    if (fallbackMediaId <= 0) return null
+    val resolvedExisting = titleEntry ?: entriesByAniListId[fallbackMediaId]
+    val movie = isMovieTarget(resolvedExisting, null)
+    val targetProgress = if (movie) {
+        resolvedExisting?.episodes?.takeIf { it > 0 } ?: 1
+    } else {
+        val episodeRef = media.episode
+        if (episodeRef != null) {
+            val addonEpisodes = resolveAddonEpisodes(
+                listOfNotNull(
+                    rawContentId,
+                    "anilist:$fallbackMediaId",
+                    resolvedExisting?.malId?.let { "mal:$it" },
+                ),
+            )
+            mapSeasonEpisodeToEntryProgress(
+                season = episodeRef.season ?: 1,
+                episode = episodeRef.number,
+                entry = resolvedExisting,
+                allEntries = allEntries,
+                addonEpisodes = addonEpisodes,
+                isPerSeasonContentId = isPerSeasonContentId(rawContentId),
+            )
+        } else {
+            resolvedExisting?.episodes?.takeIf { it > 0 } ?: 1
+        }
+    }
+    return AniListScrobbleTarget(
+        mediaId = fallbackMediaId,
+        targetProgress = targetProgress,
+        isMovie = movie,
+        existingEntry = resolvedExisting,
+    )
 }

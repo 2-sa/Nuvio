@@ -225,6 +225,7 @@ internal class PlayerScreenRuntime(
     var scrobbleStartRequestGeneration by mutableStateOf(0L)
     var pendingSeekScrobbleRestart by mutableStateOf(false)
     var hasSentCompletionScrobbleForCurrentItem by mutableStateOf(false)
+    var hasSentMidPlaybackScrobbleForCurrentItem by mutableStateOf(false)
     var currentTrackingMedia by mutableStateOf<TrackingMediaReference?>(null)
     var activeAddonPlayerEventTarget: AddonPlayerEventTarget? = null
     var lastAddonPlayerAction: AddonPlayerAction? = null
