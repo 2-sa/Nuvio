@@ -163,7 +163,10 @@ actual object AppUpdaterPlatform {
 
     private fun launchInstaller(updateFile: File) {
         val command = when (currentOs) {
-            DesktopUpdaterOs.WINDOWS -> windowsInstallerCommand(updateFile)
+            DesktopUpdaterOs.WINDOWS -> windowsInstallerCommand(
+                updateFile = updateFile,
+                currentPid = ProcessHandle.current().pid(),
+            )
             DesktopUpdaterOs.MACOS -> listOf("open", updateFile.absolutePath)
             DesktopUpdaterOs.LINUX -> linuxInstallerCommand(
                 method = linuxInstallMethod,
@@ -178,6 +181,12 @@ actual object AppUpdaterPlatform {
 
     private fun scheduleAppExit() {
         val exitDelayMillis = if (currentOs == DesktopUpdaterOs.WINDOWS) 100L else 500L
+        if (currentOs == DesktopUpdaterOs.WINDOWS) {
+            thread(name = "nuvio-updater-halt-fallback", isDaemon = true) {
+                Thread.sleep(exitDelayMillis + 4_000L)
+                Runtime.getRuntime().halt(0)
+            }
+        }
         thread(name = "nuvio-updater-exit", isDaemon = true) {
             Thread.sleep(exitDelayMillis)
             exitProcess(0)
@@ -236,16 +245,34 @@ private fun desktopArchitectureFragments(): List<String> {
     }
 }
 
-internal fun windowsInstallerCommand(updateFile: File): List<String> {
-    if (!updateFile.extension.equals("msi", ignoreCase = true)) {
-        return listOf(updateFile.absolutePath)
+internal fun windowsInstallerCommand(
+    updateFile: File,
+    currentPid: Long = ProcessHandle.current().pid(),
+): List<String> {
+    val escapedPath = updateFile.absolutePath.replace("'", "''")
+    // Wait until the current Nuvio.exe process has completely exited and Windows has
+    // released all file handles on C:\Program Files\Nuvio\app\*.jar before starting
+    // msiexec. Launching msiexec while JARs are still locked causes MSI MajorUpgrade
+    // to schedule PendingFileRenameOperations deletions that wipe unchanged JARs on
+    // the next reboot.
+    val script = buildString {
+        append("try { Wait-Process -Id $currentPid -Timeout 15 -ErrorAction SilentlyContinue } catch {}; ")
+        append("Stop-Process -Name 'Nuvio' -Force -ErrorAction SilentlyContinue; ")
+        append("Start-Sleep -Milliseconds 1500; ")
+        if (updateFile.extension.equals("msi", ignoreCase = true)) {
+            append("Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedPath')")
+        } else {
+            append("Start-Process -FilePath '$escapedPath'")
+        }
     }
-
-    val quotedPath = "\"${updateFile.absolutePath}\""
     return listOf(
-        "cmd",
-        "/c",
-        "ping -n 3 127.0.0.1 >nul && start \"\" msiexec /i $quotedPath",
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-WindowStyle",
+        "Hidden",
+        "-Command",
+        script,
     )
 }
 
