@@ -52,11 +52,12 @@ internal fun PlayerDestination(
         {
             val previousRoute = navController.routes.dropLast(1).lastOrNull()
             val metaId = launch.parentMetaId?.takeIf { it.isNotBlank() }
-            val metaType = launch.parentMetaType ?: launch.contentType
+            val metaType = (launch.parentMetaType ?: launch.contentType)?.takeIf { it.isNotBlank() }
             if (
                 previousRoute !is DetailRoute &&
                 previousRoute !is StreamRoute &&
                 metaId != null &&
+                metaType != null &&
                 !metaType.equals(CloudLibraryContentType, ignoreCase = true)
             ) {
                 navController.navigate(
