@@ -486,16 +486,15 @@ internal object AnimeIdBridge {
                 }
 
                 val now = Clock.System.now().toEpochMilliseconds()
-                val conditionalEtag: String?
-                val shouldRefresh = synchronized(stateLock) {
+                val (shouldRefresh, conditionalEtag) = synchronized(stateLock) {
                     val hasValidIndex = _indexState.value.isLoaded
                     val isFresh = hasValidIndex &&
                         lastFetchedAtEpochMs > 0L &&
                         (now - lastFetchedAtEpochMs) < ANIME_ID_BRIDGE_TTL_MS
                     val inCooldown = lastFailedRefreshAtEpochMs > 0L &&
                         (now - lastFailedRefreshAtEpochMs) < ANIME_ID_BRIDGE_RETRY_COOLDOWN_MS
-                    conditionalEtag = if (hasValidIndex) cachedEtag else null
-                    !isFresh && !inCooldown
+                    val etagForRequest = if (hasValidIndex) cachedEtag else null
+                    (!isFresh && !inCooldown) to etagForRequest
                 }
                 if (!shouldRefresh) return
 
