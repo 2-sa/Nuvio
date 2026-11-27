@@ -7,6 +7,7 @@ import com.nuvio.app.core.tracking.ensureTrackingProvidersRegistered
 import com.nuvio.app.features.addons.ADDON_LIBRARY_RESOURCE
 import com.nuvio.app.features.addons.AddonEventDispatcher
 import com.nuvio.app.features.addons.AddonLibraryAction
+import com.nuvio.app.features.anilist.AnimeIdBridge
 import com.nuvio.app.features.library.sync.LibrarySyncAdapter
 import com.nuvio.app.features.library.sync.SupabaseLibrarySyncAdapter
 import com.nuvio.app.features.library.sync.consumeCursorPages
@@ -62,6 +63,9 @@ object LibraryRepository {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
+    private val _aniListUiState = MutableStateFlow(LibraryUiState(sourceMode = LibrarySourceMode.ANILIST))
+    val aniListUiState: StateFlow<LibraryUiState> = _aniListUiState.asStateFlow()
+
     private val localState = LibraryLocalState()
     private val loadLock = SynchronizedObject()
     private val nuvioSyncMutex = Mutex()
@@ -114,6 +118,15 @@ object LibraryRepository {
                 .drop(1)
                 .collectLatest { publish() }
         }
+        syncScope.launch {
+            AnimeIdBridge.indexState
+                .drop(1)
+                .collectLatest {
+                    if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST)) {
+                        publish()
+                    }
+                }
+        }
     }
 
     fun ensureLoaded() {
@@ -128,6 +141,7 @@ object LibraryRepository {
             loadFromDisk(activeProfileId)
         }
         TrackingProviderRegistry.connectedLibraryProviders().forEach(TrackingLibraryProvider::prepare)
+        publish()
         activeLibraryProvider()?.let(::refreshLibraryProviderAsync)
     }
 
@@ -138,6 +152,7 @@ object LibraryRepository {
         if (!loadFromDisk(profileId)) return
         TrackingProviderRegistry.libraryProviders().forEach(TrackingLibraryProvider::onProfileChanged)
         TrackingProviderRegistry.connectedLibraryProviders().forEach(TrackingLibraryProvider::prepare)
+        publish()
         activeLibraryProvider()?.let(::refreshLibraryProviderAsync)
     }
 
@@ -146,6 +161,7 @@ object LibraryRepository {
         transition.detachedPushJob?.cancel()
         TrackingProviderRegistry.libraryProviders().forEach(TrackingLibraryProvider::clearLocalState)
         _uiState.value = LibraryUiState()
+        _aniListUiState.value = LibraryUiState(sourceMode = LibrarySourceMode.ANILIST)
     }
 
     internal fun runAccountStorageWipe(wipeStorage: () -> Unit) {
@@ -251,6 +267,35 @@ object LibraryRepository {
                 log.e(error) { "Failed to pull library from server" }
             }
         }
+    }
+
+    suspend fun pullAniListFromServer(
+        profileId: Int,
+        refreshIntent: TrackingRefreshIntent = TrackingRefreshIntent.AUTOMATIC,
+    ) {
+        val operationToken = activeOperationToken(profileId) ?: run {
+            log.d { "Skipping AniList library pull for inactive profile $profileId" }
+            return
+        }
+
+        val provider = TrackingProviderRegistry.libraryProvider(TrackingProviderId.ANILIST)
+            ?.takeIf { TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST) }
+        if (provider == null) {
+            if (isActiveOperation(operationToken)) {
+                publish()
+            }
+            return
+        }
+
+        provider.ensureLoaded()
+        provider.prepare()
+        refreshLibraryProvider(
+            provider = provider,
+            reason = "explicit AniList pull",
+            intent = refreshIntent,
+        )
+        if (!isActiveOperation(operationToken)) return
+        publish()
     }
 
     private suspend fun pullLibraryDelta(
@@ -658,6 +703,7 @@ object LibraryRepository {
 
     private fun publish() {
         val localSnapshot = localState.snapshot()
+        publishAniList(localSnapshot.token)
         val sourceMode = effectiveLibrarySourceMode()
         activeLibraryProvider(sourceMode)?.let { provider ->
             val providerSnapshot = provider.snapshot()
@@ -698,6 +744,27 @@ object LibraryRepository {
         )
         localState.runIfCurrent(localSnapshot) {
             _uiState.value = newUiState
+        }
+    }
+
+    private fun publishAniList(token: LibraryProfileToken) {
+        val aniListProvider = TrackingProviderRegistry.libraryProvider(TrackingProviderId.ANILIST)
+            ?.takeIf { TrackingProviderRegistry.isAuthenticated(TrackingProviderId.ANILIST) }
+        val newAniListState = if (aniListProvider != null) {
+            val providerSnapshot = aniListProvider.snapshot()
+            LibraryUiState(
+                sourceMode = LibrarySourceMode.ANILIST,
+                items = providerSnapshot.items,
+                sections = providerSnapshot.sections,
+                isLoaded = providerSnapshot.hasLoaded,
+                isLoading = providerSnapshot.isLoading,
+                errorMessage = providerSnapshot.errorMessage,
+            )
+        } else {
+            LibraryUiState(sourceMode = LibrarySourceMode.ANILIST)
+        }
+        localState.runIfTokenCurrent(token) {
+            _aniListUiState.value = newAniListState
         }
     }
 

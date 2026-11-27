@@ -65,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -123,7 +124,10 @@ import com.nuvio.app.features.home.components.PosterGridSkeletonRow
 import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.servers.ServerRepository
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.isDesktop
@@ -140,7 +144,7 @@ fun LibraryScreen(
     scrollToTopRequests: Flow<Unit> = emptyFlow(),
     onPosterClick: ((LibraryItem) -> Unit)? = null,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)? = null,
-    onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
+    onSectionViewAllClick: ((LibrarySection, LibrarySortOption, LibrarySourceMode) -> Unit)? = null,
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     onConnectCloudClick: (() -> Unit)? = null,
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
@@ -153,6 +157,12 @@ fun LibraryScreen(
         LibraryRepository.ensureLoaded()
         LibraryRepository.uiState
     }.collectAsStateWithLifecycle()
+    val aniListUiState by LibraryRepository.aniListUiState.collectAsStateWithLifecycle()
+    val trackingSettings by remember {
+        TrackingSettingsRepository.ensureLoaded()
+        TrackingSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val connectedProviderIds by TrackingProviderRegistry.connectedProviderIds.collectAsStateWithLifecycle()
     val libraryPosterPattern by remember {
         CustomPosterUrlRepository.ensureLoaded()
         CustomPosterUrlRepository.pattern
@@ -206,27 +216,51 @@ fun LibraryScreen(
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
+    var selectedDualLibraryTabName by rememberSaveable { mutableStateOf(DualLibraryTab.PRIMARY.name) }
+    val selectedDualLibraryTab = remember(selectedDualLibraryTabName) {
+        runCatching { DualLibraryTab.valueOf(selectedDualLibraryTabName) }
+            .getOrDefault(DualLibraryTab.PRIMARY)
+    }
+    val showDualAniListSwitcher = isDualAniListLibrarySwitcherVisible(
+        viewModeIsSaved = sourceMode == LibraryViewMode.Saved,
+        useAniListForAnime = trackingSettings.useAniListForAnime,
+        isAniListAuthenticated = TrackingProviderId.ANILIST in connectedProviderIds,
+        primaryLibrarySourceMode = uiState.sourceMode,
+    )
+    val effectiveDualLibraryTab = resolveEffectiveDualLibraryTab(
+        selected = selectedDualLibraryTab,
+        switcherVisible = showDualAniListSwitcher,
+    )
+    val showingAniList = effectiveDualLibraryTab == DualLibraryTab.ANILIST
+    val displayedUiState = if (showingAniList) aniListUiState else uiState
+
+    LaunchedEffect(showingAniList, aniListUiState.isLoaded, aniListUiState.isLoading) {
+        if (showingAniList && !aniListUiState.isLoaded && !aniListUiState.isLoading) {
+            LibraryRepository.pullAniListFromServer(ProfileRepository.activeProfileId)
+        }
+    }
+
     ScreenActivityEffect(listState) { screenActive ->
         if (!screenActive) listState.stopScroll()
     }
-    val isRemoteSource = uiState.sourceMode != LibrarySourceMode.LOCAL
+    val isRemoteSource = displayedUiState.sourceMode != LibrarySourceMode.LOCAL
     val effectiveSortOption = effectiveLibrarySortOption(
         selected = displaySettings.sortOption,
-        sourceMode = uiState.sourceMode,
+        sourceMode = displayedUiState.sourceMode,
     )
     val orderListKeys = if (sourceMode != LibraryViewMode.Saved) emptyList() else {
-        if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) uiState.sections.map { it.type }
-        else listOfNotNull(uiState.sections.firstOrNull { it.type == displaySettings.selectedSectionKey }?.type
-            ?: uiState.sections.firstOrNull()?.type)
+        if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) displayedUiState.sections.map { it.type }
+        else listOfNotNull(displayedUiState.sections.firstOrNull { it.type == displaySettings.selectedSectionKey }?.type
+            ?: displayedUiState.sections.firstOrNull()?.type)
     }
-    val providerOrders = rememberLibraryProviderOrders(uiState.sourceMode, orderListKeys, effectiveSortOption)
+    val providerOrders = rememberLibraryProviderOrders(displayedUiState.sourceMode, orderListKeys, effectiveSortOption)
     val visibleSortOption = if (providerOrders.failed) LibrarySortOption.DEFAULT else effectiveSortOption
-    val sortedSections = remember(uiState.sections, displaySettings, uiState.sourceMode, sourceMode, providerOrders) {
+    val sortedSections = remember(displayedUiState.sections, displaySettings, displayedUiState.sourceMode, sourceMode, providerOrders) {
         if (sourceMode == LibraryViewMode.Saved && displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
             sortLibrarySections(
-                sections = uiState.sections,
+                sections = displayedUiState.sections,
                 selected = visibleSortOption,
-                sourceMode = uiState.sourceMode,
+                sourceMode = displayedUiState.sourceMode,
                 providerOrders = providerOrders.ranks,
             )
         } else {
@@ -234,8 +268,8 @@ fun LibraryScreen(
         }
     }
     val verticalProjection = remember(
-        uiState.sections,
-        uiState.sourceMode,
+        displayedUiState.sections,
+        displayedUiState.sourceMode,
         libraryGenre,
         libraryYear,
         libraryWatchedFilter,
@@ -247,8 +281,8 @@ fun LibraryScreen(
     ) {
         if (sourceMode == LibraryViewMode.Saved && displaySettings.layoutMode == LibraryLayoutMode.VERTICAL) {
             buildLibraryVerticalProjection(
-                sections = uiState.sections,
-                sourceMode = uiState.sourceMode,
+                sections = displayedUiState.sections,
+                sourceMode = displayedUiState.sourceMode,
                 selectedSectionKey = displaySettings.selectedSectionKey,
                 selectedType = displaySettings.selectedType,
                 sortOption = visibleSortOption,
@@ -277,14 +311,21 @@ fun LibraryScreen(
     val retryLibraryLoad: () -> Unit = {
         NetworkStatusRepository.requestRefresh(force = true)
         coroutineScope.launch {
-            LibraryRepository.pullFromServer(
-                profileId = ProfileRepository.activeProfileId,
-                refreshIntent = TrackingRefreshIntent.USER_INITIATED,
-            )
+            if (showingAniList) {
+                LibraryRepository.pullAniListFromServer(
+                    profileId = ProfileRepository.activeProfileId,
+                    refreshIntent = TrackingRefreshIntent.USER_INITIATED,
+                )
+            } else {
+                LibraryRepository.pullFromServer(
+                    profileId = ProfileRepository.activeProfileId,
+                    refreshIntent = TrackingRefreshIntent.USER_INITIATED,
+                )
+            }
         }
     }
 
-    ScreenActivityEffect(networkStatusUiState.condition, isRemoteSource) { screenActive ->
+    ScreenActivityEffect(networkStatusUiState.condition, isRemoteSource, showingAniList) { screenActive ->
         if (!screenActive) return@ScreenActivityEffect
         when (networkStatusUiState.condition) {
             NetworkCondition.NoInternet,
@@ -298,7 +339,11 @@ fun LibraryScreen(
                 observedOfflineState = false
                 if (isRemoteSource) {
                     coroutineScope.launch {
-                        LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
+                        if (showingAniList) {
+                            LibraryRepository.pullAniListFromServer(ProfileRepository.activeProfileId)
+                        } else {
+                            LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
+                        }
                     }
                 }
             }
@@ -331,11 +376,11 @@ fun LibraryScreen(
     val librarySectionsDisplay = if (
         sourceMode == LibraryViewMode.Saved &&
         displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL &&
-        uiState.isLoaded &&
+        displayedUiState.isLoaded &&
         sortedSections.isNotEmpty()
     ) {
         disintegration.sync(
-            sourceMode = uiState.sourceMode,
+            sourceMode = displayedUiState.sourceMode,
             sections = sortedSections,
             previewLimit = LIBRARY_SECTION_PREVIEW_LIMIT,
             request = disintegrationRequest,
@@ -364,7 +409,7 @@ fun LibraryScreen(
         val activeTitle = if (sourceMode != LibraryViewMode.Saved) {
             stringResource(Res.string.library_title)
         } else {
-            when (uiState.sourceMode) {
+            when (displayedUiState.sourceMode) {
                 LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
                 LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
                 LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
@@ -372,9 +417,16 @@ fun LibraryScreen(
                 LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_title)
             }
         }
+        val primaryTrackerLabel = when (uiState.sourceMode) {
+            LibrarySourceMode.LOCAL -> stringResource(Res.string.app_brand_name)
+            LibrarySourceMode.TRAKT -> stringResource(Res.string.trakt_library_source_trakt)
+            LibrarySourceMode.SIMKL -> stringResource(Res.string.tracking_source_simkl)
+            LibrarySourceMode.MDBLIST -> stringResource(Res.string.tracking_source_mdblist)
+            LibrarySourceMode.ANILIST -> stringResource(Res.string.tracking_source_anilist)
+        }
         val activeItemCount = when (sourceMode) {
             LibraryViewMode.Saved -> when (displaySettings.layoutMode) {
-                LibraryLayoutMode.HORIZONTAL -> uiState.sections.sumOf { it.items.size }
+                LibraryLayoutMode.HORIZONTAL -> displayedUiState.sections.sumOf { it.items.size }
                 LibraryLayoutMode.VERTICAL -> verticalProjection.entries.size
             }
             LibraryViewMode.Cloud -> cloudUiState.items.size
@@ -410,6 +462,11 @@ fun LibraryScreen(
                                 itemCount = activeItemCount,
                                 sourceMode = sourceMode,
                                 showServers = hasServers,
+                                showListManagement = !showingAniList,
+                                showDualAniListSwitcher = showDualAniListSwitcher,
+                                primaryTrackerLabel = primaryTrackerLabel,
+                                selectedDualLibraryTab = effectiveDualLibraryTab,
+                                onDualLibraryTabSelected = { tab -> selectedDualLibraryTabName = tab.name },
                                 layoutMode = displaySettings.layoutMode,
                                 inlineSourceSwitch = useInlineDesktopToolbar,
                                 topPadding = topChromePadding,
@@ -428,7 +485,9 @@ fun LibraryScreen(
                                 topPadding = topChromePadding,
                                 actions = {
                                     if (sourceMode == LibraryViewMode.Saved) {
-                                        LibraryListManagementButton()
+                                        if (!showingAniList) {
+                                            LibraryListManagementButton()
+                                        }
                                         val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
                                             LibraryLayoutMode.VERTICAL
                                         } else {
@@ -475,6 +534,15 @@ fun LibraryScreen(
                                     .fillMaxWidth()
                                     .padding(horizontal = pageHorizontalPadding),
                             )
+                            if (showDualAniListSwitcher && sourceMode == LibraryViewMode.Saved) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                LibraryDualTrackerSwitch(
+                                    primaryLabel = primaryTrackerLabel,
+                                    selectedTab = effectiveDualLibraryTab,
+                                    onTabSelected = { tab -> selectedDualLibraryTabName = tab.name },
+                                    modifier = Modifier.padding(horizontal = pageHorizontalPadding),
+                                )
+                            }
                             Spacer(modifier = Modifier.height(6.dp))
                         }
                         if (isDesktop) {
@@ -532,7 +600,7 @@ fun LibraryScreen(
                 )
             } else {
                 when {
-                    !uiState.isLoaded || (uiState.isLoading && uiState.sections.isEmpty()) -> {
+                    !displayedUiState.isLoaded || (displayedUiState.isLoading && displayedUiState.sections.isEmpty()) -> {
                         if (displaySettings.layoutMode == LibraryLayoutMode.VERTICAL) {
                             libraryVerticalGridSkeletonItems(
                                 columns = gridColumns,
@@ -547,7 +615,7 @@ fun LibraryScreen(
                         }
                     }
 
-                    !uiState.errorMessage.isNullOrBlank() && uiState.sections.isEmpty() -> {
+                    !displayedUiState.errorMessage.isNullOrBlank() && displayedUiState.sections.isEmpty() -> {
                         item {
                             if (networkStatusUiState.isOfflineLike) {
                                 NuvioNetworkOfflineCard(
@@ -558,14 +626,14 @@ fun LibraryScreen(
                             } else {
                                 CloudLibraryEmptyStateCard(
                                     horizontalPadding = pageHorizontalPadding,
-                                    title = when (uiState.sourceMode) {
+                                    title = when (displayedUiState.sourceMode) {
                                         LibrarySourceMode.LOCAL -> stringResource(Res.string.library_load_failed)
                                         LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_load_failed)
                                         LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_load_failed)
                                         LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_load_failed)
                                         LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_load_failed)
                                     },
-                                    message = uiState.errorMessage.orEmpty(),
+                                    message = displayedUiState.errorMessage.orEmpty(),
                                     actionLabel = stringResource(Res.string.action_retry),
                                     onActionClick = retryLibraryLoad,
                                 )
@@ -573,18 +641,18 @@ fun LibraryScreen(
                         }
                     }
 
-                    uiState.sections.isEmpty() -> {
+                    displayedUiState.sections.isEmpty() -> {
                         item {
                             CloudLibraryEmptyStateCard(
                                 horizontalPadding = pageHorizontalPadding,
-                                title = when (uiState.sourceMode) {
+                                title = when (displayedUiState.sourceMode) {
                                     LibrarySourceMode.LOCAL -> stringResource(Res.string.library_empty_title)
                                     LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_empty_title)
                                     LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_empty_title)
                                     LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_empty_title)
                                     LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_empty_title)
                                 },
-                                message = when (uiState.sourceMode) {
+                                message = when (displayedUiState.sourceMode) {
                                     LibrarySourceMode.LOCAL -> stringResource(Res.string.library_empty_message)
                                     LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_empty_message)
                                     LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_empty_message)
@@ -599,12 +667,12 @@ fun LibraryScreen(
 
                     else -> {
                         item(
-                            key = "library-saved-controls:${uiState.sourceMode}:" +
+                            key = "library-saved-controls:${displayedUiState.sourceMode}:" +
                                 "${displaySettings.layoutMode}:$effectiveSortOption",
                         ) {
                             LibrarySavedControls(
                                 layoutMode = displaySettings.layoutMode,
-                                sourceMode = uiState.sourceMode,
+                                sourceMode = displayedUiState.sourceMode,
                                 sortOption = effectiveSortOption,
                                 verticalProjection = verticalProjection,
                                 watchedFilter = libraryWatchedFilter,
@@ -620,6 +688,7 @@ fun LibraryScreen(
                         }
                         when (displaySettings.layoutMode) {
                             LibraryLayoutMode.HORIZONTAL -> librarySections(
+                                sourceMode = displayedUiState.sourceMode,
                                 displaySections = librarySectionsDisplay,
                                 watchedKeys = watchedUiState.watchedKeys,
                                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
@@ -655,6 +724,11 @@ private fun DesktopLibraryToolbar(
     itemCount: Int,
     sourceMode: LibraryViewMode,
     showServers: Boolean,
+    showListManagement: Boolean,
+    showDualAniListSwitcher: Boolean,
+    primaryTrackerLabel: String,
+    selectedDualLibraryTab: DualLibraryTab,
+    onDualLibraryTabSelected: (DualLibraryTab) -> Unit,
     layoutMode: LibraryLayoutMode,
     inlineSourceSwitch: Boolean,
     topPadding: Dp?,
@@ -711,7 +785,16 @@ private fun DesktopLibraryToolbar(
                         )
                     }
                 }
+                if (inlineSourceSwitch && showDualAniListSwitcher) {
+                    LibraryDualTrackerSwitch(
+                        primaryLabel = primaryTrackerLabel,
+                        selectedTab = selectedDualLibraryTab,
+                        onTabSelected = onDualLibraryTabSelected,
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.width(NuvioTokens.Space.s8))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
@@ -726,7 +809,9 @@ private fun DesktopLibraryToolbar(
                     Spacer(modifier = Modifier.width(NuvioTokens.Space.s4))
                 }
                 if (sourceMode == LibraryViewMode.Saved) {
-                    LibraryListManagementButton()
+                    if (showListManagement) {
+                        LibraryListManagementButton()
+                    }
                     val targetLayout = if (layoutMode == LibraryLayoutMode.HORIZONTAL) {
                         LibraryLayoutMode.VERTICAL
                     } else {
@@ -787,12 +872,26 @@ private fun DesktopLibraryToolbar(
         }
 
         if (!inlineSourceSwitch) {
-            LibrarySourceSwitch(
-                selectedMode = sourceMode,
-                showServers = showServers,
-                onModeSelected = onModeSelected,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LibrarySourceSwitch(
+                    selectedMode = sourceMode,
+                    showServers = showServers,
+                    onModeSelected = onModeSelected,
+                )
+                if (showDualAniListSwitcher) {
+                    LibraryDualTrackerSwitch(
+                        primaryLabel = primaryTrackerLabel,
+                        selectedTab = selectedDualLibraryTab,
+                        onTabSelected = onDualLibraryTabSelected,
+                    )
+                }
+            }
         }
     }
 }
@@ -1134,6 +1233,110 @@ private fun LibrarySourceSwitch(
                 onClick = { onModeSelected(LibraryViewMode.Servers) },
             )
         }
+    }
+}
+
+@Composable
+private fun LibraryDualTrackerSwitch(
+    primaryLabel: String,
+    selectedTab: DualLibraryTab,
+    onTabSelected: (DualLibraryTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    val containerShape = RoundedCornerShape(NuvioTokens.Radius.full)
+    Surface(
+        modifier = modifier,
+        shape = containerShape,
+        color = tokens.colors.surfaceElevated,
+        border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
+    ) {
+        Row(
+            modifier = Modifier.padding(NuvioTokens.Space.s2),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LibraryDualTrackerSegment(
+                label = primaryLabel,
+                selected = selectedTab == DualLibraryTab.PRIMARY,
+                onClick = { onTabSelected(DualLibraryTab.PRIMARY) },
+            )
+            LibraryDualTrackerSegment(
+                label = stringResource(Res.string.tracking_source_anilist),
+                selected = selectedTab == DualLibraryTab.ANILIST,
+                onClick = { onTabSelected(DualLibraryTab.ANILIST) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LibraryDualTrackerSegment(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val pillShape = RoundedCornerShape(NuvioTokens.Radius.full)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.focusBackground
+            isDesktop && isHovered -> tokens.colors.surfaceCard
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "dual_library_segment_bg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            selected -> tokens.colors.accent
+            isDesktop && isHovered -> tokens.colors.borderStrong
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
+        label = "dual_library_segment_border",
+    )
+
+    Box(
+        modifier = Modifier
+            .nuvioFocusBorder(pillShape)
+            .clip(pillShape)
+            .background(containerColor)
+            .border(NuvioTokens.Border.thin, borderColor, pillShape)
+            .semantics { this.selected = selected }
+            .then(
+                if (isDesktop) {
+                    Modifier
+                        .hoverable(interactionSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s6),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            ),
+            color = if (selected || (isDesktop && isHovered)) {
+                tokens.colors.textPrimary
+            } else {
+                tokens.colors.textSecondary
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -1741,6 +1944,28 @@ private enum class LibraryViewMode {
     Servers,
 }
 
+internal enum class DualLibraryTab {
+    PRIMARY,
+    ANILIST,
+}
+
+internal fun isDualAniListLibrarySwitcherVisible(
+    viewModeIsSaved: Boolean,
+    useAniListForAnime: Boolean,
+    isAniListAuthenticated: Boolean,
+    primaryLibrarySourceMode: LibrarySourceMode,
+): Boolean =
+    viewModeIsSaved &&
+        useAniListForAnime &&
+        isAniListAuthenticated &&
+        primaryLibrarySourceMode != LibrarySourceMode.ANILIST
+
+internal fun resolveEffectiveDualLibraryTab(
+    selected: DualLibraryTab,
+    switcherVisible: Boolean,
+): DualLibraryTab =
+    if (switcherVisible) selected else DualLibraryTab.PRIMARY
+
 private fun LazyListScope.libraryVerticalGridItems(
     projection: LibraryVerticalProjection,
     columns: Int,
@@ -1806,6 +2031,7 @@ private fun LazyListScope.libraryVerticalGridSkeletonItems(
 }
 
 private fun LazyListScope.librarySections(
+    sourceMode: LibrarySourceMode,
     displaySections: List<LibraryDisplaySection>,
     watchedKeys: Set<String>,
     fullyWatchedSeriesKeys: Set<String>,
@@ -1813,13 +2039,13 @@ private fun LazyListScope.librarySections(
     posterPattern: String,
     horizontalPadding: Dp,
     onPosterClick: ((LibraryItem) -> Unit)?,
-    onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)?,
+    onSectionViewAllClick: ((LibrarySection, LibrarySortOption, LibrarySourceMode) -> Unit)?,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)?,
     onDisintegrated: (String) -> Unit,
 ) {
     items(
         items = displaySections,
-        key = { section -> "library-horizontal:${section.type}" },
+        key = { section -> "library-horizontal:${sourceMode.name}:${section.type}" },
     ) { section ->
         NuvioShelfSection(
             title = localizedLibrarySectionTitle(section.type, section.displayTitle),
@@ -1829,7 +2055,7 @@ private fun LazyListScope.librarySections(
             rowContentPadding = PaddingValues(horizontal = horizontalPadding),
             onViewAllClick = section.source
                 ?.takeIf { it.items.size > LIBRARY_SECTION_PREVIEW_LIMIT }
-                ?.let { source -> onSectionViewAllClick?.let { { it(source, sortOption) } } },
+                ?.let { source -> onSectionViewAllClick?.let { { it(source, sortOption, sourceMode) } } },
             viewAllPillSize = NuvioViewAllPillSize.Compact,
             key = { entry -> entry.globalKey },
             animatePlacement = true,

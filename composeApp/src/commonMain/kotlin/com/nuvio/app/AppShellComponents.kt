@@ -112,6 +112,7 @@ import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySortOption
+import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.player.PlayerBackReleaseGuard
 import com.nuvio.app.features.player.PlayerBackRequest
 import com.nuvio.app.features.profiles.ActiveProfileMiniAvatar
@@ -222,7 +223,7 @@ internal data class AppTabActions(
     val onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     val onLibraryPosterClick: ((LibraryItem) -> Unit)? = null,
     val onLibraryPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)? = null,
-    val onLibrarySectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
+    val onLibrarySectionViewAllClick: ((LibrarySection, LibrarySortOption, LibrarySourceMode) -> Unit)? = null,
     val onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     val onConnectCloudClick: (() -> Unit)? = null,
     val onDownloadsClick: () -> Unit = {},

@@ -6,6 +6,7 @@ import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.collection.TmdbCollectionSourceResolver
 import com.nuvio.app.features.collection.catalogRouteKey
 import com.nuvio.app.features.library.LibraryRepository
+import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.servers.ServerCatalog
 import com.nuvio.app.features.servers.serverMessage
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
@@ -100,8 +101,18 @@ object CatalogRepository {
             try {
                 val target = request.target as CatalogTarget.Library
                 LibraryRepository.ensureLoaded()
-                LibraryRepository.uiState.libraryCatalogStates(
-                    target, LibraryRepository.uiState.libraryCatalogOrders(target),
+                val libraryFlow = if (
+                    shouldUseAniListLibraryFlow(
+                        targetSourceMode = target.sourceMode,
+                        primarySourceMode = LibraryRepository.uiState.value.sourceMode,
+                    )
+                ) {
+                    LibraryRepository.aniListUiState
+                } else {
+                    LibraryRepository.uiState
+                }
+                libraryFlow.libraryCatalogStates(
+                    target, libraryFlow.libraryCatalogOrders(target),
                 ).collect { state ->
                     if (activeRequest != request) return@collect
                     CustomPosterUrlRepository.ensureLoaded()
@@ -243,3 +254,10 @@ private data class CatalogRequest(
     val target: CatalogTarget,
     val hideUnreleasedContent: Boolean,
 )
+
+internal fun shouldUseAniListLibraryFlow(
+    targetSourceMode: LibrarySourceMode?,
+    primarySourceMode: LibrarySourceMode,
+): Boolean =
+    targetSourceMode == LibrarySourceMode.ANILIST &&
+        primarySourceMode != LibrarySourceMode.ANILIST

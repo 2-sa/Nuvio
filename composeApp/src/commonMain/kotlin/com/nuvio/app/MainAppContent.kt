@@ -1186,26 +1186,32 @@ internal fun MainAppContent(
             )
         }
 
-        val librarySectionSubtitle = when (librarySourceMode) {
-            LibrarySourceMode.LOCAL -> stringResource(Res.string.compose_catalog_subtitle_library)
-            LibrarySourceMode.TRAKT -> stringResource(Res.string.compose_catalog_subtitle_trakt_library)
-            LibrarySourceMode.SIMKL -> stringResource(Res.string.compose_catalog_subtitle_simkl_library)
-            LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_title)
-            LibrarySourceMode.ANILIST -> stringResource(Res.string.compose_catalog_subtitle_anilist_library)
-        }
+        val localLibrarySubtitle = stringResource(Res.string.compose_catalog_subtitle_library)
+        val traktLibrarySubtitle = stringResource(Res.string.compose_catalog_subtitle_trakt_library)
+        val simklLibrarySubtitle = stringResource(Res.string.compose_catalog_subtitle_simkl_library)
+        val mdbListLibrarySubtitle = stringResource(Res.string.library_mdblist_title)
+        val aniListLibrarySubtitle = stringResource(Res.string.compose_catalog_subtitle_anilist_library)
 
         val resolveLibrarySectionTitle = rememberLibrarySectionTitleResolver()
 
-        val onLibrarySectionViewAllClick: (LibrarySection, LibrarySortOption) -> Unit = { section, sortOption ->
+        val onLibrarySectionViewAllClick: (LibrarySection, LibrarySortOption, LibrarySourceMode) -> Unit = { section, sortOption, clickedSourceMode ->
             val sectionTitle = resolveLibrarySectionTitle(section.type, section.displayTitle)
+            val sectionSubtitle = when (clickedSourceMode) {
+                LibrarySourceMode.LOCAL -> localLibrarySubtitle
+                LibrarySourceMode.TRAKT -> traktLibrarySubtitle
+                LibrarySourceMode.SIMKL -> simklLibrarySubtitle
+                LibrarySourceMode.MDBLIST -> mdbListLibrarySubtitle
+                LibrarySourceMode.ANILIST -> aniListLibrarySubtitle
+            }
             val launchId = CatalogLaunchStore.put(
                 CatalogLaunch(
                     title = sectionTitle,
-                    subtitle = librarySectionSubtitle,
+                    subtitle = sectionSubtitle,
                     target = CatalogTarget.Library(
                         contentType = section.items.firstOrNull()?.type ?: "movie",
                         sectionType = section.type,
                         sortOption = sortOption,
+                        sourceMode = clickedSourceMode,
                     ),
                 ),
             )
@@ -1213,7 +1219,7 @@ internal fun MainAppContent(
                 CatalogRoute(
                     launchId = launchId,
                     title = sectionTitle,
-                    subtitle = librarySectionSubtitle,
+                    subtitle = sectionSubtitle,
                 ),
             )
         }
